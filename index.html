@@ -113,6 +113,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
   <div class="fld"><label class="flbl">Persona de Atención</label><input class="fin" id="f-att" placeholder="Ej: Sandra Beatriz Morales"></div>
   <div class="fld"><label class="flbl">Correo electrónico (opcional)</label><input class="fin" id="f-mail" type="email" placeholder="correo@ejemplo.com"></div>
+  <div class="fld"><label class="flbl">Teléfono / WhatsApp *</label><input class="fin" id="f-tel" type="tel" placeholder="Ej: 310 555 1234"></div>
   <div class="fld"><label class="flbl">Dirección de entrega (opcional)</label><input class="fin" id="f-dir" placeholder="Ej: Cra 7 #45-12, Oficina 301"></div>
   <div class="fld"><label class="flbl">Fecha y momento de entrega (opcional)</label>
     <div class="fld" style="margin-bottom:8px"><input class="fin" id="f-date" type="date"></div>
@@ -344,8 +345,9 @@ function getMomentos(){const cbs=document.querySelectorAll('#f-moments input[typ
 function getDelivStr(){const d=$("f-date").value,moms=getMomentos();if(!d&&!moms.length)return"";const parts=d?d.split("-"):null;let ds="";if(parts){const ms=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];ds=parseInt(parts[2])+" de "+ms[parseInt(parts[1])-1]+" de "+parts[0]}const momStr=moms.join(", ");if(ds&&momStr)return ds+" — "+momStr;return ds||momStr}
 
 function renderR(){
-const cl=$("f-cli").value||"—",idStr=getIdStr(),att=$("f-att").value||cl,mail=$("f-mail").value,dir=$("f-dir").value,city=getCityName()||"—",deliv=getDelivStr();
+const cl=$("f-cli").value||"—",idStr=getIdStr(),att=$("f-att").value||cl,mail=$("f-mail").value,tel=$("f-tel").value,dir=$("f-dir").value,city=getCityName()||"—",deliv=getDelivStr();
 let info='<strong>Cliente:</strong> '+cl+(idStr?' — '+idStr:'')+'<br><strong>Atención:</strong> '+att+'<br>';
+if(tel)info+='<strong>Teléfono:</strong> '+tel+'<br>';
 if(mail)info+='<strong>Correo:</strong> '+mail+'<br>';
 if(dir)info+='<strong>Dirección:</strong> '+dir+'<br>';
 info+='<strong>Ciudad:</strong> '+city+'<br>';
@@ -363,7 +365,7 @@ $("rev-content").innerHTML='<table class="rtbl"><thead><tr><th style="text-align
 function genPDF(){
 try{
 const{jsPDF}=window.jspdf;const doc=new jsPDF("p","mm","letter");const W=215.9,H=279.4,mg=16;
-const cl=$("f-cli").value||"—",idStr=getIdStr(),att=$("f-att").value||cl,mail=$("f-mail").value,dir=$("f-dir").value,city=getCityName()||"—",deliv=getDelivStr();
+const cl=$("f-cli").value||"—",idStr=getIdStr(),att=$("f-att").value||cl,mail=$("f-mail").value,tel=$("f-tel").value,dir=$("f-dir").value,city=getCityName()||"—",deliv=getDelivStr();
 const tr=getTr(),all=allIt(),tot=getTotal();
 if(!all.length){alert("Agrega productos antes de generar el PDF");return}
 
@@ -378,6 +380,7 @@ doc.text("COTIZACIÓN GOURMETBITES BY ANDRADE MATUK - "+dateStr(),W/2,y,{align:"
 y+=6;doc.setFontSize(8.5);
 let cliLine="Cliente: "+cl;if(idStr)cliLine+=" - "+idStr;cliLine+="     Atención: "+att;
 doc.text(cliLine,W/2,y,{align:"center"});
+if(tel){y+=4;doc.setFont("helvetica","normal");doc.text("Teléfono: "+tel,W/2,y,{align:"center"})}
 if(mail){y+=4;doc.setFont("helvetica","normal");doc.text("Correo: "+mail,W/2,y,{align:"center"})}
 if(dir){y+=4;doc.setFont("helvetica","normal");doc.text("Dirección: "+dir,W/2,y,{align:"center"})}
 y+=4;doc.setFont("helvetica","bold");doc.text("Ciudad de Entrega: "+city,W/2,y,{align:"center"});
