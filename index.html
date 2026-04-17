@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-17-v4-entrega2-condiciones -->
+<!-- VERSION: 2026-04-17-v4.1-menaje-nota -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -2001,7 +2001,7 @@ if(mCant>0||aCant>0){
 const usedMenaje=menajeItems.filter(m=>m.qty||m.price);
 if(usedMenaje.length){
   const mtd=[];
-  mtd.push([{content:"MENAJE Y SERVICIOS",colSpan:4,styles:{fillColor:[201,169,110],textColor:[255,255,255],fontStyle:"bold",fontSize:8.5,halign:"left"}}]);
+  mtd.push([{content:"MENAJE",colSpan:4,styles:{fillColor:[201,169,110],textColor:[255,255,255],fontStyle:"bold",fontSize:8.5,halign:"left"}}]);
   usedMenaje.forEach(m=>{
     mtd.push([m.name,String(m.qty||""),m.price?fm(parseInt(m.price)):"—",m.qty&&m.price?fm(parseInt(m.qty)*parseInt(m.price)):"—"]);
   });
@@ -2054,7 +2054,20 @@ doc.autoTable({startY:y,margin:{left:mg,right:mg,bottom:footerH},body:rtd,theme:
   bodyStyles:{fontSize:9,cellPadding:{top:4,bottom:4,left:8,right:8},textColor:[40,40,40]},
   styles:{cellPadding:{top:4,bottom:4,left:8,right:8}}
 });
-y=doc.lastAutoTable.finalY+6;
+y=doc.lastAutoTable.finalY+3;
+
+// Nota aclaratoria: el total corresponde solo a Opción A
+const hasMultipleOptions=propSections.some(sec=>sec.options.length>1);
+if(hasMultipleOptions){
+  doc.setFont("helvetica","italic");doc.setFontSize(8);doc.setTextColor(100,100,100);
+  const notaTotal="Nota: Este total corresponde a la selección de la Opción A en cada sección. El valor final variará según las opciones que usted escoja en cada sección.";
+  const notaWrap=doc.splitTextToSize(notaTotal,tw-4);
+  notaWrap.forEach(line=>{doc.text(line,mg+2,y);y+=3.5});
+  doc.setTextColor(26,26,26);
+  y+=3;
+}else{
+  y+=3;
+}
 
 // ─── TABLA DE REPOSICIÓN (only if there are menaje items) ───
 const repoItems=[];
