@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-17-v4.3-transporte-fix -->
+<!-- VERSION: 2026-04-17-v4.4-catering-cedula -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -1416,6 +1416,12 @@ function initCondiciones(){
   Object.keys(DEFAULT_CONDICIONES).forEach(k=>{
     if(!condicionesData[k])condicionesData[k]=DEFAULT_CONDICIONES[k];
   });
+  // Auto-migrate: fix old cedula in any stored condition text
+  Object.keys(condicionesData).forEach(k=>{
+    if(typeof condicionesData[k]==="string"&&condicionesData[k].includes("1.032.876.667")){
+      condicionesData[k]=condicionesData[k].replace(/1\.032\.876\.667/g,"1.032.876.662");
+    }
+  });
 }
 
 function renderCondiciones(){
@@ -2107,12 +2113,20 @@ if(usedMenaje.length){
 
 // ─── Compute totals for "TOTAL DEL SERVICIO" summary ───
 let totMenu=0;
-propSections.forEach(sec=>sec.options.forEach(opt=>{
-  // For propuesta comercial (multiple options), only count Opción A in summary
-  if(opt.label==="Opción A"||sec.options.length===1){
-    opt.items.forEach(it=>{totMenu+=(it.price||0)*(it.qty||0)});
-  }
-}));
+let totCatering=0;
+propSections.forEach(sec=>{
+  const isCateringSec=/servicio\s*de\s*catering|coordinaci[oó]n/i.test(sec.name||"");
+  sec.options.forEach(opt=>{
+    // For propuesta comercial (multiple options), only count Opción A in summary
+    if(opt.label==="Opción A"||sec.options.length===1){
+      opt.items.forEach(it=>{
+        const val=(it.price||0)*(it.qty||0);
+        if(isCateringSec)totCatering+=val;
+        else totMenu+=val;
+      });
+    }
+  });
+});
 let totMenajeVal=0;
 menajeItems.forEach(m=>{
   const q=parseFloat(m.qty)||0,p=parseFloat(m.price)||0;
@@ -2120,14 +2134,15 @@ menajeItems.forEach(m=>{
 });
 const totPersonal=persTotal;// from earlier calc
 const trP=getTrP();const totTransp=trP?trP.p:0;
-const totalServicio=totMenu+totMenajeVal+totPersonal+totTransp;
+const totalServicio=totMenu+totCatering+totMenajeVal+totPersonal+totTransp;
 
 // ─── RESUMEN "TOTAL DEL SERVICIO" ───
-const estR=estH(4)+14;
+const estR=estH(5)+14;
 if(y+estR>H-footerH){doc.addPage();y=20}
 const rtd=[];
 rtd.push([{content:"TOTAL DEL SERVICIO",colSpan:2,styles:{fillColor:[26,26,26],textColor:[255,255,255],fontStyle:"bold",fontSize:9.5,halign:"left"}}]);
 rtd.push(["Experiencia Gastronómica",fm(totMenu)]);
+if(totCatering>0)rtd.push(["Servicio de Catering",fm(totCatering)]);
 if(totMenajeVal>0)rtd.push(["Menaje",fm(totMenajeVal)]);
 if(totPersonal>0)rtd.push(["Personal de Servicio",fm(totPersonal)]);
 if(totTransp>0)rtd.push(["Transporte "+(trP?trP.n.replace("Transporte ",""):""),fm(totTransp)]);
