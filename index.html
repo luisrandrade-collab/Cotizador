@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-18-v4.6-ciclo-vida -->
+<!-- VERSION: 2026-04-18-v4.7-duplicar -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -284,6 +284,20 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .pf-opt-radio .pf-opt-label{font-weight:700;color:#E65100;font-size:13px;margin-bottom:4px}
 .pf-opt-radio .pf-opt-items{color:var(--mid);line-height:1.5}
 .pf-opt-radio .pf-opt-sub{font-weight:700;color:var(--gr);margin-top:4px;font-size:12px}
+/* Botón duplicar en tarjeta de historial */
+.dup-btn{background:none;border:none;color:var(--bl);font-size:17px;cursor:pointer;padding:4px 8px;margin-right:2px}
+.dup-btn:active{transform:scale(.9)}
+/* Modal duplicar: botones de decisión grandes */
+.dup-choice{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.dup-choice-btn{background:var(--wh);border:2px solid var(--lt);border-radius:12px;padding:18px 16px;cursor:pointer;font-family:'DM Sans',sans-serif;text-align:left;transition:all .15s}
+.dup-choice-btn:active{transform:scale(.98)}
+.dup-choice-btn.keep{border-color:var(--bl)}
+.dup-choice-btn.clean{border-color:var(--gd)}
+.dup-choice-btn .dc-title{font-size:15px;font-weight:700;color:var(--bk);display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.dup-choice-btn .dc-title .ic{font-size:20px}
+.dup-choice-btn.keep .dc-title .ic{color:var(--bl)}
+.dup-choice-btn.clean .dc-title .ic{color:var(--gd)}
+.dup-choice-btn .dc-desc{font-size:12px;color:var(--mid);line-height:1.5;padding-left:30px}
 /* Price edited indicator */
 .pprice-edited::after{content:" *";color:var(--gd)}
 .pinput{width:90px;padding:5px 8px;border:1.5px solid var(--lt);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;text-align:right;background:var(--wh)}
@@ -611,6 +625,29 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <div class="cscr" id="pk-cats"></div>
     </div>
     <div class="modal-list" id="pk-list"></div>
+  </div>
+</div>
+
+<!-- Modal: Duplicar cotización o propuesta -->
+<div id="dup-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeDuplicateModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="mtitle">📋 Duplicar <span id="dup-kind-label">documento</span></span>
+      <button class="mclose" onclick="closeDuplicateModal()">×</button>
+    </div>
+    <div class="mform">
+      <div class="mf-intro">Vas a crear una copia de <strong id="dup-num"></strong> de <strong id="dup-cli"></strong>. La copia arranca sin consecutivo (se asigna uno nuevo al guardar) y con todas las fechas en blanco. El estado del documento original no se copia — el duplicado arranca como <em>enviada</em>.</div>
+      <div class="dup-choice">
+        <button class="dup-choice-btn keep" onclick="duplicateQuote(true)">
+          <div class="dc-title"><span class="ic">👤</span>Mantener cliente</div>
+          <div class="dc-desc">Copia el cliente, contacto, dirección y ciudad de envío — útil cuando vas a cotizar algo nuevo para el mismo cliente.</div>
+        </button>
+        <button class="dup-choice-btn clean" onclick="duplicateQuote(false)">
+          <div class="dc-title"><span class="ic">🧹</span>Limpiar todo</div>
+          <div class="dc-desc">Arranca en blanco — útil cuando usas esta cotización como plantilla para otro cliente. Se conservan productos, precios, condiciones, personal y menaje.</div>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1557,7 +1594,7 @@ async function renderHist(){
       :'<div class="hc-total">'+fm(q.total||0)+'</div><div class="hc-items">'+((q.cart||[]).length+(q.cust||[]).length)+' productos</div>';
     return '<div class="hcard" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
       '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+'</div>'+
-      '<button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div>'+
+      '<div><button class="dup-btn" onclick="openDuplicateModal(\''+q.kind+'\',\''+q.id+'\',event)" title="Duplicar">📋</button><button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div></div>'+
       '<div class="hc-date">'+ds+'</div>'+
       summary+
       actions+
@@ -1680,6 +1717,158 @@ async function submitApproveProposal(){
     console.error(e);
   }
 }
+
+
+// ─── DUPLICAR (v4.7) ────────────────────────────────────────
+// Estado del modal de duplicación: guarda el documento fuente cargado desde Firestore.
+let dupSource=null;
+
+function openDuplicateModal(kind,id,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault()}
+  if(!cloudOnline){alert("Sin conexión. Necesitamos internet para leer el documento original.");return}
+  // Determinar colección real: una PF vive en propfinals/
+  let coll;
+  if(kind==="quote")coll="quotes";
+  else if(id&&id.startsWith("GB-PF-"))coll="propfinals";
+  else coll="proposals";
+  showLoader("Cargando para duplicar...");
+  const {db,doc,getDoc}=window.fb;
+  getDoc(doc(db,coll,id)).then(snap=>{
+    hideLoader();
+    if(!snap.exists()){alert("No se encontró el documento");return}
+    dupSource={kind:kind,id:id,coll:coll,data:snap.data()};
+    // Una PF se duplica como propuesta base (vuelven a quedar como propuesta con una sola opción).
+    const effKind=coll==="propfinals"?"proposal":kind;
+    $("dup-kind-label").textContent=effKind==="quote"?"cotización":"propuesta";
+    $("dup-num").textContent=snap.data().quoteNumber||id;
+    $("dup-cli").textContent=snap.data().client||"—";
+    $("dup-modal").classList.remove("hidden");
+  }).catch(e=>{
+    hideLoader();
+    alert("Error cargando documento: "+e.message);
+    console.error(e);
+  });
+}
+
+function closeDuplicateModal(){
+  $("dup-modal").classList.add("hidden");
+  dupSource=null;
+}
+
+// Duplica la cotización o propuesta cargada en dupSource.
+// preserveClient=true  → conserva nombre, contacto, dirección y ciudad
+// preserveClient=false → arranca con todos los campos de cliente vacíos
+function duplicateQuote(preserveClient){
+  if(!dupSource)return;
+  const src=dupSource.data;
+  const effKind=dupSource.coll==="propfinals"?"proposal":dupSource.kind;
+  closeDuplicateModal();
+  if(effKind==="quote"){
+    // Duplicar cotización simple
+    setMode("cot");
+    cart=[];cust=[];
+    // Copiar items del catálogo y custom
+    if(src.cart){
+      src.cart.forEach(ci=>{
+        const p=C.find(x=>x.id===ci.id);
+        if(p)cart.push({...p,p:ci.p,origP:ci.origP||p.p,qty:ci.qty,edited:!!ci.edited});
+        else cart.push({id:ci.id||Date.now()+Math.random(),n:ci.n,d:ci.d,u:ci.u,p:ci.p,origP:ci.origP||ci.p,qty:ci.qty,edited:!!ci.edited});
+      });
+    }
+    if(src.cust)cust=src.cust.map((ci,ix)=>({id:"x"+Date.now()+ix,...ci,custom:true}));
+    // Datos del cliente
+    if(preserveClient){
+      $("f-cli").value=src.client||"";
+      const parts=(src.idStr||"").split(" ");
+      $("f-idtype").value=parts[0]||"";
+      $("f-idnum").value=parts.slice(1).join(" ")||"";
+      $("f-att").value=src.att||"";
+      $("f-mail").value=src.mail||"";
+      $("f-tel").value=src.tel||"";
+      $("f-dir").value=src.dir||"";
+      // Ciudad / transporte
+      if(src.cityType){
+        $("f-city").value=src.cityType;
+        if(src.cityType==="Otra"){
+          $("f-city-custom").value=src.city||"";
+          $("f-tr-custom").value=src.trCustom||"";
+        }
+      }
+      updTr();
+    }else{
+      // Limpiar todo lo de cliente
+      ["f-cli","f-idnum","f-att","f-mail","f-tel","f-dir","f-city-custom","f-tr-custom"].forEach(id=>{if($(id))$(id).value=""});
+      $("f-idtype").value="";
+      $("f-city").value="";
+      updTr();
+    }
+    // Fechas siempre limpias
+    $("f-date").value="";
+    document.querySelectorAll('#f-moments input[type=checkbox]').forEach(c=>{c.checked=false;togMom(c)});
+    if($("f-time-other"))$("f-time-other").value="";
+    if($("f-time-other-wrap"))$("f-time-other-wrap").classList.add("hidden");
+    // Consecutivo nuevo: asigna null para que el próximo guardado genere uno
+    currentQuoteNumber=null;
+    go("info");
+    alert("📋 Duplicado listo. Revisa y guarda para asignar consecutivo.");
+    return;
+  }
+  // Duplicar propuesta (incluye PF convertida en propuesta base)
+  setMode("prop");
+  // Datos del cliente
+  if(preserveClient){
+    $("fp-cli").value=src.client||"";
+    const parts=(src.idStr||"").split(" ");
+    $("fp-idtype").value=parts[0]||"";
+    $("fp-idnum").value=parts.slice(1).join(" ")||"";
+    $("fp-att").value=src.att||"";
+    $("fp-mail").value=src.mail||"";
+    $("fp-tel").value=src.tel||"";
+    $("fp-dir").value=src.dir||"";
+    if(src.cityType){
+      $("fp-city").value=src.cityType;
+      if(src.cityType==="Otra"){
+        $("fp-city-custom").value=src.city||"";
+        $("fp-tr-custom").value=src.trCustom||"";
+      }
+    }
+    updTrP();
+  }else{
+    ["fp-cli","fp-idnum","fp-att","fp-mail","fp-tel","fp-dir","fp-city-custom","fp-tr-custom"].forEach(id=>{if($(id))$(id).value=""});
+    $("fp-idtype").value="";
+    $("fp-city").value="";
+    updTrP();
+  }
+  // Fechas y datos específicos del evento siempre limpios
+  $("fp-date").value="";
+  $("fp-pers").value="";
+  $("fp-momento").value="";
+  // Contenido de la propuesta: secciones, menaje, personal, condiciones
+  propSections=JSON.parse(JSON.stringify(src.sections||[]));
+  menajeItems=JSON.parse(JSON.stringify(src.menaje||[]));
+  personalData=JSON.parse(JSON.stringify(src.personalData||{meseros:{cantidad:"",valor4h:"",horasExtra:"",valorHoraExtra:""},auxiliares:{cantidad:"",valor4h:"",horasExtra:"",valorHoraExtra:""}}));
+  tipoServicio=src.tipoServicio||"";
+  condicionesData=JSON.parse(JSON.stringify(src.condicionesData||{}));
+  reposicionData=JSON.parse(JSON.stringify(src.reposicionData||{}));
+  firmaProp=src.firma||"jp";
+  aperturaFrase=src.aperturaFrase||aperturaFrase;
+  // Apertura la mantenemos; fecha de vencimiento se recalcula a partir de hoy
+  fechaVencimiento="";
+  setDefaultFechaVenc();
+  $("fp-apertura").value=aperturaFrase;
+  // Refrescar UI
+  setTipoServ(tipoServicio||null);
+  renderPropSections();
+  renderMenaje();
+  renderPersonal();
+  renderCondiciones();
+  renderReposicion();
+  setFirma("prop",firmaProp);
+  // Consecutivo nuevo
+  currentPropNumber=null;
+  alert("📋 Propuesta duplicada. Revisa fechas y datos del evento antes de guardar.");
+}
+
 
 
 // ─── CICLO DE VIDA: Propuesta Final ────────────────────────
