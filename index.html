@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-19-v4.12-modular-agenda-ics-comentarios -->
+<!-- VERSION: 2026-04-19-v4.12.1-drilldown-totalpropuesta -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -447,6 +447,22 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .entrega-foto-tipo{display:flex;gap:8px;margin-bottom:8px}
 .entrega-foto-tipo label{flex:1;display:flex;align-items:center;gap:6px;padding:8px;background:var(--cl);border:1.5px solid var(--lt);border-radius:8px;cursor:pointer;font-size:12px}
 .entrega-foto-tipo label input{accent-color:var(--gr);margin-right:4px}
+/* v4.12.1: modal de detalle del dashboard */
+.dd-summary{background:var(--bk);color:var(--gd);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;text-align:center}
+.dd-summary strong{color:var(--wh);font-size:16px;margin-left:4px}
+.dd-resumen{background:var(--cl);border-radius:8px;padding:8px 12px;margin-bottom:10px;border:1px solid var(--lt)}
+.dd-resumen-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--lt)}
+.dd-resumen-row:last-child{border-bottom:none}
+.dd-resumen-row strong{color:#1B5E20;font-variant-numeric:tabular-nums}
+.dd-row{background:var(--wh);border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;border-left:3px solid var(--gd);transition:transform .12s}
+.dd-row:active{transform:scale(.98)}
+.dd-row-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:3px}
+.dd-row-cli{font-weight:700;font-size:13px;color:var(--bk);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-row-monto{font-weight:800;color:#1B5E20;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dd-row-meta{font-size:10.5px;color:var(--mid);line-height:1.5}
+.dd-empty{text-align:center;padding:24px 12px;color:var(--soft);font-style:italic;font-size:13px}
+/* v4.12.1: hint en select de cliente para no confundir */
+.cli-sel select option[value=""]{color:var(--bl);font-weight:600}
 </style>
 </head>
 <body>
@@ -527,9 +543,9 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 <div class="sec" id="step-info">
   <div class="stit">Datos del Cliente</div>
   <div class="cli-sel">
-    <label class="flbl">Cargar cliente guardado</label>
+    <label class="flbl">📂 Click aquí para cargar un cliente antiguo</label>
     <select class="fsel" id="sel-cli" onchange="loadClient()">
-      <option value="">— Nuevo cliente —</option>
+      <option value="">— Cliente nuevo (escribe abajo) · click para elegir uno existente —</option>
     </select>
     <div style="font-size:10px;color:var(--mid);margin-top:6px">💡 El cliente se guarda automáticamente al generar el PDF</div>
     <div class="cli-actions">
@@ -637,9 +653,9 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 <div class="sec" id="prop-builder">
   <div class="stit" style="color:var(--bl)">🎪 Propuesta Evento</div>
   <div class="cli-sel" style="border-color:#90CAF9;background:var(--bll)">
-    <label class="flbl">Cargar cliente guardado</label>
+    <label class="flbl">📂 Click aquí para cargar un cliente antiguo</label>
     <select class="fsel" id="sel-cli-p" onchange="loadClientP()">
-      <option value="">— Nuevo cliente —</option>
+      <option value="">— Cliente nuevo (escribe abajo) · click para elegir uno existente —</option>
     </select>
   </div>
   <div class="fld"><label class="flbl">Cliente / Empresa *</label><input class="fin" id="fp-cli" placeholder="Ej: Tarkus Pharma Lab" oninput="onClientNameChangeProp()"></div>
@@ -1043,11 +1059,24 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=4.12"></script>
-<script src="app-core.js?v=4.12"></script>
-<script src="app-cotizar.js?v=4.12"></script>
-<script src="app-propuesta.js?v=4.12"></script>
-<script src="app-historial.js?v=4.12"></script>
-<script src="app-dashboard.js?v=4.12"></script>
+<!-- v4.12.1 Modal: Detalle de KPI del dashboard (drill-down) -->
+<div id="dash-detail-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeDashDetail()">
+  <div class="modal-box" style="max-height:90vh">
+    <div class="modal-head" style="background:linear-gradient(135deg,#1976D2,#0D47A1)">
+      <span class="mtitle" id="dd-title">Detalle</span>
+      <button class="mclose" onclick="closeDashDetail()">×</button>
+    </div>
+    <div class="mform">
+      <div id="dd-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app-assets.js?v=4.12.1"></script>
+<script src="app-core.js?v=4.12.1"></script>
+<script src="app-cotizar.js?v=4.12.1"></script>
+<script src="app-propuesta.js?v=4.12.1"></script>
+<script src="app-historial.js?v=4.12.1"></script>
+<script src="app-dashboard.js?v=4.12.1"></script>
 </body>
 </html>

@@ -1,9 +1,41 @@
 // ═══════════════════════════════════════════════════════════
-// app-propuesta.js · v4.12 · 2026-04-19
+// app-propuesta.js · v4.12.1 · 2026-04-19
 // Modo Propuesta: state, condiciones, notas, reposición,
 // personal, sections, picker, menaje, save/load propuesta,
 // PDF propuesta, propfinal flow.
+// v4.12.1: computePropTotal — total real (menú+catering+menaje+personal+transporte)
 // ═══════════════════════════════════════════════════════════
+
+// ─── COMPUTE TOTAL DE PROPUESTA (mismo cálculo que el PDF) ──
+// Reproduce la lógica de "TOTAL DEL SERVICIO" para que cualquier
+// vista (dashboard, historial) tenga el mismo número que el PDF.
+// Para propuestas con varias opciones, usa Opción A (igual que PDF).
+function computePropTotal(q){
+  if(!q)return 0;
+  let totMenu=0,totCatering=0;
+  (q.sections||[]).forEach(sec=>{
+    const isCateringSec=/servicio\s*de\s*catering|coordinaci[oó]n/i.test(sec.name||"");
+    (sec.options||[]).forEach(opt=>{
+      if(opt.label==="Opción A"||sec.options.length===1){
+        (opt.items||[]).forEach(it=>{
+          const val=(it.price||0)*(it.qty||0);
+          if(isCateringSec)totCatering+=val;else totMenu+=val;
+        });
+      }
+    });
+  });
+  let totMenajeVal=0;
+  (q.menaje||[]).forEach(m=>{const qty=parseFloat(m.qty)||0,p=parseFloat(m.price)||0;totMenajeVal+=qty*p});
+  const pd=q.personalData||{meseros:{},auxiliares:{}};
+  const pm=pd.meseros||{},pa=pd.auxiliares||{};
+  const mSub=(parseFloat(pm.cantidad)||0)*((parseFloat(pm.valor4h)||0)+(parseFloat(pm.horasExtra)||0)*(parseFloat(pm.valorHoraExtra)||0));
+  const aSub=(parseFloat(pa.cantidad)||0)*((parseFloat(pa.valor4h)||0)+(parseFloat(pa.horasExtra)||0)*(parseFloat(pa.valorHoraExtra)||0));
+  const totPersonal=mSub+aSub;
+  let totTransp=0;
+  if(q.cityType==="Otra")totTransp=parseInt(q.trCustom)||0;
+  else if(q.cityType&&TR[q.cityType])totTransp=TR[q.cityType].p;
+  return totMenu+totCatering+totMenajeVal+totPersonal+totTransp;
+}
 
 const PROP_SECTION_NAMES=["Entradas","Plato Fuerte","Acompañamientos","Postres","Bebidas","Logística"];
 let propSections=[];
@@ -352,6 +384,8 @@ async function savePropQuote(silent){
     if(prevProductionDate)pObj.productionDate=prevProductionDate;
     if(prevProduced!==null)pObj.produced=prevProduced;
     if(prevHoraEntrega)pObj.horaEntrega=prevHoraEntrega;
+    // v4.12.1: persistir el total real (mismo cálculo que el PDF) para que el dashboard sume bien
+    pObj.total=computePropTotal(pObj);
     if(!silent)showLoader("Guardando en la nube...");
     await saveProposalToCloud(pObj);
     currentPropNumber=pNum;
@@ -509,6 +543,8 @@ async function generarPropuestaFinal(){
       condicionesData:condicionesData,reposicionData:reposicionData,
       firma:firmaProp,status:"propfinal",sourceProposal:src.id
     };
+    // v4.12.1: persistir el total real para que el dashboard sume bien
+    pfObj.total=computePropTotal(pfObj);
     const {db,doc,setDoc,updateDoc,serverTimestamp}=window.fb;
     await setDoc(doc(db,"propfinals",pfNum),{...pfObj,createdAt:serverTimestamp()});
     await updateDoc(doc(db,"proposals",src.id),{status:"convertida",propFinalRef:pfNum,updatedAt:serverTimestamp()});
