@@ -1,9 +1,21 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v4.12 · 2026-04-19
+// app-dashboard.js · v4.12.1 · 2026-04-19
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
+// v4.12.1: cards clickeables (drill-down) + total real de propuestas.
 // Termina con BOOTSTRAP (renderCats, renderPinPad, sessionStorage check).
 // ═══════════════════════════════════════════════════════════
+
+// ─── HELPER: total real de cualquier doc ───────────────────
+// Para propuestas usa computePropTotal (replica el "TOTAL DEL SERVICIO" del PDF).
+// Para cotizaciones usa q.total (ya guardado correctamente).
+// Si el doc tiene q.total persistido, lo usa directo (fast path).
+function getDocTotal(q){
+  if(!q)return 0;
+  if(q.total)return q.total;
+  if(q.kind==="proposal"&&typeof computePropTotal==="function")return computePropTotal(q);
+  return q.totalReal||0;
+}
 
 // ─── DASHBOARD ─────────────────────────────────────────────
 let dashPeriod="month";
@@ -39,7 +51,7 @@ async function renderDashboard(){
   const recaudoMet={};METODOS_PAGO.forEach(m=>recaudoMet[m]=0);
   quotesCache.forEach(q=>{
     const status=q.status||"enviada";
-    const total=q.total||q.totalReal||0;
+    const total=getDocTotal(q);
     const fCre=dateOfCreation(q);
     const fVen=dateOfSale(q);
     const fEnt=q.fechaEntrega||q.eventDate;
@@ -50,12 +62,14 @@ async function renderDashboard(){
     getPagos(q).forEach(p=>{if(inRange(p.fecha)){const m=METODOS_PAGO.includes(p.metodo)?p.metodo:"Otro";recaudoMet[m]+=parseInt(p.monto)||0}});
   });
   const totalRecaudo=Object.values(recaudoMet).reduce((s,v)=>s+v,0);
+  // v4.12.1: cards clickeables → openDashDetail despliega lista
+  const _hint='<div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:var(--soft)">Toca para ver →</div>';
   $("dash-cards").innerHTML=
-    '<div class="dash-card cot"><div class="dash-card-icon">🧾</div><div class="dash-card-lab">Cotizado</div><div class="dash-card-val">'+fm(cotMonto)+'</div><div class="dash-card-sub">'+cotCount+' doc · '+cotClientes.size+' cliente'+(cotClientes.size!==1?'s':'')+'</div></div>'+
-    '<div class="dash-card vendido"><div class="dash-card-icon">🤝</div><div class="dash-card-lab">Vendido</div><div class="dash-card-val">'+fm(venMonto)+'</div><div class="dash-card-sub">'+venCount+' pedido'+(venCount!==1?'s':'')+' · '+venClientes.size+' cliente'+(venClientes.size!==1?'s':'')+'</div></div>'+
-    '<div class="dash-card entregado"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+'</div></div>'+
-    '<div class="dash-card recaudo"><div class="dash-card-icon">💵</div><div class="dash-card-lab">Recaudado</div><div class="dash-card-val">'+fm(totalRecaudo)+'</div><div class="dash-card-sub">en el período</div></div>'+
-    '<div class="dash-card cobrar"><div class="dash-card-icon">⚠️</div><div class="dash-card-lab">Por cobrar</div><div class="dash-card-val">'+fm(porCobrarTotal)+'</div><div class="dash-card-sub">'+porCobrarN+' documento'+(porCobrarN!==1?'s':'')+' (todos los activos)</div></div>';
+    '<div class="dash-card cot" style="cursor:pointer" onclick="openDashDetail(\'cotizado\')"><div class="dash-card-icon">🧾</div><div class="dash-card-lab">Cotizado</div><div class="dash-card-val">'+fm(cotMonto)+'</div><div class="dash-card-sub">'+cotCount+' doc · '+cotClientes.size+' cliente'+(cotClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
+    '<div class="dash-card vendido" style="cursor:pointer" onclick="openDashDetail(\'vendido\')"><div class="dash-card-icon">🤝</div><div class="dash-card-lab">Vendido</div><div class="dash-card-val">'+fm(venMonto)+'</div><div class="dash-card-sub">'+venCount+' pedido'+(venCount!==1?'s':'')+' · '+venClientes.size+' cliente'+(venClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
+    '<div class="dash-card entregado" style="cursor:pointer" onclick="openDashDetail(\'entregado\')"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+'</div>'+_hint+'</div>'+
+    '<div class="dash-card recaudo" style="cursor:pointer" onclick="openDashDetail(\'recaudo\')"><div class="dash-card-icon">💵</div><div class="dash-card-lab">Recaudado</div><div class="dash-card-val">'+fm(totalRecaudo)+'</div><div class="dash-card-sub">en el período</div>'+_hint+'</div>'+
+    '<div class="dash-card cobrar" style="cursor:pointer" onclick="openDashDetail(\'cobrar\')"><div class="dash-card-icon">⚠️</div><div class="dash-card-lab">Por cobrar</div><div class="dash-card-val">'+fm(porCobrarTotal)+'</div><div class="dash-card-sub">'+porCobrarN+' documento'+(porCobrarN!==1?'s':'')+' (todos los activos)</div>'+_hint+'</div>';
   const maxMet=Math.max(...Object.values(recaudoMet),1);
   const recRows=METODOS_PAGO.map(m=>{
     const v=recaudoMet[m];
@@ -90,7 +104,7 @@ async function renderDashboard(){
       const items=byDay[d].map(q=>{
         const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
         const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
-        const total=fm(q.total||q.totalReal||0);
+        const total=fm(getDocTotal(q));
         return '<div class="dash-up-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
       }).join("");
       return '<div class="dash-up-day"><div class="dash-up-day-label">'+dayLabel(d)+'</div>'+items+'</div>';
@@ -253,7 +267,7 @@ function renderWeek(){
       evsHtml='<div class="wd-evs">'+evs.map(q=>{
         const tag=q.kind==="quote"?'<span class="we-tag prod">Pedido</span>':'<span class="we-tag ent">Evento</span>';
         const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
-        const total=fm(q.total||q.totalReal||0);
+        const total=fm(getDocTotal(q));
         const sCls=q.status||"enviada";
         return '<div class="wd-ev '+sCls+'" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><span class="we-cli">'+tag+(q.client||"—")+'</span><span class="we-meta">'+hora+(hora&&total?' · ':'')+total+'</span></div>';
       }).join("")+'</div>';
@@ -368,7 +382,7 @@ function _buildVeventsForDoc(q){
   baseDesc.push("Cliente: "+(q.client||"—"));
   if(q.tel)baseDesc.push("Tel: "+q.tel);
   if(q.dir)baseDesc.push("Dirección: "+q.dir);
-  if(q.total)baseDesc.push("Total: "+fm(q.total||q.totalReal||0));
+  if(q.total)baseDesc.push("Total: "+fm(getDocTotal(q)));
   if(q.entregaData?.entregadoPor)baseDesc.push("Entrega por: "+q.entregaData.entregadoPor);
   baseDesc.push("Doc: "+(q.quoteNumber||q.id));
   const baseDescStr=baseDesc.join("\\n");
@@ -474,6 +488,99 @@ function exportAgendaIcs(){
   lines.push(..._icsFooter());
   _downloadIcs("gourmet-bites-agenda-"+dateToIso(today)+".ics",lines);
 }
+
+// ═══════════════════════════════════════════════════════════
+// v4.12.1: DRILL-DOWN — modal con detalle de cada KPI del dashboard
+// ═══════════════════════════════════════════════════════════
+function openDashDetail(tipo){
+  const range=getDashRange();
+  const inRange=fecha=>fecha&&fecha>=range.start&&fecha<=range.end;
+  let title="",rows=[],totalSum=0;
+  // Helper para fila de doc
+  const docRow=(q,monto,extra)=>{
+    const fecha=dateOfCreation(q)||"—";
+    const sMeta=STATUS_META[q.status||"enviada"]||STATUS_META.enviada;
+    const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
+    return '<div class="dd-row" onclick="closeDashDetail();loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+      '<div class="dd-row-top"><div class="dd-row-cli">'+tag+(q.client||"—")+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
+      '<div class="dd-row-meta"><span class="qnum" style="font-size:9px">'+(q.quoteNumber||q.id)+'</span> · '+fecha+' · <span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+(extra?' · '+extra:'')+'</div>'+
+    '</div>';
+  };
+  if(tipo==="cotizado"){
+    title="🧾 Cotizado · "+range.label;
+    quotesCache.forEach(q=>{
+      const status=q.status||"enviada";
+      const fCre=dateOfCreation(q);
+      if(inRange(fCre)&&status!=="convertida"){const t=getDocTotal(q);totalSum+=t;rows.push({q,monto:t})}
+    });
+  }else if(tipo==="vendido"){
+    title="🤝 Vendido · "+range.label;
+    quotesCache.forEach(q=>{
+      const status=q.status||"enviada";
+      const fVen=dateOfSale(q);
+      if(inRange(fVen)&&["pedido","aprobada","en_produccion","entregado"].includes(status)){const t=getDocTotal(q);totalSum+=t;rows.push({q,monto:t,extra:"Vendido: "+fVen})}
+    });
+  }else if(tipo==="entregado"){
+    title="🎉 Entregado · "+range.label;
+    quotesCache.forEach(q=>{
+      const status=q.status||"enviada";
+      const fEnt=q.fechaEntrega||q.eventDate;
+      if(inRange(fEnt)&&status==="entregado"){const t=getDocTotal(q);totalSum+=t;rows.push({q,monto:t,extra:"Entregado: "+fEnt})}
+    });
+  }else if(tipo==="cobrar"){
+    title="⚠️ Por cobrar · todos los pedidos activos";
+    quotesCache.forEach(q=>{
+      const status=q.status||"enviada";
+      if(!["pedido","aprobada","en_produccion","entregado"].includes(status))return;
+      const pend=saldoPendiente(q);
+      if(pend>0){totalSum+=pend;rows.push({q,monto:pend,extra:"Cobrado: "+fm(totalCobrado(q))+" / Total: "+fm(getDocTotal(q))})}
+    });
+  }else if(tipo==="recaudo"){
+    title="💵 Recaudado · "+range.label;
+    // Lista de PAGOS individuales (no docs) — agrupar por método al final como resumen
+    const pagosLista=[];
+    const porMetodo={};METODOS_PAGO.forEach(m=>porMetodo[m]=0);
+    quotesCache.forEach(q=>{
+      getPagos(q).forEach(p=>{
+        if(inRange(p.fecha)){
+          const monto=parseInt(p.monto)||0;
+          totalSum+=monto;
+          const met=METODOS_PAGO.includes(p.metodo)?p.metodo:"Otro";
+          porMetodo[met]+=monto;
+          pagosLista.push({q,p,monto,met});
+        }
+      });
+    });
+    pagosLista.sort((a,b)=>(b.p.fecha||"").localeCompare(a.p.fecha||""));
+    // Render especial para recaudo: resumen por método arriba + lista
+    let resumen='<div class="dd-resumen">';
+    METODOS_PAGO.forEach(m=>{
+      if(porMetodo[m]>0)resumen+='<div class="dd-resumen-row"><span>'+m+'</span><strong>'+fm(porMetodo[m])+'</strong></div>';
+    });
+    resumen+='</div>';
+    const pagosHtml=pagosLista.map(({q,p,monto,met})=>{
+      const fotoIcon=p.foto?' 📷':'';
+      return '<div class="dd-row" onclick="closeDashDetail();openVerPagosModal(\''+q.id+'\',\''+q.kind+'\')">'+
+        '<div class="dd-row-top"><div class="dd-row-cli">'+(q.client||"—")+fotoIcon+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
+        '<div class="dd-row-meta">'+p.fecha+' · '+met+' · '+(p.tipo||"pago")+(p.notas?' · '+p.notas.slice(0,40):'')+'</div>'+
+      '</div>';
+    }).join("");
+    $("dd-title").textContent=title;
+    $("dd-list").innerHTML=
+      '<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+pagosLista.length+' pago'+(pagosLista.length!==1?'s':'')+'</div>'+
+      resumen+
+      (pagosLista.length?pagosHtml:'<div class="dd-empty">Sin pagos en el período.</div>');
+    $("dash-detail-modal").classList.remove("hidden");
+    return;
+  }
+  // Render genérico para cotizado/vendido/entregado/cobrar
+  rows.sort((a,b)=>b.monto-a.monto);
+  const html=rows.length?rows.map(r=>docRow(r.q,r.monto,r.extra)).join(""):'<div class="dd-empty">Sin documentos en este corte.</div>';
+  $("dd-title").textContent=title;
+  $("dd-list").innerHTML='<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+'</div>'+html;
+  $("dash-detail-modal").classList.remove("hidden");
+}
+function closeDashDetail(){$("dash-detail-modal").classList.add("hidden")}
 
 // ═══════════════════════════════════════════════════════════
 // BOOTSTRAP — corre cuando todos los scripts están cargados

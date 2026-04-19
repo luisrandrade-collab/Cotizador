@@ -19,7 +19,8 @@ function getPagos(q){
   return out;
 }
 function totalCobrado(q){return getPagos(q).reduce((s,p)=>s+(parseInt(p.monto)||0),0)}
-function saldoPendiente(q){const t=q.total||q.totalReal||0;return Math.max(0,t-totalCobrado(q))}
+// v4.12.1: usar getDocTotal — para propuestas viejas sin q.total recalcula igual que el PDF
+function saldoPendiente(q){const t=(typeof getDocTotal==="function"?getDocTotal(q):(q.total||q.totalReal||0));return Math.max(0,t-totalCobrado(q))}
 
 // ─── HISTORIAL render ──────────────────────────────────────
 async function renderHist(){
@@ -432,7 +433,7 @@ function openPagoModal(docId,kindOrEv,evMaybe){
   $("pm-foto").value="";
   $("pm-num").value=q.quoteNumber||q.id;
   $("pm-cli").value=q.client||"";
-  const total=q.total||q.totalReal||0;
+  const total=(typeof getDocTotal==="function"?getDocTotal(q):(q.total||q.totalReal||0));
   const cobrado=totalCobrado(q);
   const pend=Math.max(0,total-cobrado);
   $("pm-resumen").innerHTML="Total: <strong>"+fm(total)+"</strong> · Cobrado: <strong>"+fm(cobrado)+"</strong> · Pendiente: <strong>"+fm(pend)+"</strong>";
@@ -507,7 +508,7 @@ function openVerPagosModal(docId,kind,ev){
   window.__verPagosKind=q.kind;
   $("vp-num").value=q.quoteNumber||q.id;
   $("vp-cli").value=q.client||"";
-  const total=q.total||q.totalReal||0;
+  const total=(typeof getDocTotal==="function"?getDocTotal(q):(q.total||q.totalReal||0));
   const cobrado=totalCobrado(q);
   const pend=Math.max(0,total-cobrado);
   const pct=total>0?Math.round(cobrado*100/total):0;
