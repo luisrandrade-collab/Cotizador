@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-18-v4.9-header-notas-brebe -->
+<!-- VERSION: 2026-04-19-v4.10-pedidos-agenda -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -754,6 +754,10 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <div class="mf-field"><label>Cliente</label><input type="text" id="om-cli" readonly style="background:var(--cl)"></div>
       <div class="mf-field"><label>Fecha en que el cliente aprobó</label><input type="date" id="om-fecha"></div>
       <div class="mf-row">
+        <div class="mf-field"><label>Fecha de entrega *</label><input type="date" id="om-entrega-fecha" required></div>
+        <div class="mf-field"><label>Hora de entrega *</label><input type="time" id="om-entrega-hora" required></div>
+      </div>
+      <div class="mf-row">
         <div class="mf-field"><label>Monto del anticipo</label><input type="number" id="om-anticipo" placeholder="0" inputmode="numeric"></div>
         <div class="mf-field"><label>Método de pago</label><select id="om-metodo"><option value="">— Sin anticipo aún —</option><option value="Nequi">Nequi</option><option value="Daviplata">Daviplata</option><option value="Banco Falabella">Banco Falabella</option><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option><option value="Otro">Otro</option></select></div>
       </div>
@@ -967,8 +971,8 @@ const $=id=>document.getElementById(id);
 const PIN_CODE="8421";
 const APP_YEAR=new Date().getFullYear();
 // v4.9: identificación de build visible en header y PIN — cambiar en cada versión
-const BUILD_VERSION="v4.9";
-const BUILD_DATE="2026-04-18";// ISO YYYY-MM-DD
+const BUILD_VERSION="v4.10";
+const BUILD_DATE="2026-04-19";// ISO YYYY-MM-DD
 
 // Cached state from Firestore
 let cloudOnline=false;
@@ -1198,7 +1202,10 @@ async function loadAllHistory(){
 async function autoTransitionToEnProduccion(list){
   if(!cloudOnline)return;
   const todayIso=new Date().toISOString().slice(0,10);
-  const candidatos=list.filter(q=>q.status==="aprobada"&&q.eventDate&&q.eventDate<=todayIso);
+  // v4.10: propuestas aprobadas O cotizaciones en estado pedido transitionan a en_produccion al llegar la fecha.
+  const candidatos=list.filter(q=>(
+    (q.status==="aprobada"||q.status==="pedido") && q.eventDate && q.eventDate<=todayIso
+  ));
   if(!candidatos.length)return;
   try{
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
@@ -1751,6 +1758,12 @@ async function renderHist(){
     const actionBtns=[];
     if(!isProp && status==="enviada"){
       actionBtns.push('<button class="btn hc-btn-order" onclick="openOrderModal(\''+q.id+'\',event)">✅ Marcar como pedido</button>');
+    }else if(!isProp && (status==="pedido"||status==="en_produccion")){
+      // v4.10: cotizaciones en estado pedido / en producción → permitir entregar y cobrar saldo
+      if(!q.eventDate){
+        actionBtns.push('<button class="btn hc-btn-order" onclick="assignDeliveryDate(\''+q.id+'\',event)">📅 Asignar fecha de entrega</button>');
+      }
+      actionBtns.push('<button class="btn hc-btn-deliver" onclick="markAsDelivered(\''+q.id+'\',event)">🎉 Marcar como entregado</button>');
     }else if(isProp && status==="enviada"){
       const hasMulti=(q.sections||[]).some(s=>(s.options||[]).length>1);
       if(hasMulti){
@@ -1765,6 +1778,10 @@ async function renderHist(){
     }
     // Botón saldo cobrado: para aprobada/en_produccion/entregado con anticipo y sin saldo registrado
     if(isProp && ["aprobada","en_produccion","entregado"].includes(status) && q.approvalData?.anticipo>0 && !q.saldoData){
+      actionBtns.push('<button class="btn hc-btn-saldo" onclick="openSaldoModal(\''+q.id+'\',event)">💰 Marcar saldo cobrado</button>');
+    }
+    // v4.10: mismo botón saldo para cotizaciones con anticipo parcial
+    if(!isProp && ["pedido","en_produccion","entregado"].includes(status) && q.orderData?.anticipo>0 && (q.orderData.anticipo<(q.total||0)) && !q.saldoData){
       actionBtns.push('<button class="btn hc-btn-saldo" onclick="openSaldoModal(\''+q.id+'\',event)">💰 Marcar saldo cobrado</button>');
     }
     const actions=actionBtns.length?'<div class="hc-actions">'+actionBtns.join("")+'</div>':"";
@@ -1794,7 +1811,12 @@ function openOrderModal(quoteId,ev){
   if(!q){alert("No se encontró la cotización");return}
   $("om-num").value=q.quoteNumber||q.id;
   $("om-cli").value=q.client||"";
-  $("om-fecha").value=new Date().toISOString().slice(0,10);
+  const hoy=new Date().toISOString().slice(0,10);
+  $("om-fecha").value=hoy;
+  // Default fecha de entrega = mañana; hora por defecto vacía para forzar pensar en ella
+  const mañana=new Date(Date.now()+86400000).toISOString().slice(0,10);
+  $("om-entrega-fecha").value=q.eventDate||mañana;
+  $("om-entrega-hora").value=q.horaEntrega||"";
   $("om-anticipo").value="";
   $("om-metodo").value="";
   $("om-notas").value="";
@@ -1809,11 +1831,17 @@ async function submitMarkAsOrder(){
   if(!cloudOnline){alert("Sin conexión. No se puede actualizar.");return}
   const fecha=$("om-fecha").value;
   if(!fecha){alert("Ingresa la fecha de aprobación del cliente");return}
+  const fechaEntrega=$("om-entrega-fecha").value;
+  const horaEntrega=$("om-entrega-hora").value;
+  if(!fechaEntrega){alert("Ingresa la fecha de entrega del pedido");return}
+  if(!horaEntrega){alert("Ingresa la hora de entrega del pedido");return}
   const anticipo=parseInt($("om-anticipo").value)||0;
   const metodo=$("om-metodo").value;
   const notas=$("om-notas").value.trim();
   const orderData={
     fechaAprobacion:fecha,
+    fechaEntrega:fechaEntrega,
+    horaEntrega:horaEntrega,
     anticipo:anticipo,
     metodoPago:metodo,
     notas:notas,
@@ -1822,23 +1850,54 @@ async function submitMarkAsOrder(){
   try{
     showLoader("Actualizando estado...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    // Persistimos también eventDate + horaEntrega al nivel del documento para que Agenda y
+    // autoTransitionToEnProduccion los lean gratis (mismo patrón que propuestas).
     await updateDoc(doc(db,"quotes",quoteId),{
       status:"pedido",
       orderData:orderData,
+      eventDate:fechaEntrega,
+      horaEntrega:horaEntrega,
       updatedAt:serverTimestamp()
     });
     // Actualizar cache local
     const local=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
-    if(local){local.status="pedido";local.orderData=orderData}
+    if(local){local.status="pedido";local.orderData=orderData;local.eventDate=fechaEntrega;local.horaEntrega=horaEntrega}
     hideLoader();
     closeOrderModal();
-    alert("✅ Pedido confirmado: "+($("om-num").value));
+    alert("✅ Pedido confirmado: "+($("om-num").value)+"\nEntrega: "+fechaEntrega+" "+horaEntrega);
     renderHist();
   }catch(e){
     hideLoader();
     alert("Error al actualizar: "+e.message);
     console.error(e);
   }
+}
+
+// ─── v4.10: Asignar fecha de entrega a pedido viejo sin fecha ──
+async function assignDeliveryDate(quoteId,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault()}
+  const q=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
+  if(!q){alert("No se encontró el pedido");return}
+  const hoy=new Date().toISOString().slice(0,10);
+  const fecha=prompt("Fecha de entrega (YYYY-MM-DD):",q.eventDate||hoy);
+  if(!fecha)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)){alert("Formato inválido. Usa YYYY-MM-DD");return}
+  const hora=prompt("Hora de entrega (HH:MM):",q.horaEntrega||"12:00");
+  if(!hora)return;
+  if(!/^\d{2}:\d{2}$/.test(hora)){alert("Formato inválido. Usa HH:MM");return}
+  if(!cloudOnline){alert("Sin conexión");return}
+  try{
+    showLoader("Asignando fecha...");
+    const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    const patch={eventDate:fecha,horaEntrega:hora,updatedAt:serverTimestamp()};
+    if(q.orderData){patch["orderData.fechaEntrega"]=fecha;patch["orderData.horaEntrega"]=hora}
+    await updateDoc(doc(db,"quotes",quoteId),patch);
+    q.eventDate=fecha;q.horaEntrega=hora;
+    if(q.orderData){q.orderData.fechaEntrega=fecha;q.orderData.horaEntrega=hora}
+    hideLoader();
+    renderHist();
+    renderDashboard&&renderDashboard();
+  }catch(e){hideLoader();alert("Error: "+e.message)}
 }
 
 // ─── CICLO DE VIDA: Aprobar propuesta (registro interno) ───
@@ -2294,9 +2353,12 @@ function parseIsoDate(s){
 
 // Devuelve lista de eventos (documentos con eventDate) de la caché, filtrada al mes/año dado.
 function eventsForMonth(year,month){
-  const statusOK=["aprobada","en_produccion","entregado"];
+  // v4.10: incluye propuestas (aprobada/en_produccion/entregado) + cotizaciones (pedido/en_produccion/entregado)
+  const statusProp=["aprobada","en_produccion","entregado"];
+  const statusQuote=["pedido","en_produccion","entregado"];
   return quotesCache.filter(q=>{
-    if(!statusOK.includes(q.status))return false;
+    const ok = q.kind==="quote" ? statusQuote.includes(q.status) : statusProp.includes(q.status);
+    if(!ok)return false;
     const p=parseIsoDate(q.eventDate);
     if(!p)return false;
     return p.y===year&&p.m===month;
@@ -2358,22 +2420,26 @@ async function renderCalendar(){
   // Resumen del mes (lista debajo)
   const sumEl=$("cal-sum-list");
   if(!monthEvents.length){
-    sumEl.innerHTML='<div class="cal-sum-empty">📅 Sin eventos este mes.<br><span style="font-size:11px">Solo se muestran propuestas aprobadas, en producción o entregadas con fecha de evento.</span></div>';
-    $("cal-sum-title").textContent="Eventos del mes";
+    sumEl.innerHTML='<div class="cal-sum-empty">📅 Sin entregas este mes.<br><span style="font-size:11px">Se muestran propuestas aprobadas/en producción/entregadas y pedidos con fecha de entrega.</span></div>';
+    $("cal-sum-title").textContent="Entregas del mes";
     return;
   }
-  $("cal-sum-title").textContent="Eventos del mes ("+monthEvents.length+")";
+  $("cal-sum-title").textContent="Entregas del mes ("+monthEvents.length+")";
   const mShort=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
   sumEl.innerHTML=monthEvents.map(q=>{
     const p=parseIsoDate(q.eventDate);
     const sMeta=STATUS_META[q.status]||STATUS_META.enviada;
+    const isQuote=q.kind==="quote";
+    const typeTag=isQuote?'<span class="hc-type cot" style="margin-left:4px">Pedido</span>':'<span class="hc-type prop" style="margin-left:4px">Evento</span>';
     const pax=q.pers?q.pers+' pax · ':'';
     const mom=q.momento?q.momento:'';
+    const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
+    const meta=[pax+mom, hora].filter(Boolean).join(' · ');
     return '<div class="cal-ev-card '+q.status+'" id="cal-ev-'+p.d+'-'+q.id+'" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
       '<div class="cal-ev-date"><div class="d">'+p.d+'</div><div class="m">'+mShort[p.m]+'</div></div>'+
       '<div class="cal-ev-body">'+
-        '<div class="cal-ev-cli">'+(q.client||"—")+' <span class="hc-status '+sMeta.cls+'" style="margin-left:4px">'+sMeta.label+'</span></div>'+
-        '<div class="cal-ev-meta"><span>'+pax+mom+'</span></div>'+
+        '<div class="cal-ev-cli">'+(q.client||"—")+typeTag+' <span class="hc-status '+sMeta.cls+'" style="margin-left:4px">'+sMeta.label+'</span></div>'+
+        '<div class="cal-ev-meta"><span>'+meta+'</span></div>'+
       '</div>'+
     '</div>';
   }).join("");
@@ -2411,32 +2477,60 @@ async function renderMiniDash(){
   const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
   const tomorrowIso=tomorrow.toISOString().slice(0,10);
 
-  let eventosSemana=0,saldoPendiente=0,hoyMañana=0;
+  // v4.10: pasado mañana (+2 días) para widget de próximas entregas
+  const pasado=new Date(today);pasado.setDate(pasado.getDate()+2);
+  const pasadoIso=pasado.toISOString().slice(0,10);
+
+  // Próximas entregas (fusión propuestas + pedidos)
+  const upcoming={hoy:[],mañana:[],pasado:[],semana:[]};
+  let saldoPendiente=0;
+  // Status por tipo que cuentan como "agendados"
+  const statusAgendados={
+    proposal:["aprobada","en_produccion"],
+    quote:["pedido","en_produccion"]
+  };
   quotesCache.forEach(q=>{
     const s=q.status;
-    // Eventos en la próxima semana (aprobadas/en_produccion con eventDate en rango)
-    if(["aprobada","en_produccion"].includes(s)&&q.eventDate){
-      if(q.eventDate>=todayIso&&q.eventDate<=weekEndIso)eventosSemana++;
-      if(q.eventDate===todayIso||q.eventDate===tomorrowIso)hoyMañana++;
+    const statusOK=statusAgendados[q.kind]||[];
+    if(statusOK.includes(s)&&q.eventDate){
+      if(q.eventDate===todayIso)upcoming.hoy.push(q);
+      else if(q.eventDate===tomorrowIso)upcoming.mañana.push(q);
+      else if(q.eventDate===pasadoIso)upcoming.pasado.push(q);
+      else if(q.eventDate>todayIso&&q.eventDate<=weekEndIso)upcoming.semana.push(q);
     }
-    // Saldo pendiente: tuvo anticipo y no tiene saldoData
+    // Saldo pendiente: propuesta con anticipo sin saldo, o cotización con anticipo parcial sin saldo
     if(q.kind==="proposal"&&["aprobada","en_produccion","entregado"].includes(s)&&q.approvalData?.anticipo>0&&!q.saldoData){
       saldoPendiente++;
     }
+    if(q.kind==="quote"&&["pedido","en_produccion","entregado"].includes(s)&&q.orderData?.anticipo>0&&(q.orderData.anticipo<(q.total||0))&&!q.saldoData){
+      saldoPendiente++;
+    }
   });
-  // Si todo está en cero, ocultar el dashboard
-  if(eventosSemana===0&&saldoPendiente===0&&hoyMañana===0){
+
+  const hoyN=upcoming.hoy.length, mañanaN=upcoming.mañana.length, pasadoN=upcoming.pasado.length, semanaN=upcoming.semana.length;
+  const total=hoyN+mañanaN+pasadoN+semanaN;
+  if(total===0&&saldoPendiente===0){
     dashEl.classList.add("hidden");
     dashEl.innerHTML="";
     return;
   }
+  // Helper: lista compacta para tooltip
+  const listify=arr=>arr.map(q=>(q.client||"—")+(q.horaEntrega?' '+q.horaEntrega:'')).join(" · ");
   const items=[];
-  items.push('<div class="mini-dash-item"><div class="mini-dash-val">'+eventosSemana+'</div><div class="mini-dash-lab">🎪 Eventos<br>próxima semana</div></div>');
-  if(hoyMañana>0){
-    items.push('<div class="mini-dash-item today"><div class="mini-dash-val">'+hoyMañana+'</div><div class="mini-dash-lab">📅 Hoy<br>o mañana</div></div>');
+  if(hoyN>0){
+    items.push('<div class="mini-dash-item today" title="'+listify(upcoming.hoy)+'" onclick="go(\'cal\')"><div class="mini-dash-val">'+hoyN+'</div><div class="mini-dash-lab">🔥 Hoy</div></div>');
+  }
+  if(mañanaN>0){
+    items.push('<div class="mini-dash-item" title="'+listify(upcoming.mañana)+'" onclick="go(\'cal\')"><div class="mini-dash-val">'+mañanaN+'</div><div class="mini-dash-lab">📅 Mañana</div></div>');
+  }
+  if(pasadoN>0){
+    items.push('<div class="mini-dash-item" title="'+listify(upcoming.pasado)+'" onclick="go(\'cal\')"><div class="mini-dash-val">'+pasadoN+'</div><div class="mini-dash-lab">📆 Pasado<br>mañana</div></div>');
+  }
+  if(semanaN>0){
+    items.push('<div class="mini-dash-item" title="'+listify(upcoming.semana)+'" onclick="go(\'cal\')"><div class="mini-dash-val">'+semanaN+'</div><div class="mini-dash-lab">🗓️ Resto<br>semana</div></div>');
   }
   if(saldoPendiente>0){
-    items.push('<div class="mini-dash-item alert"><div class="mini-dash-val">'+saldoPendiente+'</div><div class="mini-dash-lab">💰 Saldo<br>por cobrar</div></div>');
+    items.push('<div class="mini-dash-item alert" onclick="go(\'hist\')"><div class="mini-dash-val">'+saldoPendiente+'</div><div class="mini-dash-lab">💰 Saldo<br>por cobrar</div></div>');
   }
   dashEl.innerHTML=items.join("");
   dashEl.classList.remove("hidden");
@@ -2456,8 +2550,8 @@ async function markAsDelivered(propId,ev){
   try{
     showLoader("Cerrando evento...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
-    // Detectar colección por prefijo del ID (PF vive en propfinals/)
-    const coll=propId.startsWith("GB-PF-")?"propfinals":"proposals";
+    // Detectar colección por prefijo del ID: cotización (GB-YYYY), PF (GB-PF-) o propuesta (GB-P-)
+    const coll=p.kind==="quote"?"quotes":(propId.startsWith("GB-PF-")?"propfinals":"proposals");
     await updateDoc(doc(db,coll,propId),{
       status:"entregado",
       fechaEntrega:new Date().toISOString().slice(0,10),
@@ -2487,12 +2581,12 @@ function openSaldoModal(propId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const p=quotesCache.find(x=>x.id===propId);
   if(!p){alert("No se encontró la propuesta");return}
-  if(!p.approvalData?.anticipo){alert("Esta propuesta no tiene anticipo registrado.");return}
-  // Calcular total esperado. Para propuestas con opciones, el total real lo lleva PF; para propuestas simples
-  // o PF, podemos estimarlo desde la suma de items, pero es más seguro pedir al usuario el monto exacto.
-  // Hacemos un estimado: si hay total precalculado lo usamos, sino dejamos en blanco.
+  // v4.10: también soporta cotizaciones (anticipo guardado en orderData)
+  const anticipoProp=p.approvalData?.anticipo;
+  const anticipoOrder=p.orderData?.anticipo;
+  if(!anticipoProp && !anticipoOrder){alert("Este documento no tiene anticipo registrado.");return}
   const totalEstimado=p.total||p.totalReal||0;
-  const anticipo=p.approvalData.anticipo||0;
+  const anticipo=anticipoProp||anticipoOrder||0;
   const saldoEstimado=Math.max(0,totalEstimado-anticipo);
   saldoSource={id:propId,kind:p.kind,doc:p};
   $("sm-num").value=p.quoteNumber||p.id;
@@ -2535,7 +2629,7 @@ async function submitSaldoCobrado(){
     showLoader("Registrando cobro...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
     const propId=saldoSource.id;
-    const coll=propId.startsWith("GB-PF-")?"propfinals":"proposals";
+    const coll=saldoSource.kind==="quote"?"quotes":(propId.startsWith("GB-PF-")?"propfinals":"proposals");
     await updateDoc(doc(db,coll,propId),{
       saldoData:saldoData,
       updatedAt:serverTimestamp()
