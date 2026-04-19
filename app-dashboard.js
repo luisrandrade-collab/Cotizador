@@ -374,7 +374,47 @@ function _icsFold(line){
 function _icsDateUtc(d){return d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z"}
 function _icsDateOnly(iso){return iso.replace(/-/g,"")}
 
+// v4.12.4: extrae listado de productos del doc para incluir en el .ics
+// - Cotización: cart + custom
+// - Propuesta: Opción A de cada sección + menaje (lo que se debe alistar/producir)
+function _buildItemsList(q){
+  const items=[];
+  if(q.kind==="quote"){
+    (q.cart||[]).forEach(i=>{const qty=i.qty||0;items.push(qty+" × "+(i.n||"—"))});
+    (q.cust||[]).forEach(i=>{const qty=i.qty||0;items.push(qty+" × "+(i.n||"—")+" (custom)")});
+  }else{
+    // Propuesta — toma Opción A de cada sección (la que está aprobada / la única en propfinal)
+    (q.sections||[]).forEach(sec=>{
+      const opts=sec.options||[];
+      const opt=opts.find(o=>o.label==="Opción A")||opts[0];
+      if(!opt)return;
+      const its=opt.items||[];
+      if(!its.length)return;
+      items.push("【"+(sec.name||"")+"】");
+      its.forEach(it=>{
+        const qStr=(it.qty%1===0)?String(it.qty):(it.qty||0).toFixed(1);
+        items.push("  "+qStr+" × "+(it.name||"—"));
+      });
+    });
+    // Menaje (lo que hay que llevar)
+    const menUsado=(q.menaje||[]).filter(m=>m.qty);
+    if(menUsado.length){
+      items.push("【MENAJE】");
+      menUsado.forEach(m=>items.push("  "+m.qty+" × "+(m.name||"—")));
+    }
+    // Personal
+    const pm=q.personalData?.meseros||{},pa=q.personalData?.auxiliares||{};
+    if(pm.cantidad||pa.cantidad){
+      items.push("【PERSONAL】");
+      if(pm.cantidad)items.push("  "+pm.cantidad+" mesero(s)");
+      if(pa.cantidad)items.push("  "+pa.cantidad+" auxiliar(es)");
+    }
+  }
+  return items;
+}
+
 // v4.12.3: Genera VEVENT producción (8 AM, alerta -1d) + entrega (hora real, alertas -1d y -3h)
+// v4.12.4: incluye listado de productos en el DESCRIPTION
 function _buildVeventsForDoc(q){
   const lines=[];
   const dtStamp=_icsDateUtc(new Date());
@@ -382,10 +422,19 @@ function _buildVeventsForDoc(q){
   baseDesc.push("Cliente: "+(q.client||"—"));
   if(q.tel)baseDesc.push("Tel: "+q.tel);
   if(q.dir)baseDesc.push("Dirección: "+q.dir);
-  if(q.total)baseDesc.push("Total: "+fm(getDocTotal(q)));
+  if(q.kind==="proposal"&&q.pers)baseDesc.push("Personas: "+q.pers);
+  if(q.horaEntrega)baseDesc.push("Hora entrega: "+q.horaEntrega);
+  baseDesc.push("Total: "+fm(getDocTotal(q)));
   if(q.entregaData?.entregadoPor)baseDesc.push("Entrega por: "+q.entregaData.entregadoPor);
   baseDesc.push("Doc: "+(q.quoteNumber||q.id));
-  const baseDescStr=baseDesc.join("\\n");
+  // v4.12.4: agregar productos
+  const productos=_buildItemsList(q);
+  if(productos.length){
+    baseDesc.push("");
+    baseDesc.push("📦 PRODUCTOS A "+(q.kind==="proposal"?"PRODUCIR Y LLEVAR":"PRODUCIR Y ENTREGAR")+":");
+    productos.forEach(p=>baseDesc.push(p));
+  }
+  const baseDescStr=baseDesc.map(_icsEscape).join("\\n");
   const summaryBase=(q.client||"—")+(q.kind==="proposal"?" (Evento)":"");
 
   // ─── PRODUCCIÓN ─── 8:00 AM (3 horas duración hasta 11 AM) + 1 alerta -1d
