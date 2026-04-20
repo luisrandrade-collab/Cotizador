@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-19-v4.12.5-ics-descripcion-minima-prod-vs-entrega -->
+<!-- VERSION: 2026-04-20-v4.12.6-ics-compacto-slots-5min-share-api-viewport -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -114,7 +114,9 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .crow>div{flex:1}
 .crow>.sm{flex:0 0 70px}
 .icard{background:var(--wh);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;box-shadow:var(--sh);font-size:13px;line-height:1.8}
-.rtbl{width:100%;border-collapse:collapse;font-size:12px;background:var(--wh);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+/* v4.12.6: scroll horizontal para tabla review en pantallas chicas */
+.rtbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+.rtbl{width:100%;min-width:520px;border-collapse:collapse;font-size:12px;background:var(--wh);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
 .rtbl thead th{background:var(--bk);color:var(--wh);padding:10px 8px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
 .rtbl tbody td{padding:10px 8px;border-bottom:1px solid var(--lt);vertical-align:middle}
 .tbox{background:var(--gr);color:#fff;text-align:center;padding:18px;border-radius:var(--r);margin:16px 0;box-shadow:0 4px 20px rgba(76,175,80,.3)}
@@ -866,10 +868,10 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
         <div class="mf-field"><label>Hora de entrega *</label><input type="time" id="om-entrega-hora" required></div>
       </div>
       <div class="mf-row">
-        <div class="mf-field"><label>Fecha de producción *</label><input type="date" id="om-prod-fecha" required></div>
+        <div class="mf-field"><label>Fecha de producción (auto)</label><input type="date" id="om-prod-fecha" readonly style="background:var(--cl);color:var(--mid)"></div>
         <div class="mf-field" style="display:flex;align-items:flex-end"><label style="cursor:pointer"><input type="checkbox" id="om-produced" style="vertical-align:middle;margin-right:6px"> Ya está producido</label></div>
       </div>
-      <div class="mf-intro" style="font-size:11px;background:#FFF3E0;border-color:#FFB74D;color:#E65100">💡 Producción se sugiere 1 día antes de la entrega. Marca "Ya está producido" si lo armaste antes.</div>
+      <div class="mf-intro" style="font-size:11px;background:#FFF3E0;border-color:#FFB74D;color:#E65100">💡 Producción = 1 día antes de la entrega (automático, por definición). En el calendario se asigna un bloque de 5 min desde las 8:00 AM, ordenado por hora de entrega del día siguiente. Marca "Ya está producido" si lo armaste antes.</div>
       <div class="mf-field"><label>Notas de producción (Kathy/JP) — irán al evento de producción del .ics</label><textarea id="om-notas-prod" placeholder="Ej: usar moldes pequeños, alergia gluten, doble porción de tahinne..."></textarea></div>
       <div class="mf-row">
         <div class="mf-field"><label>Monto del anticipo</label><input type="number" id="om-anticipo" placeholder="0" inputmode="numeric"></div>
@@ -1072,11 +1074,11 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=4.12.5"></script>
-<script src="app-core.js?v=4.12.5"></script>
-<script src="app-cotizar.js?v=4.12.5"></script>
-<script src="app-propuesta.js?v=4.12.5"></script>
-<script src="app-historial.js?v=4.12.5"></script>
-<script src="app-dashboard.js?v=4.12.5"></script>
+<script src="app-assets.js?v=4.12.6"></script>
+<script src="app-core.js?v=4.12.6"></script>
+<script src="app-cotizar.js?v=4.12.6"></script>
+<script src="app-propuesta.js?v=4.12.6"></script>
+<script src="app-historial.js?v=4.12.6"></script>
+<script src="app-dashboard.js?v=4.12.6"></script>
 </body>
 </html>
