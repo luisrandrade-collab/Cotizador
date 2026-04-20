@@ -154,8 +154,10 @@ async function submitMarkAsOrder(){
   const horaEntrega=$("om-entrega-hora").value;
   if(!fechaEntrega){alert("Ingresa la fecha de entrega");return}
   if(!horaEntrega){alert("Ingresa la hora de entrega");return}
-  const productionDate=$("om-prod-fecha").value;
-  if(!productionDate){alert("Ingresa la fecha de producción");return}
+  // v4.12.6: producción es SIEMPRE entrega − 1 día (por definición, no editable)
+  const _entD=new Date(fechaEntrega+"T00:00:00");
+  const _prodD=new Date(_entD.getTime()-86400000);
+  const productionDate=_prodD.toISOString().slice(0,10);
   const produced=$("om-produced").checked;
   const anticipo=parseInt($("om-anticipo").value)||0;
   const metodo=$("om-metodo").value;

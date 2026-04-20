@@ -83,7 +83,8 @@ function renderR(){
     '<div class="paynote">Envía el comprobante del pago por WhatsApp para procesar la confirmación del pedido. Mínimo 24 horas de anticipación a la entrega.</div>'+
     '</div></div>';
   const notasHtml='<div class="sec" style="margin-top:12px"><div class="stit" style="display:flex;justify-content:space-between;align-items:center">Condiciones del servicio <button class="cond-reset" style="font-size:10px" onclick="resetAllNotasCot()">↻ Restablecer todas</button></div><div id="notas-cot-list"></div></div>';
-  $("rev-content").innerHTML='<table class="rtbl"><thead><tr><th style="text-align:left">Producto</th><th>Cant.</th><th style="text-align:right">V. Unit</th><th style="text-align:right">Subtotal</th><th></th></tr></thead><tbody>'+rows+'</tbody></table><div class="tbox"><div class="tl">Total</div><div class="ta">'+fm(tot)+'</div></div>'+payBoxHtml+notasHtml+'<div class="acts"><button class="btn bd" onclick="go(\'products\')">+ Productos</button><button class="btn bp" onclick="genPDF()">📄 Generar PDF</button><button class="btn bg" onclick="saveCurrentQuote()">💾 Guardar borrador</button></div>';
+  // v4.12.6: tabla envuelta en .rtbl-wrap para scroll horizontal en pantallas chicas
+  $("rev-content").innerHTML='<div class="rtbl-wrap"><table class="rtbl"><thead><tr><th style="text-align:left">Producto</th><th>Cant.</th><th style="text-align:right">V. Unit</th><th style="text-align:right">Subtotal</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="tbox"><div class="tl">Total</div><div class="ta">'+fm(tot)+'</div></div>'+payBoxHtml+notasHtml+'<div class="acts"><button class="btn bd" onclick="go(\'products\')">+ Productos</button><button class="btn bp" onclick="genPDF()">📄 Generar PDF</button><button class="btn bg" onclick="saveCurrentQuote()">💾 Guardar borrador</button></div>';
   renderNotasCot();
 }
 

@@ -374,111 +374,142 @@ function _icsFold(line){
 function _icsDateUtc(d){return d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z"}
 function _icsDateOnly(iso){return iso.replace(/-/g,"")}
 
-// v4.12.4: extrae listado de productos del doc para incluir en el .ics
-// - Cotización: cart + custom
-// - Propuesta: Opción A de cada sección + menaje (lo que se debe alistar/producir)
-function _buildItemsList(q){
-  const items=[];
+// v4.12.6: Lista de productos en formato compacto (una línea con separadores).
+// - Cotización: "33× Hummus, 2× Babaganush, 1× Quibbe"
+// - Propuesta: "ENTRADAS: 33× Hummus, 2× Babaganush — PLATO FUERTE: 33× Mixto — MENAJE: 35× Platos — PERSONAL: 2 meseros"
+function _buildItemsInline(q){
   if(q.kind==="quote"){
-    (q.cart||[]).forEach(i=>{const qty=i.qty||0;items.push(qty+" × "+(i.n||"—"))});
-    (q.cust||[]).forEach(i=>{const qty=i.qty||0;items.push(qty+" × "+(i.n||"—")+" (custom)")});
-  }else{
-    // Propuesta — toma Opción A de cada sección (la que está aprobada / la única en propfinal)
-    (q.sections||[]).forEach(sec=>{
-      const opts=sec.options||[];
-      const opt=opts.find(o=>o.label==="Opción A")||opts[0];
-      if(!opt)return;
-      const its=opt.items||[];
-      if(!its.length)return;
-      items.push("【"+(sec.name||"")+"】");
-      its.forEach(it=>{
-        const qStr=(it.qty%1===0)?String(it.qty):(it.qty||0).toFixed(1);
-        items.push("  "+qStr+" × "+(it.name||"—"));
-      });
-    });
-    // Menaje (lo que hay que llevar)
-    const menUsado=(q.menaje||[]).filter(m=>m.qty);
-    if(menUsado.length){
-      items.push("【MENAJE】");
-      menUsado.forEach(m=>items.push("  "+m.qty+" × "+(m.name||"—")));
-    }
-    // Personal
-    const pm=q.personalData?.meseros||{},pa=q.personalData?.auxiliares||{};
-    if(pm.cantidad||pa.cantidad){
-      items.push("【PERSONAL】");
-      if(pm.cantidad)items.push("  "+pm.cantidad+" mesero(s)");
-      if(pa.cantidad)items.push("  "+pa.cantidad+" auxiliar(es)");
-    }
+    const parts=[];
+    (q.cart||[]).forEach(i=>{const qty=i.qty||0;parts.push(qty+"× "+(i.n||"—"))});
+    (q.cust||[]).forEach(i=>{const qty=i.qty||0;parts.push(qty+"× "+(i.n||"—"))});
+    return parts.join(", ");
   }
-  return items;
+  const sections=[];
+  (q.sections||[]).forEach(sec=>{
+    const opts=sec.options||[];
+    const opt=opts.find(o=>o.label==="Opción A")||opts[0];
+    if(!opt)return;
+    const its=opt.items||[];
+    if(!its.length)return;
+    const items=its.map(it=>{
+      const qStr=(it.qty%1===0)?String(it.qty):(it.qty||0).toFixed(1);
+      return qStr+"× "+(it.name||"—");
+    }).join(", ");
+    sections.push((sec.name||"").toUpperCase()+": "+items);
+  });
+  const menUsado=(q.menaje||[]).filter(m=>m.qty);
+  if(menUsado.length){
+    sections.push("MENAJE: "+menUsado.map(m=>m.qty+"× "+(m.name||"—")).join(", "));
+  }
+  const pm=q.personalData?.meseros||{},pa=q.personalData?.auxiliares||{};
+  const pers=[];
+  if(pm.cantidad)pers.push(pm.cantidad+" meseros");
+  if(pa.cantidad)pers.push(pa.cantidad+" auxiliares");
+  if(pers.length)sections.push("PERSONAL: "+pers.join(", "));
+  return sections.join(" — ");
 }
 
-// v4.12.5: descripciones MÍNIMAS y diferenciadas:
-//   - Producción: solo cliente + productos (+ notas producción si existen)
-//   - Entrega: cliente + dirección + productos (+ notas entrega si existen)
-// Sin valores, sin doc#, sin tel, sin hora dentro del cuerpo.
+// v4.12.6: Calcula el slot de producción de un pedido.
+// Producción = entrega − 1 día (por definición). Si hay múltiples pedidos ese día,
+// se organizan en slots consecutivos de 5 min desde 8:00 AM.
+// Orden: por horaEntrega ascendente (quien sale más temprano se produce primero).
+// Tiebreak: por quoteNumber.
+function _getProdSlot(q){
+  if(!q.eventDate&&!q.productionDate)return null;
+  // Helper: derivar productionDate = eventDate - 1 si no existe
+  const derivePD=x=>{
+    if(x.productionDate)return x.productionDate;
+    if(!x.eventDate)return null;
+    const d=isoToDate(x.eventDate);d.setDate(d.getDate()-1);
+    return dateToIso(d);
+  };
+  const prodDate=derivePD(q);
+  if(!prodDate)return null;
+  // Todos los pedidos/eventos que se producirán ese mismo día
+  const sameDay=quotesCache.filter(x=>{
+    if(!(x.eventDate||x.productionDate))return false;
+    // Solo docs activos que van a producción (pedido/aprobada/en_produccion/entregado)
+    const s=x.status||"enviada";
+    const okStatus=(x.kind==="quote"&&["pedido","en_produccion","entregado"].includes(s))
+                 ||(x.kind==="proposal"&&["aprobada","en_produccion","entregado"].includes(s));
+    if(!okStatus)return false;
+    return derivePD(x)===prodDate;
+  });
+  // Ordenar por horaEntrega, tiebreak por quoteNumber/id
+  sameDay.sort((a,b)=>{
+    const hA=a.horaEntrega||"99:99";
+    const hB=b.horaEntrega||"99:99";
+    if(hA!==hB)return hA.localeCompare(hB);
+    return (a.quoteNumber||a.id||"").localeCompare(b.quoteNumber||b.id||"");
+  });
+  const idx=sameDay.findIndex(x=>x.id===q.id);
+  const safeIdx=idx<0?0:idx;
+  const startMin=8*60+safeIdx*5; // 08:00 + idx×5 min
+  const endMin=startMin+5;       // duración 5 min
+  return {
+    prodDate,
+    startH:Math.floor(startMin/60),startM:startMin%60,
+    endH:Math.floor(endMin/60),endM:endMin%60,
+    position:safeIdx+1,totalSameDay:sameDay.length
+  };
+}
+
+// v4.12.6: DESCRIPTION compacto (una línea con separador " · ") + slots de producción 5 min.
+//   - Producción: "Cliente · A PRODUCIR: 33× Hummus, 2× Babaganush · NOTAS: ..."
+//     Horario: slot consecutivo de 5 min desde 8:00 AM, ordenado por hora de entrega del día sig.
+//     1 alarma: 24h antes
+//   - Entrega: "Cliente · Dirección · A ENTREGAR: ... · NOTAS: ..."
+//     Horario: hora real, 1h duración.
+//     2 alarmas: 24h antes + 2h antes
 function _buildVeventsForDoc(q){
   const lines=[];
   const dtStamp=_icsDateUtc(new Date());
-  const productos=_buildItemsList(q);
+  const productos=_buildItemsInline(q);
   const summaryBase=(q.client||"—")+(q.kind==="proposal"?" (Evento)":"");
 
-  // ─── PRODUCCIÓN ─── 8:00 AM (3 horas duración hasta 11 AM) + 1 alerta -1d
-  if(q.productionDate){
-    const notas=q.orderData?.notasProduccion||q.approvalData?.notasProduccion||"";
-    // Descripción mínima: solo cliente + productos (+ notas producción)
-    const descLines=[];
-    descLines.push("Cliente: "+(q.client||"—"));
-    if(productos.length){
-      descLines.push("");
-      descLines.push("🔪 A PRODUCIR:");
-      productos.forEach(p=>descLines.push(p));
+  // ─── PRODUCCIÓN ─── slot 5 min desde 8AM + 1 alerta -1d
+  // Se activa si hay productionDate O si hay eventDate (derivamos prod = entrega-1)
+  if(q.productionDate||q.eventDate){
+    const slot=_getProdSlot(q);
+    if(slot){
+      const notas=q.orderData?.notasProduccion||q.approvalData?.notasProduccion||"";
+      // Descripción compacta: cliente · productos · notas (una línea con ·)
+      const descParts=[q.client||"—"];
+      if(productos)descParts.push("A PRODUCIR: "+productos);
+      if(notas)descParts.push("NOTAS: "+notas);
+      const desc=descParts.map(_icsEscape).join(" · ");
+      const dateStr=slot.prodDate.replace(/-/g,"");
+      const hh=s=>String(s).padStart(2,"0");
+      const startLocal=dateStr+"T"+hh(slot.startH)+hh(slot.startM)+"00";
+      const endLocal=dateStr+"T"+hh(slot.endH)+hh(slot.endM)+"00";
+      lines.push("BEGIN:VEVENT");
+      lines.push(_icsFold("UID:"+_uid(q.id,"PRODUCCION")));
+      lines.push("DTSTAMP:"+dtStamp);
+      lines.push("DTSTART:"+startLocal);
+      lines.push("DTEND:"+endLocal);
+      lines.push(_icsFold("SUMMARY:🔪 Producción "+_icsEscape(summaryBase)));
+      lines.push(_icsFold("DESCRIPTION:"+desc));
+      lines.push("CATEGORIES:GOURMET-BITES,PRODUCCION");
+      lines.push("STATUS:CONFIRMED");
+      // Una sola alerta: 24 horas antes
+      lines.push("BEGIN:VALARM");
+      lines.push("TRIGGER:-P1D");
+      lines.push("ACTION:DISPLAY");
+      lines.push(_icsFold("DESCRIPTION:Mañana producción "+hh(slot.startH)+":"+hh(slot.startM)+" — "+_icsEscape(q.client||"—")));
+      lines.push("END:VALARM");
+      lines.push("END:VEVENT");
     }
-    if(notas){
-      descLines.push("");
-      descLines.push("📝 NOTAS:");
-      descLines.push(notas);
-    }
-    const desc=descLines.map(_icsEscape).join("\\n");
-    const dateStr=q.productionDate.replace(/-/g,"");
-    const startLocal=dateStr+"T080000";
-    const endLocal=dateStr+"T110000";
-    lines.push("BEGIN:VEVENT");
-    lines.push(_icsFold("UID:"+_uid(q.id,"PRODUCCION")));
-    lines.push("DTSTAMP:"+dtStamp);
-    lines.push("DTSTART:"+startLocal);
-    lines.push("DTEND:"+endLocal);
-    lines.push(_icsFold("SUMMARY:🔪 Producción "+_icsEscape(summaryBase)));
-    lines.push(_icsFold("DESCRIPTION:"+desc));
-    lines.push("CATEGORIES:GOURMET-BITES,PRODUCCION");
-    lines.push("STATUS:CONFIRMED");
-    // Una sola alerta: 24 horas antes
-    lines.push("BEGIN:VALARM");
-    lines.push("TRIGGER:-P1D");
-    lines.push("ACTION:DISPLAY");
-    lines.push(_icsFold("DESCRIPTION:Mañana producción 8AM — "+_icsEscape(q.client||"—")));
-    lines.push("END:VALARM");
-    lines.push("END:VEVENT");
   }
 
-  // ─── ENTREGA ─── hora real (1 hora duración) + alertas -1d y -3h
+  // ─── ENTREGA ─── hora real (1h duración) + alertas -1d y -2h
   if(q.eventDate){
     const notas=q.entregaData?.notasEntrega||"";
-    // Descripción mínima: cliente + dirección + productos (+ notas entrega)
-    const descLines=[];
-    descLines.push("Cliente: "+(q.client||"—"));
-    if(q.dir)descLines.push("Dirección: "+q.dir);
-    if(productos.length){
-      descLines.push("");
-      descLines.push("🎉 A ENTREGAR:");
-      productos.forEach(p=>descLines.push(p));
-    }
-    if(notas){
-      descLines.push("");
-      descLines.push("📝 NOTAS:");
-      descLines.push(notas);
-    }
-    const desc=descLines.map(_icsEscape).join("\\n");
+    // Descripción compacta: cliente · dirección · productos · notas (una línea con ·)
+    const descParts=[q.client||"—"];
+    if(q.dir)descParts.push(q.dir);
+    if(productos)descParts.push("A ENTREGAR: "+productos);
+    if(notas)descParts.push("NOTAS: "+notas);
+    const desc=descParts.map(_icsEscape).join(" · ");
     lines.push("BEGIN:VEVENT");
     lines.push(_icsFold("UID:"+_uid(q.id,"ENTREGA")));
     lines.push("DTSTAMP:"+dtStamp);
@@ -506,12 +537,12 @@ function _buildVeventsForDoc(q){
     lines.push("ACTION:DISPLAY");
     lines.push(_icsFold("DESCRIPTION:Mañana entrega"+(q.horaEntrega?" "+q.horaEntrega:"")+" — "+_icsEscape(q.client||"—")));
     lines.push("END:VALARM");
-    // Alerta 2: 3 horas antes (solo si tiene hora)
+    // Alerta 2: 2 horas antes (v4.12.6: bajó de 3h → 2h)
     if(q.horaEntrega){
       lines.push("BEGIN:VALARM");
-      lines.push("TRIGGER:-PT3H");
+      lines.push("TRIGGER:-PT2H");
       lines.push("ACTION:DISPLAY");
-      lines.push(_icsFold("DESCRIPTION:Entrega en 3h ("+q.horaEntrega+") — "+_icsEscape(q.client||"—")));
+      lines.push(_icsFold("DESCRIPTION:Entrega en 2h ("+q.horaEntrega+") — "+_icsEscape(q.client||"—")));
       lines.push("END:VALARM");
     }
     lines.push("END:VEVENT");
@@ -524,9 +555,25 @@ function _icsHeader(){
 }
 function _icsFooter(){return ["END:VCALENDAR"]}
 
-function _downloadIcs(filename,lines){
+// v4.12.6: igual que savePdf pero para .ics — en iOS/Android usa Web Share API,
+// en desktop/navegadores sin share cae al download clásico.
+// Así el botón 📅 .ics funciona igual de fluido en ambas plataformas.
+async function shareOrDownloadIcs(filename,lines){
   const ics=lines.join("\r\n");
   const blob=new Blob([ics],{type:"text/calendar;charset=utf-8"});
+  try{
+    const file=new File([blob],filename,{type:"text/calendar"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:filename});
+        return;
+      }catch(e){
+        if(e&&e.name==="AbortError")return;
+        console.warn("Web Share .ics falló, fallback a download:",e);
+      }
+    }
+  }catch(e){console.warn("shareIcs blob creation falló, fallback:",e)}
+  // Fallback: download clásico
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   a.href=url;a.download=filename;
@@ -535,18 +582,18 @@ function _downloadIcs(filename,lines){
 }
 
 // Export 1 pedido: 2 eventos (producción + entrega)
-function exportPedidoIcs(docId,kind,ev){
+async function exportPedidoIcs(docId,kind,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
   if(!q){alert("No encontrado");return}
   if(!q.eventDate&&!q.productionDate){alert("Este pedido no tiene fechas de entrega ni producción asignadas.");return}
   const lines=[..._icsHeader(),..._buildVeventsForDoc(q),..._icsFooter()];
   const fname=(q.quoteNumber||q.id)+"_"+(q.client||"sin").replace(/\s+/g,"_")+".ics";
-  _downloadIcs(fname,lines);
+  await shareOrDownloadIcs(fname,lines);
 }
 
 // Export agenda completa: todos los eventos próximos 60 días + último mes
-function exportAgendaIcs(){
+async function exportAgendaIcs(){
   const today=new Date();
   const past=new Date(today);past.setDate(past.getDate()-30);
   const future=new Date(today);future.setDate(future.getDate()+60);
@@ -559,7 +606,7 @@ function exportAgendaIcs(){
   const lines=[..._icsHeader()];
   docs.forEach(q=>{lines.push(..._buildVeventsForDoc(q))});
   lines.push(..._icsFooter());
-  _downloadIcs("gourmet-bites-agenda-"+dateToIso(today)+".ics",lines);
+  await shareOrDownloadIcs("gourmet-bites-agenda-"+dateToIso(today)+".ics",lines);
 }
 
 // ═══════════════════════════════════════════════════════════
