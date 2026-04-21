@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-20-v5.0.2-autosync-fechas-flexibles-boton-fantasmas-guia-backup -->
+<!-- VERSION: 2026-04-20-v5.0.3-anulacion-reversion-estado-anulada -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -291,6 +291,15 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .hc-status.en_produccion{background:#F3E5F5;color:#6A1B9A;border:1px solid #BA68C8}
 .hc-status.convertida{background:#ECEFF1;color:#546E7A}
 .hc-status.superseded{background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A}
+/* v5.0.3: estado anulada (pedido/propuesta cancelado antes de entregar) */
+.hc-status.anulada{background:#FFEBEE;color:#C62828;border:1px solid #E57373}
+.hc-anulada-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFEBEE;color:#C62828;border:1px solid #E57373;vertical-align:middle}
+.hc-btn-anular{background:#FFF3E0;color:#BF360C;border:1px solid #FFAB91}
+.hc-btn-anular:hover{background:#FFCCBC}
+.hc-btn-devolver{background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A}
+.hcard.hc-anulada{opacity:.6;border-left:3px solid #E57373}
+.hist-filter.anuladas-filter{background:#FFEBEE;color:#C62828;border-color:#EF9A9A}
+.hist-filter.anuladas-filter.act{background:#C62828;color:#fff;border-color:#C62828}
 /* v4.12.7: badges y botones para PF reemplazadas y docs fantasmas */
 .hc-superseded-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A;vertical-align:middle}
 .hc-wrong-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;vertical-align:middle}
@@ -378,6 +387,18 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .hist-filter.convertidas-filter.act{background:#3F51B5;color:#fff;border-color:#3F51B5}
 /* ══════ v5.0.1b: tarjeta con opacity para convertidas ocultas ══════ */
 .hcard.hc-convertida{opacity:.7;border-left:3px solid #9FA8DA}
+/* ══════ v5.0.3: estado anulada + botón anular + badge ══════ */
+.hc-status.anulada{background:#FFCDD2;color:#B71C1C;border:1px solid #EF5350}
+.hc-anulada-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFCDD2;color:#B71C1C;border:1px solid #EF5350;vertical-align:middle}
+.hcard.hc-anulada{opacity:.6;border-left:3px solid #EF5350}
+.hc-btn-anular{background:linear-gradient(135deg,#E57373,#C62828);color:#fff;border:none}
+.hc-btn-anular:hover{filter:brightness(1.05)}
+.hc-btn-revivir{background:linear-gradient(135deg,#66BB6A,#2E7D32);color:#fff;border:none}
+.hist-filter.anuladas-filter{background:#FFCDD2;color:#B71C1C;border-color:#EF5350}
+.hist-filter.anuladas-filter.act{background:#B71C1C;color:#fff;border-color:#B71C1C}
+/* Sección informativa de anuladas en dashboard */
+.dash-anuladas-info{background:#FFEBEE;border:1px dashed #EF5350;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12px;color:#B71C1C}
+.dash-anuladas-info strong{font-weight:800}
 /* v4.13.0: Indicador de offline activo */
 .cloud-ind.offline-cache{background:#FFF3E0;color:#E65100}
 .hist-filters{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:4px}
@@ -1253,6 +1274,77 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
+<!-- v5.0.3: Modal de anular pedido / evento -->
+<div id="anular-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeAnularModal()">
+  <div class="modal-box" style="max-height:90vh">
+    <div class="modal-head" style="background:linear-gradient(135deg,#D84315,#BF360C)">
+      <span class="mtitle">↩️ Anular pedido</span>
+      <button class="mclose" onclick="closeAnularModal()">×</button>
+    </div>
+    <div class="mform">
+      <div id="anular-body">
+        <div style="background:#FFF3E0;border-left:3px solid #E65100;padding:10px 12px;border-radius:6px;margin-bottom:14px;font-size:12px;color:#5D4037">
+          Vas a anular <strong id="an-doc-id">—</strong> · <strong id="an-doc-cli">—</strong><br>
+          <span id="an-doc-estado" style="font-size:11px;color:#888"></span>
+        </div>
+        <div class="fld">
+          <label class="flbl">Motivo *</label>
+          <select class="fsel" id="an-motivo" onchange="onMotivoChange()">
+            <option value="">— Escoge un motivo —</option>
+            <option value="cliente_cancelo">Cliente canceló</option>
+            <option value="no_pago_anticipo">Cliente no pagó anticipo</option>
+            <option value="no_pudimos_producir">No pudimos producir / cambio de agenda</option>
+            <option value="error_cotizacion">Error en cotización</option>
+            <option value="problema_pago">Problema con el pago / chargeback</option>
+            <option value="otro">Otro (escribe abajo)</option>
+          </select>
+        </div>
+        <div class="fld hidden" id="an-motivo-otro-wrap">
+          <label class="flbl">Especifica el motivo</label>
+          <input type="text" class="fin" id="an-motivo-otro" placeholder="Ej: feriado inesperado" />
+        </div>
+        <div class="fld">
+          <label class="flbl">Notas adicionales (opcional)</label>
+          <textarea class="fin" id="an-notas" rows="2" placeholder="Detalles del motivo, conversación con el cliente, etc."></textarea>
+        </div>
+        <div class="fld">
+          <label class="flbl">¿Qué hacer con el registro? *</label>
+          <select class="fsel" id="an-accion">
+            <option value="anular">Anular pero conservar (recomendado) — queda como registro histórico ❌ Anulada</option>
+            <option value="regresar">Regresar a cotización viva — vuelve a estado "Enviada" (como si no se hubiera marcado)</option>
+          </select>
+          <div style="font-size:10px;color:var(--mid);margin-top:4px" id="an-accion-hint">El doc conserva todos sus datos pero NO suma en Cotizado / Vendido. Aparece en el filtro "Anuladas" del historial.</div>
+        </div>
+        <div class="fld hidden" id="an-devolucion-wrap">
+          <div style="background:#FFEBEE;border:1px solid #EF9A9A;border-radius:8px;padding:10px 12px;margin-bottom:10px;color:#B71C1C;font-size:12px;line-height:1.4">
+            ⚠️ Este pedido tiene pagos previos por <strong id="an-pagos-total">—</strong>. Puedes registrar la devolución ahora (recomendado) o después desde el módulo de pagos.
+          </div>
+          <label class="flbl">Devolución (opcional)</label>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input type="number" class="fin" id="an-dev-monto" placeholder="Monto a devolver" style="flex:2" />
+            <input type="date" class="fin" id="an-dev-fecha" style="flex:1" />
+          </div>
+          <select class="fsel" id="an-dev-metodo" style="margin-bottom:6px">
+            <option value="">— Método de devolución —</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Nequi">Nequi</option>
+            <option value="Daviplata">Daviplata</option>
+            <option value="Banco Falabella">Banco Falabella</option>
+            <option value="Transferencia">Transferencia</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <input type="text" class="fin" id="an-dev-notas" placeholder="Notas devolución (opcional)" />
+          <div style="font-size:10px;color:var(--mid);margin-top:6px">Si dejas el monto en 0 o vacío, no se registra devolución. Los pagos previos quedan intactos como histórico.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn bo" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeAnularModal()">Cancelar</button>
+          <button class="btn" style="background:linear-gradient(135deg,#D84315,#BF360C);color:#fff;flex:2" onclick="submitAnular()">Confirmar anulación</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- v5.0.1b: Modal de borrado en cascada para convertidas con PF hija -->
 <div id="cascade-del-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeCascadeDelModal()">
   <div class="modal-box">
@@ -1342,11 +1434,110 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.0.2"></script>
-<script src="app-core.js?v=5.0.2"></script>
-<script src="app-cotizar.js?v=5.0.2"></script>
-<script src="app-propuesta.js?v=5.0.2"></script>
-<script src="app-historial.js?v=5.0.2"></script>
-<script src="app-dashboard.js?v=5.0.2"></script>
+<!-- v5.0.3: Modal Anular / Regresar pedido -->
+<div id="anular-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeAnularModal()">
+  <div class="modal-box" style="max-height:92vh">
+    <div class="modal-head" style="background:linear-gradient(135deg,#D32F2F,#B71C1C)">
+      <span class="mtitle">↩️ Anular / Regresar pedido</span>
+      <button class="mclose" onclick="closeAnularModal()">×</button>
+    </div>
+    <div class="mform">
+      <div style="background:#FFF3E0;border-left:3px solid #FB8C00;padding:10px 12px;border-radius:6px;font-size:12px;color:#5D4037;margin-bottom:14px">
+        <strong id="an-doc-label">Documento</strong> · <span id="an-doc-cli">—</span><br>
+        <span id="an-doc-meta" style="font-size:11px;color:#777"></span>
+      </div>
+
+      <div class="fld">
+        <label class="flbl">Motivo *</label>
+        <select class="fsel" id="an-motivo" onchange="onAnularMotivoChange()">
+          <option value="">— Escoge el motivo —</option>
+          <option value="cliente_cancelo">Cliente canceló</option>
+          <option value="no_pago_anticipo">Cliente no pagó anticipo</option>
+          <option value="no_pudimos_producir">No pudimos producir / cambio de agenda</option>
+          <option value="error_cotizacion">Error en cotización</option>
+          <option value="problema_pago">Problema con el pago / chargeback</option>
+          <option value="otro">Otro (escribir abajo)</option>
+        </select>
+      </div>
+
+      <div class="fld" id="an-motivo-otro-wrap" style="display:none">
+        <label class="flbl">Detalle del motivo *</label>
+        <input type="text" class="fin" id="an-motivo-otro" placeholder="Describe brevemente" />
+      </div>
+
+      <div class="fld">
+        <label class="flbl">¿Qué hacer con este documento? *</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px;border:1.5px solid #E0E0E0;border-radius:8px;cursor:pointer" class="an-accion-lbl">
+            <input type="radio" name="an-accion" value="anular" checked style="margin-top:3px" />
+            <div style="flex:1">
+              <div style="font-weight:700;color:#C62828;font-size:13px">❌ Anular y conservar (recomendado)</div>
+              <div style="font-size:11px;color:#666;line-height:1.4">Queda como registro histórico con el motivo. No suma en dashboard. No cuenta para sync con Kathy/JP. Sirve para auditoría futura.</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;padding:10px;border:1.5px solid #E0E0E0;border-radius:8px;cursor:pointer" class="an-accion-lbl">
+            <input type="radio" name="an-accion" value="revivir" style="margin-top:3px" />
+            <div style="flex:1">
+              <div style="font-weight:700;color:#2E7D32;font-size:13px">↩️ Regresar a cotización viva</div>
+              <div style="font-size:11px;color:#666;line-height:1.4">Status vuelve a 'Enviada'. Se limpian datos de pedido/aprobación. Útil si el cliente puede volver más adelante. No se pierde el doc — solo vuelve atrás.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="fld">
+        <label class="flbl">Notas adicionales (opcional)</label>
+        <textarea class="fin" id="an-notas" rows="2" placeholder="Contexto, conversación con el cliente, etc." style="resize:vertical;min-height:50px"></textarea>
+      </div>
+
+      <!-- Bloque de pagos previos (se muestra solo si hay) -->
+      <div id="an-pagos-wrap" style="display:none;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12.5px;font-weight:700;color:#B71C1C;margin-bottom:6px">💸 Recordatorio: hay pagos registrados en este documento</div>
+        <div id="an-pagos-detalle" style="font-size:11.5px;color:#5D4037;margin-bottom:10px"></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#333;margin-bottom:8px">
+          <input type="checkbox" id="an-registrar-devol" onchange="toggleRegistrarDevol()" />
+          <span>Registrar devolución ahora (recomendado)</span>
+        </label>
+        <div id="an-devol-wrap" style="display:none;background:#fff;padding:10px;border-radius:6px;border:1px dashed #EF9A9A">
+          <div class="fld" style="margin-bottom:8px">
+            <label class="flbl" style="font-size:10.5px">Monto devuelto</label>
+            <input type="number" class="fin" id="an-devol-monto" placeholder="Total cobrado sugerido" />
+          </div>
+          <div class="fld" style="margin-bottom:8px">
+            <label class="flbl" style="font-size:10.5px">Fecha de devolución</label>
+            <input type="date" class="fin" id="an-devol-fecha" />
+          </div>
+          <div class="fld" style="margin-bottom:8px">
+            <label class="flbl" style="font-size:10.5px">Método</label>
+            <select class="fsel" id="an-devol-metodo">
+              <option value="Efectivo">Efectivo</option>
+              <option value="Nequi">Nequi</option>
+              <option value="Daviplata">Daviplata</option>
+              <option value="Banco Falabella">Banco Falabella</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="fld" style="margin-bottom:0">
+            <label class="flbl" style="font-size:10.5px">Notas de devolución (opcional)</label>
+            <input type="text" class="fin" id="an-devol-notas" placeholder="Ref, comprobante, etc." />
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeAnularModal()">Cancelar</button>
+        <button class="btn" style="background:linear-gradient(135deg,#D32F2F,#B71C1C);color:#fff;flex:2" onclick="submitAnular()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app-assets.js?v=5.0.3"></script>
+<script src="app-core.js?v=5.0.3"></script>
+<script src="app-cotizar.js?v=5.0.3"></script>
+<script src="app-propuesta.js?v=5.0.3"></script>
+<script src="app-historial.js?v=5.0.3"></script>
+<script src="app-dashboard.js?v=5.0.3"></script>
 </body>
 </html>

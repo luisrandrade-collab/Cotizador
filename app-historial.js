@@ -1,10 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// app-historial.js · v5.0.2 · 2026-04-20
+// app-historial.js · v5.0.3 · 2026-04-20
 // Historial + ciclo de vida (order/approve/saldo) + pagos +
 // duplicar + features v4.12: foto entrega, notas producción,
 // notas entrega, quién entregó, recibido conforme, comentarios cliente.
 // v5.0.1b: filtro "Convertidas" oculta por default + badge "origen de PF".
 // v5.0.2: badge "pendiente sync" + marcar needsSync al confirmar pedido/aprobada.
+// v5.0.3: botón ↩️ Anular + modal + filtro Anuladas + devolución opcional.
 // ═══════════════════════════════════════════════════════════
 
 const METODOS_PAGO=["Efectivo","Nequi","Daviplata","Banco Falabella","Transferencia","Otro"];
@@ -32,10 +33,12 @@ async function renderHist(){
   if(!quotesCache.length){el.innerHTML='<div class="empty"><div class="ic">📁</div><p>No hay cotizaciones guardadas</p></div>';return}
   // v5.0.1b: el filtro "all" ya NO incluye convertidas (quedan ocultas por default).
   // Aparecen solo con filtro explícito "convertidas".
-  const cnt={all:0,cot:0,prop:0,pedido:0,propfinal:0,aprobada:0,en_produccion:0,convertidas:0};
+  // v5.0.3: mismo tratamiento para anuladas.
+  const cnt={all:0,cot:0,prop:0,pedido:0,propfinal:0,aprobada:0,en_produccion:0,convertidas:0,anuladas:0};
   quotesCache.forEach(q=>{
     const s=q.status||"enviada";
     if(s==="convertida"){cnt.convertidas++;return} // v5.0.1b: no suma en "all" ni en "prop"
+    if(s==="anulada"){cnt.anuladas++;return}       // v5.0.3: no suma en "all" tampoco
     cnt.all++;
     if(q.kind==="quote")cnt.cot++;else cnt.prop++;
     if(s==="pedido")cnt.pedido++;
@@ -48,6 +51,9 @@ async function renderHist(){
     // v5.0.1b: convertidas solo aparecen con filtro explícito
     if(histFilter==="convertidas")return s==="convertida";
     if(s==="convertida")return false; // oculta por default en todos los otros filtros
+    // v5.0.3: anuladas solo aparecen con filtro explícito
+    if(histFilter==="anuladas")return s==="anulada";
+    if(s==="anulada")return false;
     if(histFilter==="all")return true;
     if(histFilter==="cot")return q.kind==="quote";
     if(histFilter==="prop")return q.kind==="proposal";
@@ -64,6 +70,8 @@ async function renderHist(){
     mkFilter("en_produccion","En producción",cnt.en_produccion)+
     // v5.0.1b: filtro nuevo convertidas (aparece solo si hay alguna)
     (cnt.convertidas>0?mkFilter("convertidas","Convertidas",cnt.convertidas,"convertidas-filter"):"")+
+    // v5.0.3: filtro nuevo anuladas (aparece solo si hay alguna)
+    (cnt.anuladas>0?mkFilter("anuladas","Anuladas",cnt.anuladas,"anuladas-filter"):"")+
     '</div>';
   if(!filtered.length){el.innerHTML=filtersBar+'<div class="empty"><div class="ic">🔍</div><p>Sin resultados para este filtro</p></div>';return}
   const cards=filtered.map(q=>{
@@ -80,6 +88,9 @@ async function renderHist(){
     const wrongCollBadge=q._wrongCollection?'<span class="hc-wrong-badge">⚠️ Fantasma</span>':'';
     // v5.0.1b: badge "origen de PF-XXXX" para propuestas convertidas
     const origenPfBadge=(status==="convertida"&&q.propFinalRef)?'<span class="hc-origen-pf">→ origen de '+q.propFinalRef+'</span>':'';
+    // v5.0.3: badge Anulada (motivo visible como tooltip)
+    const motivoAnulacion=q.anuladaData?.motivoLabel||q.anuladaData?.motivo||"";
+    const anuladaBadge=(status==="anulada")?'<span class="hc-anulada-badge" title="'+motivoAnulacion+'">❌ Anulada</span>':'';
     const _pagos=getPagos(q);
     const _cobrado=totalCobrado(q);
     const _saldo=saldoPendiente(q);
@@ -122,6 +133,11 @@ async function renderHist(){
     if(q._wrongCollection){
       actionBtns.push('<button class="btn hc-btn-wrong" onclick="deleteWrongDoc(\''+q.id+'\',event)">🗑️ Eliminar fantasma</button>');
     }
+    // v5.0.3: botón ↩️ Anular para docs en estados reversibles (antes de entregar)
+    const _anulable=["pedido","en_produccion","aprobada"].includes(status);
+    if(_anulable){
+      actionBtns.push('<button class="btn hc-btn-anular" onclick="openAnularModal(\''+q.id+'\',\''+q.kind+'\',event)">↩️ Anular</button>');
+    }
     const _puedePago=(!isProp&&["pedido","en_produccion","entregado"].includes(status))||(isProp&&["aprobada","en_produccion","entregado"].includes(status));
     if(_puedePago&&_saldo>0)actionBtns.push('<button class="btn hc-btn-pago" onclick="openPagoModal(\''+q.id+'\',event)">💵 Registrar pago</button>');
     if(_pagos.length>0)actionBtns.push('<button class="btn hc-btn-pagos-ver" onclick="openVerPagosModal(\''+q.id+'\',event)">📒 Ver pagos ('+_pagos.length+')</button>');
@@ -134,10 +150,13 @@ async function renderHist(){
       ?'<div class="hc-items">'+(q.sections||[]).length+' secciones · '+(q.pers||"?")+' personas</div>'
       :'<div class="hc-total">'+fm(q.total||0)+'</div><div class="hc-items">'+((q.cart||[]).length+(q.cust||[]).length)+' productos</div>';
     // v5.0.1b: clase hc-convertida aplicada si es convertida (para opacity + borde lateral)
-    const cardCls="hcard"+(status==="convertida"?" hc-convertida":"");
+    // v5.0.3: clase hc-anulada aplicada si es anulada (igual efecto visual)
+    let cardCls="hcard";
+    if(status==="convertida")cardCls+=" hc-convertida";
+    if(status==="anulada")cardCls+=" hc-anulada";
     const cardExtra=(status==="superseded"||q._wrongCollection)?' style="opacity:.65"':"";
     return '<div class="'+cardCls+'"'+cardExtra+' onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+pagadoBadge+prodBadge+comentBadge+syncBadge+'</div>'+
+      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+anuladaBadge+pagadoBadge+prodBadge+comentBadge+syncBadge+'</div>'+
       '<div><button class="dup-btn" onclick="openDuplicateModal(\''+q.kind+'\',\''+q.id+'\',event)" title="Duplicar">📋</button><button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div></div>'+
       '<div class="hc-date">'+ds+'</div>'+summary+actions+
       '</div>';
@@ -823,4 +842,179 @@ async function cleanupWrongDocs(){
     renderHist();
     if(curMode==="dash")renderDashboard();
   }catch(e){hideLoader();alert("Error: "+e.message);console.error(e)}
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.3: ANULAR PEDIDO / EVENTO
+// Permite regresar un pedido en estado pedido/aprobada/en_produccion
+// a estado "anulada" (registro histórico) o "enviada" (cotización viva).
+// Opcionalmente registra una devolución como pago negativo si hubo anticipo.
+// ═══════════════════════════════════════════════════════════
+
+const MOTIVOS_ANULACION={
+  cliente_cancelo:"Cliente canceló",
+  no_pago_anticipo:"Cliente no pagó anticipo",
+  no_pudimos_producir:"No pudimos producir / cambio de agenda",
+  error_cotizacion:"Error en cotización",
+  problema_pago:"Problema con el pago / chargeback",
+  otro:"Otro"
+};
+
+let _anularCtx=null;
+
+function openAnularModal(docId,kind,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault()}
+  if(!cloudOnline){alert("Sin conexión.");return}
+  const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
+  if(!q){alert("No se encontró el documento.");return}
+  const status=q.status||"enviada";
+  if(!["pedido","aprobada","en_produccion"].includes(status)){
+    alert("Solo se pueden anular pedidos/eventos en estado Pedido, Aprobada o En producción.\n\nEstado actual: "+(STATUS_META[status]?.label||status));
+    return;
+  }
+  _anularCtx={docId:docId,kind:kind,q:q};
+  $("an-doc-id").textContent=q.quoteNumber||q.id;
+  $("an-doc-cli").textContent=q.client||"—";
+  $("an-doc-estado").textContent="Estado: "+(STATUS_META[status]?.label||status)+" · Total: "+fm(q.total||0)+(q.eventDate?" · Entrega: "+q.eventDate:"");
+  $("an-motivo").value="";
+  $("an-motivo-otro").value="";
+  $("an-motivo-otro-wrap").classList.add("hidden");
+  $("an-notas").value="";
+  $("an-accion").value="anular";
+  // Fecha default para devolución = hoy
+  $("an-dev-fecha").value=new Date().toISOString().slice(0,10);
+  $("an-dev-monto").value="";
+  $("an-dev-metodo").value="";
+  $("an-dev-notas").value="";
+  // Si hay pagos previos, mostrar bloque de devolución con total cobrado
+  const cobrado=totalCobrado(q);
+  if(cobrado>0){
+    $("an-pagos-total").textContent=fm(cobrado);
+    $("an-devolucion-wrap").classList.remove("hidden");
+    // Sugerir monto = total cobrado
+    $("an-dev-monto").value=cobrado;
+  }else{
+    $("an-devolucion-wrap").classList.add("hidden");
+  }
+  $("anular-modal").classList.remove("hidden");
+}
+function closeAnularModal(){
+  $("anular-modal").classList.add("hidden");
+  _anularCtx=null;
+}
+function onMotivoChange(){
+  const v=$("an-motivo").value;
+  if(v==="otro")$("an-motivo-otro-wrap").classList.remove("hidden");
+  else $("an-motivo-otro-wrap").classList.add("hidden");
+}
+
+async function submitAnular(){
+  if(!_anularCtx){alert("Contexto perdido.");return}
+  const motivo=$("an-motivo").value;
+  if(!motivo){alert("Escoge un motivo.");return}
+  const motivoLabel=motivo==="otro"?($("an-motivo-otro").value.trim()||"Otro"):MOTIVOS_ANULACION[motivo];
+  if(motivo==="otro"&&!$("an-motivo-otro").value.trim()){alert("Especifica el motivo 'Otro'.");return}
+  const notas=$("an-notas").value.trim();
+  const accion=$("an-accion").value;
+  if(!["anular","regresar"].includes(accion)){alert("Escoge qué hacer con el registro.");return}
+
+  const {docId,kind,q}=_anularCtx;
+  const cobrado=totalCobrado(q);
+  // Devolución opcional
+  let devPago=null;
+  const devMonto=parseInt($("an-dev-monto").value)||0;
+  if(cobrado>0&&devMonto>0){
+    const devFecha=$("an-dev-fecha").value;
+    const devMetodo=$("an-dev-metodo").value||"Sin especificar";
+    const devNotas=$("an-dev-notas").value.trim();
+    if(!devFecha){alert("Escoge la fecha de la devolución.");return}
+    devPago={
+      fecha:devFecha,
+      monto:-Math.abs(devMonto), // negativo para que reste del cobrado
+      metodo:devMetodo,
+      tipo:"devolucion",
+      notas:devNotas||"Devolución por anulación: "+motivoLabel,
+      registradoEn:new Date().toISOString()
+    };
+  }
+
+  try{
+    showLoader("Anulando...");
+    const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    let coll;
+    if(kind==="quote")coll="quotes";
+    else if(docId&&docId.startsWith("GB-PF-"))coll="propfinals";
+    else coll="proposals";
+
+    const anuladaData={
+      fecha:new Date().toISOString(),
+      motivo:motivo,
+      motivoLabel:motivoLabel,
+      notas:notas,
+      accion:accion, // "anular" o "regresar"
+      estadoAnterior:q.status,
+      totalCobradoAlAnular:cobrado
+    };
+
+    const patch={updatedAt:serverTimestamp()};
+    if(typeof auditStamp==="function")Object.assign(patch,auditStamp());
+
+    if(accion==="anular"){
+      patch.status="anulada";
+      patch.anuladaData=anuladaData;
+      patch.needsSync=false; // ya no va a agenda
+    }else{
+      // Regresar a cotización viva
+      patch.status="enviada";
+      patch.anuladaData=anuladaData; // se guarda el histórico del regreso igual
+      patch.orderData=null;
+      patch.approvalData=null;
+      patch.eventDate=null;
+      patch.horaEntrega=null;
+      patch.productionDate=null;
+      patch.produced=false;
+      patch.producedAt=null;
+      patch.needsSync=false;
+      patch.lastSyncAt=null;
+    }
+
+    // Agregar devolución a pagos[] si aplica
+    if(devPago){
+      const pagosExistentes=getPagos(q)||[];
+      const pagosNuevos=[...pagosExistentes,devPago];
+      patch.pagos=pagosNuevos;
+    }
+
+    await updateDoc(doc(db,coll,docId),patch);
+    // Actualizar cache local
+    const local=quotesCache.find(x=>x.id===docId&&x.kind===kind);
+    if(local){
+      local.status=patch.status;
+      local.anuladaData=anuladaData;
+      if(accion==="regresar"){
+        local.orderData=null;
+        local.approvalData=null;
+        local.eventDate=null;
+        local.horaEntrega=null;
+        local.productionDate=null;
+        local.produced=false;
+        local.producedAt=null;
+      }
+      if(devPago)local.pagos=patch.pagos;
+      local.needsSync=false;
+    }
+    hideLoader();
+    closeAnularModal();
+    const msg=accion==="anular"
+      ? "❌ "+(q.quoteNumber||docId)+" anulada: "+motivoLabel+(devPago?" · Devolución registrada "+fm(Math.abs(devPago.monto)):"")
+      : "↩️ "+(q.quoteNumber||docId)+" regresada a cotización viva · "+motivoLabel+(devPago?" · Devolución registrada "+fm(Math.abs(devPago.monto)):"");
+    toast(msg,"success");
+    renderHist();
+    if(curMode==="dash"&&typeof renderDashboard==="function")renderDashboard();
+    if(typeof renderMiniDash==="function")renderMiniDash();
+  }catch(e){
+    hideLoader();
+    alert("Error al anular: "+(e.message||e));
+    console.error(e);
+  }
 }

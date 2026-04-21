@@ -1,11 +1,12 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v5.0.2 · 2026-04-20
+// app-dashboard.js · v5.0.3 · 2026-04-20
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v4.12.1: cards clickeables (drill-down) + total real de propuestas.
 // v5.0.1b: drill-down agrupado por cliente + banner entregas HOY +
 //          botón Sincronizar agenda con Kathy/JP + excluir convertidas.
 // v5.0.2: banner sync pendiente + syncPendingOnly incremental + rango custom.
+// v5.0.3: excluir anuladas en todos los KPIs + sección informativa.
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -74,6 +75,7 @@ async function renderDashboard(){
     if(q._wrongCollection)return;
     const status=q.status||"enviada";
     if(status==="superseded")return;
+    if(status==="anulada")return; // v5.0.3: anuladas no suman en KPIs
     const total=getDocTotal(q);
     const fCre=dateOfCreation(q);
     const fVen=dateOfSale(q);
@@ -152,8 +154,8 @@ async function renderDashboard(){
       return '<div class="dash-up-item" onclick="openVerPagosModal(\''+q.id+'\',\''+q.kind+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta" style="color:#E65100;font-weight:700">'+fm(pend)+'</div></div>';
     }).join("")+(pendList.length>8?'<div class="dash-met-empty" style="padding:8px">+'+(pendList.length-8)+' más en Historial</div>':"");
   }
-  // v4.12: comentarios recientes (5 últimos) — v4.12.7 excluye fantasmas y superseded
-  const coments=quotesCache.filter(q=>!q._wrongCollection&&q.status!=="superseded"&&(q.comentarioCliente?.texto||q.comentarioCliente?.fotoUrl||q.comentarioCliente?.fotoBase64)).map(q=>({q,c:q.comentarioCliente}));
+  // v4.12: comentarios recientes (5 últimos) — v4.12.7 excluye fantasmas y superseded · v5.0.3 también anuladas
+  const coments=quotesCache.filter(q=>!q._wrongCollection&&q.status!=="superseded"&&q.status!=="anulada"&&(q.comentarioCliente?.texto||q.comentarioCliente?.fotoUrl||q.comentarioCliente?.fotoBase64)).map(q=>({q,c:q.comentarioCliente}));
   coments.sort((a,b)=>(b.c.fecha||"").localeCompare(a.c.fecha||""));
   if(!coments.length){$("dash-coments").innerHTML='<div class="dash-met-empty">Aún no se han registrado comentarios. Cuando entregues, registra qué dijo el cliente.</div>'}
   else{
@@ -264,6 +266,7 @@ function eventsAllStatuses(){
   return quotesCache.filter(q=>{
     if(q._wrongCollection)return false;
     if(q.status==="superseded")return false;
+    if(q.status==="anulada")return false; // v5.0.3: anuladas no aparecen en agenda
     const ok=q.kind==="quote"?statusQuote.includes(q.status):statusProp.includes(q.status);
     return ok&&q.eventDate;
   });
@@ -649,7 +652,8 @@ function openDashDetail(tipo){
   const inRange=fecha=>fecha&&fecha>=range.start&&fecha<=range.end;
   let title="",rows=[],totalSum=0;
   // v4.12.7: helper de filtro común — excluye fantasmas y superseded
-  const _excluido=q=>q._wrongCollection||q.status==="superseded";
+  // v5.0.3: también excluye anuladas
+  const _excluido=q=>q._wrongCollection||q.status==="superseded"||q.status==="anulada";
   // Helper para fila de doc
   const docRow=(q,monto,extra)=>{
     const fecha=dateOfCreation(q)||"—";
@@ -795,7 +799,7 @@ function renderBannerEntregasHoy(){
   if(!el)return;
   const hoyIso=new Date().toISOString().slice(0,10);
   const entregasHoy=quotesCache.filter(q=>{
-    if(q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+    if(q._wrongCollection||q.status==="superseded"||q.status==="convertida"||q.status==="anulada")return false;
     if(q.eventDate!==hoyIso)return false;
     if(q.status==="entregado")return false; // ya entregado no aparece
     const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(q.status))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(q.status));
@@ -840,7 +844,7 @@ async function syncAgendaAllFuture(){
     const hoyIso=new Date().toISOString().slice(0,10);
     // Pedidos agendados vivos con fecha futura (incluye hoy)
     const futuros=quotesCache.filter(q=>{
-      if(q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+      if(q._wrongCollection||q.status==="superseded"||q.status==="convertida"||q.status==="anulada")return false;
       if(!q.eventDate||q.eventDate<hoyIso)return false;
       const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(q.status))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(q.status));
       return ok;
@@ -957,6 +961,7 @@ async function exportHistoryJson(){
         propfinales:quotesCache.filter(q=>q._isPF).length,
         fantasmas:quotesCache.filter(q=>q._wrongCollection).length,
         superseded:quotesCache.filter(q=>q.status==="superseded").length,
+        anuladas:quotesCache.filter(q=>q.status==="anulada").length,
         clientes:clientsCache.length
       }
     };
