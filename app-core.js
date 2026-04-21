@@ -1,14 +1,14 @@
 // ═══════════════════════════════════════════════════════════
-// app-core.js · v5.0.2 · 2026-04-20
+// app-core.js · v5.0.3 · 2026-04-20
 // Firebase wrapper, Auth (v5.0), Storage (v5.0), state global,
 // helpers, INIT, mode switching, search, transporte, cart,
 // navegación, clientes, autoTransition, getNextNumber.
-// v5.0.1b: borrado en cascada de propuestas convertidas.
 // v5.0.2: flag needsSync + helpers auto-sync + rango custom dashboard.
+// v5.0.3: nuevo estado "anulada" + flujo de reversión/anulación.
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.0.2";
+const BUILD_VERSION="v5.0.3";
 const BUILD_DATE="2026-04-20";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -186,7 +186,8 @@ const STATUS_META={
   aprobada:     {label:"Aprobada",        cls:"aprobada",      desc:"Cliente firmó — evento reservado"},
   en_produccion:{label:"En producción",   cls:"en_produccion", desc:"Evento en curso — cocina en marcha"},
   convertida:   {label:"Convertida",      cls:"convertida",    desc:"Convertida a Propuesta Final"},
-  superseded:   {label:"Reemplazada",     cls:"superseded",    desc:"PF reemplazada por una versión nueva"}
+  superseded:   {label:"Reemplazada",     cls:"superseded",    desc:"PF reemplazada por una versión nueva"},
+  anulada:      {label:"Anulada",         cls:"anulada",       desc:"Cancelada antes de entregar — registro histórico"}
 };
 
 // ─── v5.0: AUTHENTICATION (Firebase Auth, reemplaza al PIN de v4.x) ──
@@ -645,7 +646,7 @@ async function deleteHistoryItem(kind,id){
 
 // ¿Es un pedido con fecha de entrega futura en un estado agendable?
 function isAgendable(q){
-  if(!q||q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+  if(!q||q._wrongCollection||q.status==="superseded"||q.status==="convertida"||q.status==="anulada")return false;
   if(!q.eventDate)return false;
   const hoy=new Date().toISOString().slice(0,10);
   if(q.eventDate<hoy)return false;
@@ -1077,9 +1078,14 @@ async function delHistItem(kind,id,ev){
   //   Propuestas: borrables excepto en_produccion/entregado, con cascada para "convertida".
   const q=quotesCache.find(x=>x.id===id&&x.kind===kind);
   const status=q?.status||"enviada";
-  const hardBlock=["en_produccion","entregado"];
+  // v5.0.3: docs anulados son registro histórico financiero — no se borran
+  const hardBlock=["en_produccion","entregado","anulada"];
   if(hardBlock.includes(status)){
-    alert("⚠️ No se puede eliminar.\n\n"+id+" está en estado \""+(STATUS_META[status]?.label||status)+"\".\n\nDocumentos en producción o entregados son registro histórico financiero. No se borran — se anulan dejando los productos en 0 y notas del motivo.");
+    if(status==="anulada"){
+      alert("⚠️ No se puede eliminar.\n\n"+id+" está anulada — es registro histórico del pedido cancelado (con motivo y pagos/devoluciones registradas).\n\nBorrarla perdería la trazabilidad financiera.\n\nSi necesitas sacarla del historial, usa el filtro 'Anuladas' que ya la tiene oculta por default.");
+    }else{
+      alert("⚠️ No se puede eliminar.\n\n"+id+" está en estado \""+(STATUS_META[status]?.label||status)+"\".\n\nDocumentos en producción o entregados son registro histórico financiero. No se borran — se anulan dejando los productos en 0 y notas del motivo.");
+    }
     return;
   }
   // Cotizaciones: solo enviada (mantiene regla v4.12.3)
