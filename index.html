@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-21-v5.1.0-archivos-buscador-botones-rapidos-adjuntar-comprobante -->
+<!-- VERSION: 2026-04-21-v5.2.0-dashboard-rediseno-reportes-conversion-perdidas-cliente-novedades -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -495,6 +495,95 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .mant-btn-migrar{border-color:#BA68C8;color:#6A1B9A}
 .mant-btn-migrar:hover{background:#F3E5F5}
 .mant-hint{font-size:10px;color:#999;margin-top:8px;font-style:italic}
+
+/* ════════════ v5.2.0: Dashboard rediseñado ════════════ */
+/* Título de zona "Métricas del período" */
+.dash-kpis-title{font-size:11px;font-weight:800;color:#455A64;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 10px 0;display:flex;align-items:center;gap:6px}
+/* Secciones de reportes v5.2 */
+.dash-section-reportes{background:linear-gradient(135deg,#FAFBFC,#F5F7FA)}
+/* Row header con título + botón lateral (ej: Próximas entregas · [Sync]) */
+.dash-stit-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.dash-stit-row .dash-stit{margin-bottom:0}
+.dash-stit-btn{background:#fff;border:1px solid #90A4AE;color:#37474F;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;-webkit-appearance:none;display:inline-flex;align-items:center;gap:4px}
+.dash-stit-btn:active{transform:scale(.96);background:#ECEFF1}
+
+/* v5.2.0: Banner de novedades (R5 simple - badge de cambios desde última visita) */
+.dash-banner-novedades{background:linear-gradient(135deg,#E3F2FD,#BBDEFB);border:1.5px solid #1976D2;border-radius:12px;padding:12px 16px;margin:0 0 14px 0;display:flex;align-items:center;gap:10px;cursor:pointer;transition:transform .1s}
+.dash-banner-novedades:active{transform:scale(.99)}
+.dash-banner-novedades .dbn-ic{font-size:22px}
+.dash-banner-novedades .dbn-body{flex:1;min-width:0}
+.dash-banner-novedades .dbn-title{font-size:12.5px;font-weight:800;color:#0D47A1;margin-bottom:2px}
+.dash-banner-novedades .dbn-desc{font-size:11px;color:#1565C0;line-height:1.35}
+.dash-banner-novedades .dbn-close{background:rgba(255,255,255,.6);border:none;width:28px;height:28px;border-radius:50%;font-size:15px;font-weight:700;cursor:pointer;color:#0D47A1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* v5.2.0: Reporte de conversión (embudo) */
+.conv-embudo{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+.conv-row{background:#fff;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-left:4px solid #90A4AE;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.conv-row.cotizadas{border-left-color:#90A4AE}
+.conv-row.pedidos{border-left-color:#1976D2}
+.conv-row.entregadas{border-left-color:#2E7D32}
+.conv-row.perdidas{border-left-color:#C62828}
+.conv-row .cr-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#37474F}
+.conv-row .cr-values{display:flex;align-items:baseline;gap:8px}
+.conv-row .cr-count{font-size:15px;font-weight:800;color:#263238}
+.conv-row .cr-pct{font-size:11px;font-weight:700;color:#607D8B;background:#ECEFF1;padding:2px 7px;border-radius:10px}
+.conv-row .cr-amount{font-size:11px;color:#78909C}
+.conv-embudo-resumen{background:#E3F2FD;border:1px dashed #1976D2;border-radius:10px;padding:10px 14px;margin-top:8px;font-size:12px;color:#0D47A1;text-align:center}
+.conv-embudo-resumen strong{font-size:17px;font-weight:800}
+.conv-empty{padding:16px;text-align:center;color:#999;font-size:11.5px;font-style:italic}
+
+/* v5.2.0: Reporte de pérdidas por motivo */
+.perd-motivos{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.perd-row{background:#fff;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;border-left:3px solid #C62828}
+.perd-row .pr-label{font-size:11.5px;font-weight:700;color:#B71C1C;min-width:120px}
+.perd-row .pr-bar{flex:1;height:10px;background:#FFEBEE;border-radius:5px;overflow:hidden;position:relative}
+.perd-row .pr-bar-fill{height:100%;background:linear-gradient(90deg,#EF5350,#C62828);border-radius:5px;transition:width .3s}
+.perd-row .pr-count{font-size:11px;font-weight:800;color:#C62828;min-width:60px;text-align:right}
+.perd-resumen{font-size:11px;color:#78909C;margin-top:6px;text-align:center;font-style:italic}
+
+/* v5.2.0: Vista por cliente (R4) */
+.cliente-filtro-bar{position:relative;display:flex;align-items:center;gap:8px}
+.cliente-filtro-input{flex:1;padding:10px 14px;border:1.5px solid #CFD8DC;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;background:#fff;-webkit-appearance:none}
+.cliente-filtro-input:focus{outline:none;border-color:#1976D2;box-shadow:0 0 0 2px rgba(25,118,210,.15)}
+.cliente-filtro-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:24px;height:24px;background:#ECEFF1;border:none;border-radius:50%;font-size:15px;font-weight:700;color:#546E7A;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-appearance:none}
+.cliente-suggestions{background:#fff;border:1px solid #CFD8DC;border-top:none;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;margin-top:-4px;box-shadow:0 4px 8px rgba(0,0,0,.08)}
+.cs-item{padding:9px 14px;cursor:pointer;font-size:12.5px;color:#37474F;border-bottom:1px solid #F0F0F0;display:flex;justify-content:space-between;align-items:center}
+.cs-item:last-child{border-bottom:none}
+.cs-item:active{background:#E3F2FD}
+.cs-item .cs-count{font-size:10.5px;color:#90A4AE;font-weight:600}
+/* Resumen de cliente después de seleccionar */
+.cli-view{margin-top:10px;padding:12px;background:#F5F7FA;border-radius:10px;border-left:3px solid #1976D2}
+.cli-view-title{font-size:13px;font-weight:800;color:#0D47A1;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.cli-view-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px;margin-bottom:10px}
+.cli-view-met{background:#fff;border-radius:8px;padding:8px 10px;text-align:center}
+.cli-view-met .cvm-lab{font-size:9.5px;color:#78909C;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.cli-view-met .cvm-val{font-size:14px;font-weight:800;color:#263238}
+.cli-view-met .cvm-sub{font-size:9.5px;color:#90A4AE;margin-top:2px}
+.cli-view-docs{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;padding-right:4px}
+.cli-view-doc{background:#fff;border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;font-size:11.5px;cursor:pointer;border:1px solid #E0E0E0}
+.cli-view-doc:active{background:#F5F5F5}
+.cli-view-doc .cvd-num{font-weight:700;color:#263238;font-family:monospace;font-size:10.5px;background:#ECEFF1;padding:2px 7px;border-radius:6px}
+.cli-view-doc .cvd-status{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px}
+.cli-view-doc .cvd-total{font-weight:700;color:#2E7D32}
+
+/* v5.2.0: Mantenimiento colapsable */
+.dash-mant-collapsible{background:#FAFAFA;border:1px dashed #BDBDBD;padding:0;overflow:hidden}
+.dash-mant-toggle{width:100%;background:transparent;border:none;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:#546E7A;cursor:pointer;display:flex;justify-content:space-between;align-items:center;text-align:left;-webkit-appearance:none}
+.dash-mant-toggle:active{background:#F0F0F0}
+.mant-chevron{font-size:14px;transition:transform .2s;display:inline-block}
+.mant-chevron.open{transform:rotate(90deg)}
+.dash-mant-body{padding:0 16px 16px 16px}
+.dash-mant-body.hidden{display:none}
+.mant-hint-top{font-size:10.5px;color:#78909C;margin-bottom:10px;font-style:italic;padding:8px 10px;background:#FFF8E1;border-radius:6px;border-left:3px solid #FFB74D}
+/* v5.2.0: mant-grid con botones compactos en grid de 2-3 columnas */
+.dash-mant-body .mant-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:0}
+.dash-mant-body .mant-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:60px;font-size:10.5px;line-height:1.2;padding:8px 6px;min-width:0;text-align:center}
+.dash-mant-body .mant-btn span{display:block}
+.mant-btn-backup{border-color:#1976D2;color:#0D47A1}
+.mant-btn-backup:hover{background:#E3F2FD}
+.mant-btn-backup-auto{border-color:#66BB6A;color:#1B5E20}
+.mant-btn-backup-auto:hover{background:#E8F5E9}
+
 /* v5.0.2: badge "pendiente sync" en cards del historial */
 .hc-sync-pending{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;vertical-align:middle;animation:syncPulse 1.8s ease-in-out infinite}
 .hc-sync-ok{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px;background:#E8F5E9;color:#2E7D32;border:1px solid #81C784;vertical-align:middle}
@@ -803,8 +892,9 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   <button class="mode-btn m-cal" onclick="setMode('cal')">📅 Agenda</button>
 </div>
 
-<!-- ======== DASHBOARD MODE ======== -->
+<!-- ======== DASHBOARD MODE · v5.2.0 rediseñado ======== -->
 <div id="mode-dash">
+  <!-- Cabecera compacta -->
   <div class="dash-head">
     <div class="dash-title">📊 Dashboard</div>
     <div class="dash-period">
@@ -812,41 +902,64 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <button class="dp-btn act" data-p="month" onclick="setDashPeriod('month')">Mes</button>
       <button class="dp-btn" data-p="year" onclick="setDashPeriod('year')">Año</button>
       <button class="dp-btn" data-p="all" onclick="setDashPeriod('all')">Todo</button>
-      <button class="dp-btn dp-btn-custom" data-p="custom" onclick="openCustomRangeModal()" title="Rango de fechas personalizado">📆</button>
+      <button class="dp-btn dp-btn-custom" data-p="custom" onclick="openCustomRangeModal()" title="Rango personalizado">📆</button>
     </div>
-    <button class="dash-export-btn" onclick="exportHistoryJson()" title="Descargar JSON de respaldo con todo el historial">📥 Backup JSON</button>
-    <!-- v5.0.2: botón para ver guía de activación de backup automático Firebase -->
-    <button class="dash-export-btn" onclick="openBackupInfoModal()" title="Guía de backup automático en Firebase Console" style="background:#E8F5E9;color:#1B5E20;border-color:#81C784">ℹ️ Backup auto</button>
   </div>
-  <!-- v4.13.0: banner de advertencia si hay docs fantasmas detectados -->
+  <div class="dash-period-info" id="dash-period-info"></div>
+
+  <!-- v5.2.0: Banner de novedades (R5 simple) — aparece solo si hay cambios desde última visita -->
+  <div id="dash-banner-novedades" class="dash-banner-novedades hidden"></div>
+
+  <!-- Banners existentes (solo visibles si aplican) -->
   <div id="dash-warn-fantasmas" class="dash-banner-warn hidden"></div>
-  <!-- v5.0.2: banner sync pendiente — aparece si hay pedidos con needsSync:true -->
   <div id="dash-banner-sync" class="dash-banner-sync hidden"></div>
-  <!-- v5.0.4: banner de seguimiento comercial pendiente -->
   <div id="dash-banner-follow" class="dash-banner-follow hidden"></div>
-  <!-- v5.0.1b: banner de entregas HOY (aparece solo si hay) -->
   <div id="dash-banner-hoy" class="dash-banner-hoy hidden" onclick="setMode('cal')"></div>
-  <!-- v5.0.1b: banner de convertidas archivables (aparece solo si hay 3+ de meses anteriores) -->
   <div id="dash-banner-convertidas" class="dash-banner-info hidden"></div>
-  <!-- v5.0.2: rango de fechas custom activo (aparece solo si dashPeriod === 'custom') -->
   <div id="dash-custom-range-info" class="dash-custom-info hidden"></div>
-  <!-- v5.0.4: Pipeline Activo (pipeline vivo, independiente del período) -->
+
+  <!-- Zona 1: Pipeline Activo (lo vivo hoy) — compacto -->
   <div class="pipeline-section" id="dash-pipeline">
     <div class="pipeline-title"><span class="pt-ic">🎯</span> Pipeline Activo (lo vivo hoy)</div>
     <div class="pipeline-grid" id="pipeline-grid"></div>
   </div>
-  <div class="dash-period-info" id="dash-period-info"></div>
+
+  <!-- Zona 2: KPIs del período (bento grid) -->
+  <div class="dash-kpis-title">📈 Métricas del período</div>
   <div class="dash-grid" id="dash-cards"></div>
+
+  <!-- v5.2.0: Zona 3 · Reportes comerciales (R1 + R3) -->
+  <div class="dash-section dash-section-reportes">
+    <div class="dash-stit">📊 Conversión del período</div>
+    <div id="dash-reporte-conversion"></div>
+  </div>
+  <div class="dash-section dash-section-reportes">
+    <div class="dash-stit">❌ Pérdidas por motivo</div>
+    <div id="dash-reporte-perdidas"></div>
+  </div>
+
+  <!-- v5.2.0: Zona 4 · Filtro por cliente (R4) -->
+  <div class="dash-section">
+    <div class="dash-stit">🔍 Vista por cliente</div>
+    <div class="cliente-filtro-bar">
+      <input type="text" id="dash-cliente-input" class="cliente-filtro-input" placeholder="Escribe un cliente para ver todo su historial..." oninput="onClienteFilterInput(event)" autocomplete="off">
+      <button class="cliente-filtro-clear" onclick="clearClienteFilter()" id="dash-cliente-clear" style="display:none">×</button>
+    </div>
+    <div id="dash-cliente-suggestions" class="cliente-suggestions hidden"></div>
+    <div id="dash-cliente-resultado"></div>
+  </div>
+
+  <!-- Zona 5: Recaudo + Entregas + Cobros + Comentarios -->
   <div class="dash-section">
     <div class="dash-stit">💰 Recaudo por método</div>
     <div id="dash-recaudo"></div>
   </div>
   <div class="dash-section">
-    <div class="dash-stit">📅 Próximas entregas</div>
+    <div class="dash-stit-row">
+      <div class="dash-stit">📅 Próximas entregas</div>
+      <button class="dash-stit-btn" onclick="syncAgendaAllFuture()" title="Sincronizar .ics completo con Kathy y JP">📤 Sync agenda</button>
+    </div>
     <div id="dash-upcoming"></div>
-    <!-- v5.0.1b: botón sincronizar agenda consolidada con Kathy y JP -->
-    <!-- v5.0.2: el botón ahora es SECUNDARIO. El flujo primario es el banner de pendientes arriba. -->
-    <button class="sync-agenda-btn sync-agenda-btn-secondary" onclick="syncAgendaAllFuture()">📤 Sincronizar TODA la agenda con Kathy y JP<span class="sab-sub">.ics con todos los pedidos futuros · usa esto si quieres re-sincronizar todo (no solo pendientes)</span></button>
   </div>
   <div class="dash-section">
     <div class="dash-stit">⚠️ Pendientes por cobrar</div>
@@ -856,15 +969,23 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
     <div class="dash-stit">💬 Últimos comentarios de clientes</div>
     <div id="dash-coments"></div>
   </div>
-  <!-- v5.0.2: sección de mantenimiento con botones avanzados -->
-  <div class="dash-section dash-section-mantenimiento">
-    <div class="dash-stit">🧰 Mantenimiento</div>
-    <div class="mant-grid">
-      <button class="mant-btn mant-btn-fantasmas" onclick="cleanupWrongDocs()" title="Buscar y eliminar docs fantasma (GB-PF-* guardados por error en proposals/)">🧹 Limpiar fantasmas</button>
-      <button class="mant-btn mant-btn-resync" onclick="markAllUnsyncedAsPending()" title="Marca todos los pedidos agendados futuros como 'pendientes de sincronizar' (útil si cambias de teléfono o algo falló)">🔁 Marcar todo para re-sync</button>
-      <button class="mant-btn mant-btn-migrar" onclick="migrarFotosStorage()" title="Migra fotos antiguas en base64 a Firebase Storage (se ejecuta una sola vez en la vida)">🗜️ Migrar fotos a Storage</button>
+
+  <!-- v5.2.0: Mantenimiento colapsado por default (progressive disclosure) -->
+  <div class="dash-section dash-mant-collapsible">
+    <button class="dash-mant-toggle" onclick="toggleMantenimiento()" id="mant-toggle-btn">
+      <span>⚙️ Opciones avanzadas · Mantenimiento y backups</span>
+      <span class="mant-chevron" id="mant-chevron">▸</span>
+    </button>
+    <div class="dash-mant-body hidden" id="dash-mant-body">
+      <div class="mant-hint-top">Acciones de mantenimiento. Antes de ejecutar, haz un 📥 Backup JSON.</div>
+      <div class="mant-grid">
+        <button class="mant-btn mant-btn-backup" onclick="exportHistoryJson()" title="Descargar JSON de respaldo con todo el historial">📥<span>Backup JSON</span></button>
+        <button class="mant-btn mant-btn-backup-auto" onclick="openBackupInfoModal()" title="Guía backup automático Firebase">ℹ️<span>Backup auto</span></button>
+        <button class="mant-btn mant-btn-fantasmas" onclick="cleanupWrongDocs()" title="Eliminar docs fantasma">🧹<span>Limpiar fantasmas</span></button>
+        <button class="mant-btn mant-btn-resync" onclick="markAllUnsyncedAsPending()" title="Marcar todo pedidos futuros como re-sync pendiente">🔁<span>Re-sync agenda</span></button>
+        <button class="mant-btn mant-btn-migrar" onclick="migrarFotosStorage()" title="Migrar fotos legacy a Storage (una vez)">🗜️<span>Migrar fotos</span></button>
+      </div>
     </div>
-    <div class="mant-hint">Estas acciones NO rompen nada. Si algo sale mal, usa 📥 Backup JSON arriba antes de ejecutarlas.</div>
   </div>
 </div>
 
@@ -1671,12 +1792,12 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.1.0"></script>
-<script src="app-core.js?v=5.1.0"></script>
-<script src="app-cotizar.js?v=5.1.0"></script>
-<script src="app-propuesta.js?v=5.1.0"></script>
-<script src="app-historial.js?v=5.1.0"></script>
-<script src="app-seguimiento.js?v=5.1.0"></script>
-<script src="app-dashboard.js?v=5.1.0"></script>
+<script src="app-assets.js?v=5.2.0"></script>
+<script src="app-core.js?v=5.2.0"></script>
+<script src="app-cotizar.js?v=5.2.0"></script>
+<script src="app-propuesta.js?v=5.2.0"></script>
+<script src="app-historial.js?v=5.2.0"></script>
+<script src="app-seguimiento.js?v=5.2.0"></script>
+<script src="app-dashboard.js?v=5.2.0"></script>
 </body>
 </html>

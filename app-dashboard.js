@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v5.0.5 · 2026-04-21
+// app-dashboard.js · v5.2.0 · 2026-04-21
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v5.0.1b: drill-down agrupado + banner HOY + sync agenda + excluir convertidas.
@@ -7,6 +7,9 @@
 // v5.0.3: excluir anuladas en todos los KPIs.
 // v5.0.4: Pipeline Activo (pipeline vivo sin filtro de fecha) + banner follow-up.
 // v5.0.5: badge VIVA/PERDIDA en drill-down y pipeline detail.
+// v5.2.0: Dashboard rediseñado (bento grid, render robusto con try-catch por
+//         sección) + 3 reportes nuevos (conversión/pérdidas motivo/vista cliente) +
+//         badge novedades + mantenimiento colapsable + fix botones ancho-completo.
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -54,17 +57,21 @@ function dateOfSale(q){return q.orderData?.fechaAprobacion||q.approvalData?.fech
 
 async function renderDashboard(){
   if(!quotesCache.length){try{await loadAllHistory()}catch{}}
-  // v4.13.0: banner de alerta si hay fantasmas
-  renderFantasmasBanner();
-  // v5.0.1b: banners de entregas HOY y convertidas archivables
-  renderBannerEntregasHoy();
-  renderBannerConvertidasArchivables();
-  // v5.0.2: banner de sync pendiente + info de rango custom si aplica
-  renderBannerSync();
-  renderCustomRangeInfo();
-  // v5.0.4: Pipeline Activo (lo vivo hoy) + banner follow-up pendiente
-  renderPipelineActivo();
-  renderBannerFollowUp();
+  // v5.2.0: cada sección se envuelve en try-catch para que un error en una
+  // no impida que el resto del dashboard se renderice. Antes de v5.2 un error
+  // en renderBannerFollowUp (por ejemplo) dejaba el dashboard en blanco.
+  const _safe=(fn,name)=>{try{fn()}catch(e){console.warn("Dashboard sección '"+name+"' falló:",e)}};
+
+  _safe(renderFantasmasBanner,"fantasmas-banner");
+  _safe(renderBannerEntregasHoy,"banner-hoy");
+  _safe(renderBannerConvertidasArchivables,"banner-convertidas");
+  _safe(renderBannerSync,"banner-sync");
+  _safe(renderCustomRangeInfo,"custom-range");
+  _safe(renderPipelineActivo,"pipeline-activo");
+  _safe(renderBannerFollowUp,"banner-followup");
+  // v5.2.0: banner de novedades desde última visita (R5 simple)
+  _safe(renderBannerNovedades,"banner-novedades");
+
   const range=getDashRange();
   $("dash-period-info").textContent=range.label;
   const inRange=fecha=>fecha&&fecha>=range.start&&fecha<=range.end;
@@ -74,12 +81,10 @@ async function renderDashboard(){
   let porCobrarTotal=0,porCobrarN=0;
   const recaudoMet={};METODOS_PAGO.forEach(m=>recaudoMet[m]=0);
   quotesCache.forEach(q=>{
-    // v4.12.7: excluir docs fantasmas (GB-PF-* mal guardados en proposals/) y PF reemplazadas
     if(q._wrongCollection)return;
     const status=q.status||"enviada";
     if(status==="superseded")return;
-    if(status==="anulada")return; // v5.0.3: anuladas no suman en KPIs
-    // v5.0.4: excluir cotizaciones/propuestas marcadas como perdidas
+    if(status==="anulada")return;
     if(typeof getFollowUp==="function"&&getFollowUp(q)==="perdida"&&(status==="enviada"||status==="propfinal"))return;
     const total=getDocTotal(q);
     const fCre=dateOfCreation(q);
@@ -92,87 +97,107 @@ async function renderDashboard(){
     getPagos(q).forEach(p=>{if(inRange(p.fecha)){const m=METODOS_PAGO.includes(p.metodo)?p.metodo:"Otro";recaudoMet[m]+=parseInt(p.monto)||0}});
   });
   const totalRecaudo=Object.values(recaudoMet).reduce((s,v)=>s+v,0);
-  // v4.12.1: cards clickeables → openDashDetail despliega lista
   const _hint='<div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:var(--soft)">Toca para ver →</div>';
-  $("dash-cards").innerHTML=
-    '<div class="dash-card cot" style="cursor:pointer" onclick="openDashDetail(\'cotizado\')"><div class="dash-card-icon">🧾</div><div class="dash-card-lab">Cotizado</div><div class="dash-card-val">'+fm(cotMonto)+'</div><div class="dash-card-sub">'+cotCount+' doc · '+cotClientes.size+' cliente'+(cotClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
-    '<div class="dash-card vendido" style="cursor:pointer" onclick="openDashDetail(\'vendido\')"><div class="dash-card-icon">🤝</div><div class="dash-card-lab">Vendido</div><div class="dash-card-val">'+fm(venMonto)+'</div><div class="dash-card-sub">'+venCount+' pedido'+(venCount!==1?'s':'')+' · '+venClientes.size+' cliente'+(venClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
-    '<div class="dash-card entregado" style="cursor:pointer" onclick="openDashDetail(\'entregado\')"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+'</div>'+_hint+'</div>'+
-    '<div class="dash-card recaudo" style="cursor:pointer" onclick="openDashDetail(\'recaudo\')"><div class="dash-card-icon">💵</div><div class="dash-card-lab">Recaudado</div><div class="dash-card-val">'+fm(totalRecaudo)+'</div><div class="dash-card-sub">en el período</div>'+_hint+'</div>'+
-    '<div class="dash-card cobrar" style="cursor:pointer" onclick="openDashDetail(\'cobrar\')"><div class="dash-card-icon">⚠️</div><div class="dash-card-lab">Por cobrar</div><div class="dash-card-val">'+fm(porCobrarTotal)+'</div><div class="dash-card-sub">'+porCobrarN+' documento'+(porCobrarN!==1?'s':'')+' (todos los activos)</div>'+_hint+'</div>';
-  const maxMet=Math.max(...Object.values(recaudoMet),1);
-  const recRows=METODOS_PAGO.map(m=>{
-    const v=recaudoMet[m];
-    const pct=Math.round(v*100/maxMet);
-    return '<div class="dash-met-row"><div class="dash-met-name">'+m+'</div><div class="dash-met-bar"><div class="dash-met-bar-fill" style="width:'+(v>0?pct:0)+'%"></div></div><div class="dash-met-val">'+fm(v)+'</div></div>';
-  }).join("");
-  $("dash-recaudo").innerHTML=totalRecaudo>0?recRows:'<div class="dash-met-empty">Sin pagos registrados en el período.</div>';
+  // KPIs del período (bento)
+  _safe(()=>{
+    $("dash-cards").innerHTML=
+      '<div class="dash-card cot" style="cursor:pointer" onclick="openDashDetail(\'cotizado\')"><div class="dash-card-icon">🧾</div><div class="dash-card-lab">Cotizado</div><div class="dash-card-val">'+fm(cotMonto)+'</div><div class="dash-card-sub">'+cotCount+' doc · '+cotClientes.size+' cliente'+(cotClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
+      '<div class="dash-card vendido" style="cursor:pointer" onclick="openDashDetail(\'vendido\')"><div class="dash-card-icon">🤝</div><div class="dash-card-lab">Vendido</div><div class="dash-card-val">'+fm(venMonto)+'</div><div class="dash-card-sub">'+venCount+' pedido'+(venCount!==1?'s':'')+' · '+venClientes.size+' cliente'+(venClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
+      '<div class="dash-card entregado" style="cursor:pointer" onclick="openDashDetail(\'entregado\')"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+'</div>'+_hint+'</div>'+
+      '<div class="dash-card recaudo" style="cursor:pointer" onclick="openDashDetail(\'recaudo\')"><div class="dash-card-icon">💵</div><div class="dash-card-lab">Recaudado</div><div class="dash-card-val">'+fm(totalRecaudo)+'</div><div class="dash-card-sub">en el período</div>'+_hint+'</div>'+
+      '<div class="dash-card cobrar" style="cursor:pointer" onclick="openDashDetail(\'cobrar\')"><div class="dash-card-icon">⚠️</div><div class="dash-card-lab">Por cobrar</div><div class="dash-card-val">'+fm(porCobrarTotal)+'</div><div class="dash-card-sub">'+porCobrarN+' documento'+(porCobrarN!==1?'s':'')+' (todos los activos)</div>'+_hint+'</div>';
+  },"kpis-cards");
+
+  // v5.2.0: Reportes comerciales
+  _safe(()=>renderReporteConversion(range,inRange),"reporte-conversion");
+  _safe(()=>renderReportePerdidas(range,inRange),"reporte-perdidas");
+  // v5.2.0: Vista por cliente (re-renderiza si hay uno seleccionado)
+  _safe(renderClienteView,"cliente-view");
+
+  // Recaudo por método
+  _safe(()=>{
+    const maxMet=Math.max(...Object.values(recaudoMet),1);
+    const recRows=METODOS_PAGO.map(m=>{
+      const v=recaudoMet[m];
+      const pct=Math.round(v*100/maxMet);
+      return '<div class="dash-met-row"><div class="dash-met-name">'+m+'</div><div class="dash-met-bar"><div class="dash-met-bar-fill" style="width:'+(v>0?pct:0)+'%"></div></div><div class="dash-met-val">'+fm(v)+'</div></div>';
+    }).join("");
+    $("dash-recaudo").innerHTML=totalRecaudo>0?recRows:'<div class="dash-met-empty">Sin pagos registrados en el período.</div>';
+  },"recaudo");
   // Próximas entregas (próximos 14 días, ignora período)
-  const todayIso2=new Date().toISOString().slice(0,10);
-  const t14=new Date();t14.setDate(t14.getDate()+14);
-  const t14Iso=t14.toISOString().slice(0,10);
-  const upcoming=[];
-  quotesCache.forEach(q=>{
-    if(q._wrongCollection)return; // v4.12.7
-    const s=q.status||"enviada";
-    if(s==="superseded")return; // v4.12.7
-    const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(s))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(s));
-    if(!ok||!q.eventDate)return;
-    if(q.eventDate>=todayIso2&&q.eventDate<=t14Iso)upcoming.push(q);
-  });
-  upcoming.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
-  if(!upcoming.length){$("dash-upcoming").innerHTML='<div class="dash-met-empty">No hay entregas en los próximos 14 días.</div>'}
-  else{
-    const byDay={};upcoming.forEach(q=>{(byDay[q.eventDate]=byDay[q.eventDate]||[]).push(q)});
-    const dayLabel=iso=>{
-      if(iso===todayIso2)return"HOY · "+iso;
-      const t=new Date(todayIso2+"T00:00:00"),d=new Date(iso+"T00:00:00");
-      const diff=Math.round((d-t)/86400000);
-      if(diff===1)return"MAÑANA · "+iso;
-      if(diff===2)return"PASADO · "+iso;
-      return iso;
-    };
-    $("dash-upcoming").innerHTML=Object.keys(byDay).sort().map(d=>{
-      const items=byDay[d].map(q=>{
-        const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
-        const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
-        const total=fm(getDocTotal(q));
-        return '<div class="dash-up-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
+  _safe(()=>{
+    const todayIso2=new Date().toISOString().slice(0,10);
+    const t14=new Date();t14.setDate(t14.getDate()+14);
+    const t14Iso=t14.toISOString().slice(0,10);
+    const upcoming=[];
+    quotesCache.forEach(q=>{
+      if(q._wrongCollection)return;
+      const s=q.status||"enviada";
+      if(s==="superseded")return;
+      const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(s))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(s));
+      if(!ok||!q.eventDate)return;
+      if(q.eventDate>=todayIso2&&q.eventDate<=t14Iso)upcoming.push(q);
+    });
+    upcoming.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
+    if(!upcoming.length){$("dash-upcoming").innerHTML='<div class="dash-met-empty">No hay entregas en los próximos 14 días.</div>'}
+    else{
+      const byDay={};upcoming.forEach(q=>{(byDay[q.eventDate]=byDay[q.eventDate]||[]).push(q)});
+      const dayLabel=iso=>{
+        if(iso===todayIso2)return"HOY · "+iso;
+        const t=new Date(todayIso2+"T00:00:00"),d=new Date(iso+"T00:00:00");
+        const diff=Math.round((d-t)/86400000);
+        if(diff===1)return"MAÑANA · "+iso;
+        if(diff===2)return"PASADO · "+iso;
+        return iso;
+      };
+      $("dash-upcoming").innerHTML=Object.keys(byDay).sort().map(d=>{
+        const items=byDay[d].map(q=>{
+          const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
+          const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
+          const total=fm(getDocTotal(q));
+          return '<div class="dash-up-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
+        }).join("");
+        return '<div class="dash-up-day"><div class="dash-up-day-label">'+dayLabel(d)+'</div>'+items+'</div>';
       }).join("");
-      return '<div class="dash-up-day"><div class="dash-up-day-label">'+dayLabel(d)+'</div>'+items+'</div>';
-    }).join("");
-  }
+    }
+  },"upcoming");
   // Pendientes por cobrar (top 8)
-  const pendList=[];
-  quotesCache.forEach(q=>{
-    if(q._wrongCollection)return; // v4.12.7
-    const s=q.status||"enviada";
-    if(s==="superseded")return; // v4.12.7
-    if(!["pedido","aprobada","en_produccion","entregado"].includes(s))return;
-    const pend=saldoPendiente(q);if(pend>0)pendList.push({q,pend});
-  });
-  pendList.sort((a,b)=>b.pend-a.pend);
-  if(!pendList.length){$("dash-pendientes").innerHTML='<div class="dash-met-empty">🎉 No hay saldos pendientes.</div>'}
-  else{
-    $("dash-pendientes").innerHTML=pendList.slice(0,8).map(({q,pend})=>{
-      const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
-      return '<div class="dash-up-item" onclick="openVerPagosModal(\''+q.id+'\',\''+q.kind+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta" style="color:#E65100;font-weight:700">'+fm(pend)+'</div></div>';
-    }).join("")+(pendList.length>8?'<div class="dash-met-empty" style="padding:8px">+'+(pendList.length-8)+' más en Historial</div>':"");
-  }
-  // v4.12: comentarios recientes (5 últimos) — v4.12.7 excluye fantasmas y superseded · v5.0.3 también anuladas
-  const coments=quotesCache.filter(q=>!q._wrongCollection&&q.status!=="superseded"&&q.status!=="anulada"&&(q.comentarioCliente?.texto||q.comentarioCliente?.fotoUrl||q.comentarioCliente?.fotoBase64)).map(q=>({q,c:q.comentarioCliente}));
-  coments.sort((a,b)=>(b.c.fecha||"").localeCompare(a.c.fecha||""));
-  if(!coments.length){$("dash-coments").innerHTML='<div class="dash-met-empty">Aún no se han registrado comentarios. Cuando entregues, registra qué dijo el cliente.</div>'}
-  else{
-    $("dash-coments").innerHTML=coments.slice(0,5).map(({q,c})=>{
-      const fotoIcon=(c.fotoUrl||c.fotoBase64)?' 📷':'';
-      const txt=(c.texto||"(solo foto)").slice(0,120)+((c.texto||"").length>120?'...':'');
-      return '<div class="dash-up-item" style="flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid var(--cl)" onclick="openComentModal(\''+q.id+'\',\''+q.kind+'\')">'+
-        '<div style="font-size:11px;color:var(--mid)"><strong>'+(q.client||"—")+'</strong> · '+(c.fecha||"—")+fotoIcon+'</div>'+
-        '<div style="font-size:12.5px;color:var(--bk);font-style:italic">"'+txt+'"</div>'+
-      '</div>';
-    }).join("");
-  }
+  _safe(()=>{
+    const pendList=[];
+    quotesCache.forEach(q=>{
+      if(q._wrongCollection)return;
+      const s=q.status||"enviada";
+      if(s==="superseded")return;
+      if(!["pedido","aprobada","en_produccion","entregado"].includes(s))return;
+      const pend=saldoPendiente(q);if(pend>0)pendList.push({q,pend});
+    });
+    pendList.sort((a,b)=>b.pend-a.pend);
+    if(!pendList.length){$("dash-pendientes").innerHTML='<div class="dash-met-empty">🎉 No hay saldos pendientes.</div>'}
+    else{
+      $("dash-pendientes").innerHTML=pendList.slice(0,8).map(({q,pend})=>{
+        const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
+        return '<div class="dash-up-item" onclick="openVerPagosModal(\''+q.id+'\',\''+q.kind+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta" style="color:#E65100;font-weight:700">'+fm(pend)+'</div></div>';
+      }).join("")+(pendList.length>8?'<div class="dash-met-empty" style="padding:8px">+'+(pendList.length-8)+' más en Historial</div>':"");
+    }
+  },"pendientes");
+  // Comentarios recientes
+  _safe(()=>{
+    const coments=quotesCache.filter(q=>!q._wrongCollection&&q.status!=="superseded"&&q.status!=="anulada"&&(q.comentarioCliente?.texto||q.comentarioCliente?.fotoUrl||q.comentarioCliente?.fotoBase64)).map(q=>({q,c:q.comentarioCliente}));
+    coments.sort((a,b)=>(b.c.fecha||"").localeCompare(a.c.fecha||""));
+    if(!coments.length){$("dash-coments").innerHTML='<div class="dash-met-empty">Aún no se han registrado comentarios. Cuando entregues, registra qué dijo el cliente.</div>'}
+    else{
+      $("dash-coments").innerHTML=coments.slice(0,5).map(({q,c})=>{
+        const fotoIcon=(c.fotoUrl||c.fotoBase64)?' 📷':'';
+        const txt=(c.texto||"(solo foto)").slice(0,120)+((c.texto||"").length>120?'...':'');
+        return '<div class="dash-up-item" style="flex-direction:column;align-items:flex-start;gap:2px;padding:8px 0;border-bottom:1px solid var(--cl)" onclick="openComentModal(\''+q.id+'\',\''+q.kind+'\')">'+
+          '<div style="font-size:11px;color:var(--mid)"><strong>'+(q.client||"—")+'</strong> · '+(c.fecha||"—")+fotoIcon+'</div>'+
+          '<div style="font-size:12.5px;color:var(--bk);font-style:italic">"'+txt+'"</div>'+
+        '</div>';
+      }).join("");
+    }
+  },"comentarios");
+  // v5.2.0: marcar visita actual para comparar en siguiente sesión (R5 simple)
+  try{saveLastVisit()}catch(e){console.warn("saveLastVisit falló:",e)}
 }
 
 // ─── MINI-DASHBOARD landing cotización ─────────────────────
@@ -1226,4 +1251,323 @@ function renderBannerFollowUp(){
   el.innerHTML='<div class="dbf-ic">📞</div>'+
     '<div class="dbf-txt"><strong>'+urgentes.length+' cotizacion'+(urgentes.length!==1?'es':'')+' sin seguimiento hace más de 7 días</strong><br><span style="font-size:11px;opacity:.85">'+primeros+mas+'</span></div>'+
     '<button onclick="setMode(\'seg\')">Ver seguimiento</button>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.2.0 · NUEVAS FEATURES
+// ═══════════════════════════════════════════════════════════
+
+// ─── R1: REPORTE DE CONVERSIÓN (embudo) ───────────────────
+// Muestra cuántas cotizaciones del período llegaron a pedido / entregado / perdida.
+// El denominador son las cotizaciones CREADAS en el período (fCre ∈ rango).
+function renderReporteConversion(range,inRange){
+  const el=$("dash-reporte-conversion");
+  if(!el)return;
+  if(!quotesCache.length){el.innerHTML='<div class="conv-empty">Sin datos todavía.</div>';return}
+  // Universo: docs creados en el período (excluyendo fantasmas/superseded/anuladas/convertidas).
+  // convertidas se excluyen porque son referencias a PFs (no cotizaciones independientes).
+  let tot=0,totMonto=0;
+  let ped=0,pedMonto=0;      // cualquier estado "vendido" (pedido/aprobada/en_produccion/entregado)
+  let ent=0,entMonto=0;      // solo entregado
+  let perd=0,perdMonto=0;    // followUp=perdida (enviada/propfinal)
+  let pend=0,pendMonto=0;    // todavía viva sin cerrar
+  quotesCache.forEach(q=>{
+    if(q._wrongCollection)return;
+    const s=q.status||"enviada";
+    if(s==="superseded"||s==="anulada"||s==="convertida")return;
+    const fCre=dateOfCreation(q);
+    if(!inRange(fCre))return;
+    const total=getDocTotal(q);
+    const fu=typeof getFollowUp==="function"?getFollowUp(q):"pendiente";
+    tot++;totMonto+=total;
+    if(fu==="perdida"&&(s==="enviada"||s==="propfinal")){perd++;perdMonto+=total;return}
+    if(["pedido","aprobada","en_produccion","entregado"].includes(s)){ped++;pedMonto+=total}
+    if(s==="entregado"){ent++;entMonto+=total}
+    if((s==="enviada"||s==="propfinal")&&fu!=="perdida"){pend++;pendMonto+=total}
+  });
+  if(!tot){
+    el.innerHTML='<div class="conv-empty">No hay cotizaciones creadas en este período.</div>';
+    return;
+  }
+  const pct=(n)=>tot>0?Math.round(n*100/tot):0;
+  const tasa=tot>0?Math.round(ped*100/tot):0;
+  el.innerHTML='<div class="conv-embudo">'+
+    '<div class="conv-row cotizadas">'+
+      '<div class="cr-label">🧾 Cotizadas en el período</div>'+
+      '<div class="cr-values"><span class="cr-count">'+tot+'</span><span class="cr-amount">('+fm(totMonto)+')</span></div>'+
+    '</div>'+
+    '<div class="conv-row pedidos">'+
+      '<div class="cr-label">🤝 Se convirtieron en pedido</div>'+
+      '<div class="cr-values"><span class="cr-count">'+ped+'</span><span class="cr-pct">'+pct(ped)+'%</span><span class="cr-amount">('+fm(pedMonto)+')</span></div>'+
+    '</div>'+
+    '<div class="conv-row entregadas">'+
+      '<div class="cr-label">🎉 Ya fueron entregadas</div>'+
+      '<div class="cr-values"><span class="cr-count">'+ent+'</span><span class="cr-pct">'+pct(ent)+'%</span><span class="cr-amount">('+fm(entMonto)+')</span></div>'+
+    '</div>'+
+    '<div class="conv-row perdidas">'+
+      '<div class="cr-label">❌ Se perdieron</div>'+
+      '<div class="cr-values"><span class="cr-count">'+perd+'</span><span class="cr-pct">'+pct(perd)+'%</span><span class="cr-amount">('+fm(perdMonto)+')</span></div>'+
+    '</div>'+
+    (pend>0?'<div class="conv-row" style="border-left-color:#FB8C00">'+
+      '<div class="cr-label">⏳ Aún vivas (sin cerrar)</div>'+
+      '<div class="cr-values"><span class="cr-count">'+pend+'</span><span class="cr-pct">'+pct(pend)+'%</span><span class="cr-amount">('+fm(pendMonto)+')</span></div>'+
+    '</div>':'')+
+  '</div>'+
+  '<div class="conv-embudo-resumen">Tasa de conversión: <strong>'+tasa+'%</strong> · '+ped+' de '+tot+' cotizaciones llegaron a pedido</div>';
+}
+
+// ─── R3: REPORTE DE PÉRDIDAS POR MOTIVO ───────────────────
+// Muestra distribución de motivos de pérdida en el período.
+// Incluye docs con followUp=perdida cuyo perdidaData.fecha está en el rango,
+// o su dateISO si no hay perdidaData.fecha.
+function renderReportePerdidas(range,inRange){
+  const el=$("dash-reporte-perdidas");
+  if(!el)return;
+  if(!quotesCache.length){el.innerHTML='<div class="conv-empty">Sin datos todavía.</div>';return}
+  const motivosOrden=["precio","competencia","no_respondio","cambio_planes","tiempo","otro","sin_motivo"];
+  const motivosLabel={
+    precio:"Precio",
+    competencia:"Competencia",
+    no_respondio:"No respondió",
+    cambio_planes:"Cambio de planes",
+    tiempo:"Tiempo",
+    otro:"Otro",
+    sin_motivo:"Sin motivo registrado"
+  };
+  const cnt={};const monto={};
+  motivosOrden.forEach(k=>{cnt[k]=0;monto[k]=0});
+  let total=0,totalMonto=0;
+  quotesCache.forEach(q=>{
+    if(q._wrongCollection)return;
+    if(typeof getFollowUp!=="function"||getFollowUp(q)!=="perdida")return;
+    const s=q.status||"enviada";
+    if(s!=="enviada"&&s!=="propfinal")return;
+    const fechaRef=q.perdidaData?.fecha||q.dateISO||dateOfCreation(q);
+    if(!inRange(fechaRef?.slice(0,10)))return;
+    const motivo=q.perdidaData?.motivo||"sin_motivo";
+    const key=motivosOrden.includes(motivo)?motivo:"sin_motivo";
+    cnt[key]++;
+    monto[key]+=getDocTotal(q);
+    total++;
+    totalMonto+=getDocTotal(q);
+  });
+  if(!total){
+    el.innerHTML='<div class="conv-empty">🎉 Ninguna pérdida registrada en el período. Buena noticia.</div>';
+    return;
+  }
+  const maxCnt=Math.max(...Object.values(cnt),1);
+  const filas=motivosOrden.filter(k=>cnt[k]>0).map(k=>{
+    const pctBar=Math.round(cnt[k]*100/maxCnt);
+    const pctTot=Math.round(cnt[k]*100/total);
+    return '<div class="perd-row">'+
+      '<div class="pr-label">'+motivosLabel[k]+'</div>'+
+      '<div class="pr-bar"><div class="pr-bar-fill" style="width:'+pctBar+'%"></div></div>'+
+      '<div class="pr-count">'+cnt[k]+' · '+pctTot+'%</div>'+
+    '</div>';
+  }).join("");
+  el.innerHTML='<div class="perd-motivos">'+filas+'</div>'+
+    '<div class="perd-resumen">Total perdido en el período: <strong>'+fm(totalMonto)+'</strong> · '+total+' cotizacion'+(total!==1?'es':'')+'</div>';
+}
+
+// ─── R4: VISTA POR CLIENTE ────────────────────────────────
+// Filtro en el dashboard que al escoger un cliente muestra todos sus docs
+// con KPIs: total cotizado, vendido, entregado, pendiente de cobro, perdidas.
+let _clienteFiltroActivo="";   // cliente seleccionado (string exacto)
+let _clienteFiltroInput="";    // lo que está tipeando (para sugerencias)
+
+function _normTxtDash(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")}
+
+function onClienteFilterInput(ev){
+  const v=ev.target.value;
+  _clienteFiltroInput=v;
+  const clearBtn=$("dash-cliente-clear");
+  if(clearBtn)clearBtn.style.display=v?"flex":"none";
+  if(!v.trim()){
+    _clienteFiltroActivo="";
+    $("dash-cliente-suggestions").classList.add("hidden");
+    renderClienteView();
+    return;
+  }
+  // Buscar clientes que matcheen
+  const norm=_normTxtDash(v);
+  const clientesSet=new Set();
+  const clientesCount={};
+  quotesCache.forEach(q=>{
+    if(q._wrongCollection)return;
+    if(!q.client)return;
+    const nc=_normTxtDash(q.client);
+    if(nc.includes(norm)){
+      clientesSet.add(q.client);
+      clientesCount[q.client]=(clientesCount[q.client]||0)+1;
+    }
+  });
+  const clientes=[...clientesSet].sort((a,b)=>(clientesCount[b]||0)-(clientesCount[a]||0)).slice(0,8);
+  const sug=$("dash-cliente-suggestions");
+  if(!clientes.length){
+    sug.classList.add("hidden");
+  }else{
+    sug.classList.remove("hidden");
+    sug.innerHTML=clientes.map(c=>{
+      return '<div class="cs-item" onclick="selectClienteFilter('+JSON.stringify(c).replace(/"/g,"&quot;")+')">'+
+        '<span>'+c.replace(/[<>]/g,"")+'</span>'+
+        '<span class="cs-count">'+clientesCount[c]+' doc</span>'+
+      '</div>';
+    }).join("");
+  }
+}
+
+function selectClienteFilter(clienteName){
+  _clienteFiltroActivo=clienteName;
+  $("dash-cliente-input").value=clienteName;
+  $("dash-cliente-suggestions").classList.add("hidden");
+  $("dash-cliente-clear").style.display="flex";
+  renderClienteView();
+}
+
+function clearClienteFilter(){
+  _clienteFiltroActivo="";
+  _clienteFiltroInput="";
+  const inp=$("dash-cliente-input");if(inp)inp.value="";
+  const sug=$("dash-cliente-suggestions");if(sug)sug.classList.add("hidden");
+  const clr=$("dash-cliente-clear");if(clr)clr.style.display="none";
+  renderClienteView();
+}
+
+function renderClienteView(){
+  const el=$("dash-cliente-resultado");
+  if(!el)return;
+  if(!_clienteFiltroActivo){el.innerHTML="";return}
+  const cli=_clienteFiltroActivo;
+  const docs=quotesCache.filter(q=>!q._wrongCollection&&q.client===cli);
+  if(!docs.length){
+    el.innerHTML='<div class="cli-view"><div class="cli-view-title">⚠️ Sin datos para "'+cli.replace(/[<>]/g,"")+'"</div></div>';
+    return;
+  }
+  // Calcular métricas
+  let totCot=0,totVen=0,totEnt=0,totPend=0,totPerd=0;
+  let cntCot=0,cntVen=0,cntEnt=0,cntPerd=0;
+  docs.forEach(q=>{
+    const s=q.status||"enviada";
+    if(s==="superseded"||s==="convertida")return;
+    const fu=typeof getFollowUp==="function"?getFollowUp(q):"pendiente";
+    const total=getDocTotal(q);
+    if(s==="anulada")return;
+    if(fu==="perdida"&&(s==="enviada"||s==="propfinal")){totPerd+=total;cntPerd++;return}
+    totCot+=total;cntCot++;
+    if(["pedido","aprobada","en_produccion","entregado"].includes(s)){totVen+=total;cntVen++}
+    if(s==="entregado"){totEnt+=total;cntEnt++}
+    if(["pedido","aprobada","en_produccion","entregado"].includes(s)){
+      const sp=saldoPendiente(q);if(sp>0)totPend+=sp;
+    }
+  });
+  // Lista de docs (ordenada por fecha desc)
+  const docsSorted=[...docs].sort((a,b)=>(b.dateISO||"").localeCompare(a.dateISO||""));
+  const statusColor={
+    enviada:"#90A4AE",propfinal:"#5C6BC0",pedido:"#43A047",aprobada:"#43A047",
+    en_produccion:"#689F38",entregado:"#2E7D32",anulada:"#EF5350",convertida:"#9E9E9E",superseded:"#BDBDBD"
+  };
+  const listHtml=docsSorted.slice(0,20).map(q=>{
+    const s=q.status||"enviada";
+    const fu=typeof getFollowUp==="function"?getFollowUp(q):"pendiente";
+    const statusLabel=fu==="perdida"&&(s==="enviada"||s==="propfinal")?"perdida":s;
+    const bg=fu==="perdida"?"#C62828":(statusColor[s]||"#90A4AE");
+    const num=q.quoteNumber||q.id;
+    const total=getDocTotal(q);
+    return '<div class="cli-view-doc" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+      '<span class="cvd-num">'+num+'</span>'+
+      '<span class="cvd-status" style="background:'+bg+'22;color:'+bg+';border:1px solid '+bg+'55">'+statusLabel+'</span>'+
+      '<span class="cvd-total">'+fm(total)+'</span>'+
+    '</div>';
+  }).join("");
+  const masLabel=docsSorted.length>20?'<div class="dash-met-empty" style="padding:6px;font-size:10.5px">+'+(docsSorted.length-20)+' documentos más</div>':'';
+  el.innerHTML='<div class="cli-view">'+
+    '<div class="cli-view-title">👤 '+cli.replace(/[<>]/g,"")+'</div>'+
+    '<div class="cli-view-metrics">'+
+      '<div class="cli-view-met"><div class="cvm-lab">Cotizado</div><div class="cvm-val">'+fm(totCot)+'</div><div class="cvm-sub">'+cntCot+' doc</div></div>'+
+      '<div class="cli-view-met"><div class="cvm-lab">Vendido</div><div class="cvm-val">'+fm(totVen)+'</div><div class="cvm-sub">'+cntVen+' pedido'+(cntVen!==1?'s':'')+'</div></div>'+
+      '<div class="cli-view-met"><div class="cvm-lab">Entregado</div><div class="cvm-val">'+fm(totEnt)+'</div><div class="cvm-sub">'+cntEnt+' entrega'+(cntEnt!==1?'s':'')+'</div></div>'+
+      '<div class="cli-view-met"><div class="cvm-lab" style="color:#E65100">Por cobrar</div><div class="cvm-val" style="color:#E65100">'+fm(totPend)+'</div><div class="cvm-sub">saldo</div></div>'+
+      (cntPerd>0?'<div class="cli-view-met"><div class="cvm-lab" style="color:#C62828">Perdido</div><div class="cvm-val" style="color:#C62828">'+fm(totPerd)+'</div><div class="cvm-sub">'+cntPerd+' doc</div></div>':'')+
+    '</div>'+
+    '<div class="cli-view-docs">'+listHtml+masLabel+'</div>'+
+  '</div>';
+}
+
+// ─── Mantenimiento colapsable ─────────────────────────────
+let _mantOpen=false;
+function toggleMantenimiento(){
+  _mantOpen=!_mantOpen;
+  const body=$("dash-mant-body");
+  const chev=$("mant-chevron");
+  if(body)body.classList.toggle("hidden",!_mantOpen);
+  if(chev)chev.classList.toggle("open",_mantOpen);
+}
+
+// ─── R5 simple · Banner de novedades desde última visita ──
+// Guarda en localStorage la fecha de última visita del usuario actual.
+// Al entrar al dashboard, compara y muestra un banner si hay cambios relevantes.
+function _lastVisitKey(){
+  const uid=(typeof currentUser!=="undefined"&&currentUser?.uid)||"anon";
+  return "gb_last_visit_"+uid;
+}
+function getLastVisit(){
+  try{return localStorage.getItem(_lastVisitKey())}catch{return null}
+}
+function saveLastVisit(){
+  try{localStorage.setItem(_lastVisitKey(),new Date().toISOString())}catch{}
+}
+function renderBannerNovedades(){
+  const el=$("dash-banner-novedades");
+  if(!el)return;
+  el.classList.add("hidden");
+  const last=getLastVisit();
+  if(!last)return; // primera visita, no hay con qué comparar
+  // Detectar cambios desde last:
+  //   - Pedidos nuevos (status pedido/aprobada con createdAt o updatedAt > last)
+  //   - Entregas registradas (status entregado con updatedAt > last)
+  //   - Pagos recibidos (algún pago con fecha > last)
+  let nuevosPedidos=0,nuevasEntregas=0,nuevosPagos=0;
+  const lastTs=new Date(last).getTime();
+  quotesCache.forEach(q=>{
+    if(q._wrongCollection)return;
+    const s=q.status||"enviada";
+    if(s==="superseded"||s==="anulada")return;
+    const upd=q.updatedAtLocal||q.updatedAtIso||(q.updatedAt?.toDate?q.updatedAt.toDate().toISOString():null);
+    const updTs=upd?new Date(upd).getTime():0;
+    if(updTs>lastTs){
+      if(["pedido","aprobada","en_produccion"].includes(s))nuevosPedidos++;
+      if(s==="entregado")nuevasEntregas++;
+    }
+    // pagos
+    const pagos=typeof getPagos==="function"?getPagos(q):[];
+    pagos.forEach(p=>{
+      if(p.registradoEn){
+        const pTs=new Date(p.registradoEn).getTime();
+        if(pTs>lastTs)nuevosPagos++;
+      }else if(p.fecha){
+        const pTs=new Date(p.fecha).getTime();
+        if(pTs>lastTs)nuevosPagos++;
+      }
+    });
+  });
+  const total=nuevosPedidos+nuevasEntregas+nuevosPagos;
+  if(!total)return;
+  const partes=[];
+  if(nuevosPedidos)partes.push(nuevosPedidos+" pedido"+(nuevosPedidos!==1?"s":"")+" nuevo"+(nuevosPedidos!==1?"s":""));
+  if(nuevasEntregas)partes.push(nuevasEntregas+" entrega"+(nuevasEntregas!==1?"s":"")+" registrada"+(nuevasEntregas!==1?"s":""));
+  if(nuevosPagos)partes.push(nuevosPagos+" pago"+(nuevosPagos!==1?"s":"")+" recibido"+(nuevosPagos!==1?"s":""));
+  const desde=new Date(last);
+  const desdeStr=desde.toLocaleDateString("es-CO",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+  el.classList.remove("hidden");
+  el.innerHTML='<div class="dbn-ic">🔔</div>'+
+    '<div class="dbn-body">'+
+      '<div class="dbn-title">Novedades desde tu última visita</div>'+
+      '<div class="dbn-desc">'+partes.join(" · ")+' · desde '+desdeStr+'</div>'+
+    '</div>'+
+    '<button class="dbn-close" onclick="dismissNovedades(event)" title="Descartar">×</button>';
+}
+function dismissNovedades(ev){
+  if(ev){ev.stopPropagation();ev.preventDefault()}
+  saveLastVisit();
+  const el=$("dash-banner-novedades");if(el)el.classList.add("hidden");
 }
