@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-20-v5.0.1b-hide-convertidas-cascade-delete-grouped-drilldown-sync-agenda -->
+<!-- VERSION: 2026-04-20-v5.0.2-autosync-fechas-flexibles-boton-fantasmas-guia-backup -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -332,6 +332,37 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .sync-agenda-btn{display:block;width:100%;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;border:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:12px;box-shadow:0 2px 8px rgba(27,94,32,.25)}
 .sync-agenda-btn:active{transform:scale(.98)}
 .sync-agenda-btn .sab-sub{display:block;font-size:10px;font-weight:500;opacity:.9;margin-top:2px}
+/* v5.0.2: versión secundaria del botón sync (menos prominente, flujo primario ahora es el banner) */
+.sync-agenda-btn-secondary{background:linear-gradient(135deg,#607D8B,#455A64);box-shadow:0 1px 4px rgba(69,90,100,.2);padding:10px 14px;font-size:12px}
+.sync-agenda-btn-secondary .sab-sub{font-size:9.5px}
+/* v5.0.2: banner sync pendiente (verde brillante con conteo) */
+.dash-banner-sync{background:linear-gradient(135deg,#A5D6A7,#66BB6A);border:1.5px solid #2E7D32;border-left:4px solid #1B5E20;border-radius:10px;padding:12px 14px;margin:0 0 14px 0;display:flex;align-items:center;gap:10px;color:#1B5E20;font-size:13px;line-height:1.4}
+.dash-banner-sync .dbs-ic{font-size:22px;flex-shrink:0}
+.dash-banner-sync .dbs-txt{flex:1;min-width:0}
+.dash-banner-sync .dbs-txt strong{color:#0D3818;font-weight:800}
+.dash-banner-sync button{background:#1B5E20;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif}
+.dash-banner-sync button:active{transform:scale(.97)}
+/* v5.0.2: info del rango custom activo */
+.dash-custom-info{background:#ECEFF1;border:1px dashed #90A4AE;border-radius:8px;padding:8px 12px;margin:0 0 10px 0;font-size:11.5px;color:#455A64;display:flex;align-items:center;gap:8px}
+.dash-custom-info button{background:transparent;border:none;color:#1976D2;font-size:11px;cursor:pointer;text-decoration:underline;padding:2px 4px;font-family:'DM Sans',sans-serif}
+.dp-btn-custom{font-size:14px !important;padding:5px 10px !important}
+/* v5.0.2: sección mantenimiento */
+.dash-section-mantenimiento{background:#FAFAFA;border:1px dashed #BDBDBD}
+.mant-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.mant-btn{background:#fff;border:1px solid #CFD8DC;color:#37474F;padding:8px 12px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;flex:1 1 auto;min-width:140px}
+.mant-btn:hover{background:#F5F5F5;border-color:#90A4AE}
+.mant-btn:active{transform:scale(.97)}
+.mant-btn-fantasmas{border-color:#FFB74D;color:#E65100}
+.mant-btn-fantasmas:hover{background:#FFF8E1}
+.mant-btn-resync{border-color:#81C784;color:#1B5E20}
+.mant-btn-resync:hover{background:#E8F5E9}
+.mant-btn-migrar{border-color:#BA68C8;color:#6A1B9A}
+.mant-btn-migrar:hover{background:#F3E5F5}
+.mant-hint{font-size:10px;color:#999;margin-top:8px;font-style:italic}
+/* v5.0.2: badge "pendiente sync" en cards del historial */
+.hc-sync-pending{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;vertical-align:middle;animation:syncPulse 1.8s ease-in-out infinite}
+.hc-sync-ok{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px;background:#E8F5E9;color:#2E7D32;border:1px solid #81C784;vertical-align:middle}
+@keyframes syncPulse{0%,100%{opacity:.9}50%{opacity:.55}}
 /* ══════ v5.0.1b: etiqueta "origen de PF" en convertidas ══════ */
 .hc-origen-pf{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;background:#E8EAF6;color:#3F51B5;border:1px solid #9FA8DA;vertical-align:middle;font-style:italic}
 /* ══════ v5.0.1b: drill-down agrupado por cliente ══════ */
@@ -632,15 +663,22 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <button class="dp-btn act" data-p="month" onclick="setDashPeriod('month')">Mes</button>
       <button class="dp-btn" data-p="year" onclick="setDashPeriod('year')">Año</button>
       <button class="dp-btn" data-p="all" onclick="setDashPeriod('all')">Todo</button>
+      <button class="dp-btn dp-btn-custom" data-p="custom" onclick="openCustomRangeModal()" title="Rango de fechas personalizado">📆</button>
     </div>
     <button class="dash-export-btn" onclick="exportHistoryJson()" title="Descargar JSON de respaldo con todo el historial">📥 Backup JSON</button>
+    <!-- v5.0.2: botón para ver guía de activación de backup automático Firebase -->
+    <button class="dash-export-btn" onclick="openBackupInfoModal()" title="Guía de backup automático en Firebase Console" style="background:#E8F5E9;color:#1B5E20;border-color:#81C784">ℹ️ Backup auto</button>
   </div>
   <!-- v4.13.0: banner de advertencia si hay docs fantasmas detectados -->
   <div id="dash-warn-fantasmas" class="dash-banner-warn hidden"></div>
+  <!-- v5.0.2: banner sync pendiente — aparece si hay pedidos con needsSync:true -->
+  <div id="dash-banner-sync" class="dash-banner-sync hidden"></div>
   <!-- v5.0.1b: banner de entregas HOY (aparece solo si hay) -->
   <div id="dash-banner-hoy" class="dash-banner-hoy hidden" onclick="setMode('cal')"></div>
   <!-- v5.0.1b: banner de convertidas archivables (aparece solo si hay 3+ de meses anteriores) -->
   <div id="dash-banner-convertidas" class="dash-banner-info hidden"></div>
+  <!-- v5.0.2: rango de fechas custom activo (aparece solo si dashPeriod === 'custom') -->
+  <div id="dash-custom-range-info" class="dash-custom-info hidden"></div>
   <div class="dash-period-info" id="dash-period-info"></div>
   <div class="dash-grid" id="dash-cards"></div>
   <div class="dash-section">
@@ -651,7 +689,8 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
     <div class="dash-stit">📅 Próximas entregas</div>
     <div id="dash-upcoming"></div>
     <!-- v5.0.1b: botón sincronizar agenda consolidada con Kathy y JP -->
-    <button class="sync-agenda-btn" onclick="syncAgendaAllFuture()">📤 Sincronizar agenda con Kathy y JP<span class="sab-sub">Genera un .ics con todos los pedidos futuros · compartir por WhatsApp</span></button>
+    <!-- v5.0.2: el botón ahora es SECUNDARIO. El flujo primario es el banner de pendientes arriba. -->
+    <button class="sync-agenda-btn sync-agenda-btn-secondary" onclick="syncAgendaAllFuture()">📤 Sincronizar TODA la agenda con Kathy y JP<span class="sab-sub">.ics con todos los pedidos futuros · usa esto si quieres re-sincronizar todo (no solo pendientes)</span></button>
   </div>
   <div class="dash-section">
     <div class="dash-stit">⚠️ Pendientes por cobrar</div>
@@ -660,6 +699,16 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   <div class="dash-section">
     <div class="dash-stit">💬 Últimos comentarios de clientes</div>
     <div id="dash-coments"></div>
+  </div>
+  <!-- v5.0.2: sección de mantenimiento con botones avanzados -->
+  <div class="dash-section dash-section-mantenimiento">
+    <div class="dash-stit">🧰 Mantenimiento</div>
+    <div class="mant-grid">
+      <button class="mant-btn mant-btn-fantasmas" onclick="cleanupWrongDocs()" title="Buscar y eliminar docs fantasma (GB-PF-* guardados por error en proposals/)">🧹 Limpiar fantasmas</button>
+      <button class="mant-btn mant-btn-resync" onclick="markAllUnsyncedAsPending()" title="Marca todos los pedidos agendados futuros como 'pendientes de sincronizar' (útil si cambias de teléfono o algo falló)">🔁 Marcar todo para re-sync</button>
+      <button class="mant-btn mant-btn-migrar" onclick="migrarFotosStorage()" title="Migra fotos antiguas en base64 a Firebase Storage (se ejecuta una sola vez en la vida)">🗜️ Migrar fotos a Storage</button>
+    </div>
+    <div class="mant-hint">Estas acciones NO rompen nada. Si algo sale mal, usa 📥 Backup JSON arriba antes de ejecutarlas.</div>
   </div>
 </div>
 
@@ -1216,11 +1265,88 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.0.1b"></script>
-<script src="app-core.js?v=5.0.1b"></script>
-<script src="app-cotizar.js?v=5.0.1b"></script>
-<script src="app-propuesta.js?v=5.0.1b"></script>
-<script src="app-historial.js?v=5.0.1b"></script>
-<script src="app-dashboard.js?v=5.0.1b"></script>
+<!-- v5.0.2: Modal de rango de fechas custom -->
+<div id="custom-range-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeCustomRangeModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#455A64,#263238)">
+      <span class="mtitle">📆 Rango de fechas personalizado</span>
+      <button class="mclose" onclick="closeCustomRangeModal()">×</button>
+    </div>
+    <div class="mform">
+      <div style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.4">Escoge las fechas entre las que quieres ver las métricas del dashboard. Se usan para todos los KPIs (Cotizado, Vendido, Entregado, Recaudado) y comentarios recientes.</div>
+      <div class="fld">
+        <label class="flbl">Desde</label>
+        <input type="date" class="fin" id="cr-from" />
+      </div>
+      <div class="fld">
+        <label class="flbl">Hasta</label>
+        <input type="date" class="fin" id="cr-to" />
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px">
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('last7')">Últimos 7 días</button>
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('last30')">Últimos 30 días</button>
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('last90')">Últimos 90 días</button>
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('ytd')">Año corrido (YTD)</button>
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('q1')">Q1 año actual</button>
+        <button class="btn" style="background:#ECEFF1;color:#455A64;font-size:11px;padding:6px 10px" onclick="setCustomRangePreset('prev-month')">Mes anterior</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeCustomRangeModal()">Cancelar</button>
+        <button class="btn" style="background:linear-gradient(135deg,#1976D2,#0D47A1);color:#fff;flex:1" onclick="applyCustomRange()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v5.0.2: Modal informativo sobre backups Firebase -->
+<div id="backup-info-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeBackupInfoModal()">
+  <div class="modal-box" style="max-height:90vh">
+    <div class="modal-head" style="background:linear-gradient(135deg,#2E7D32,#1B5E20)">
+      <span class="mtitle">ℹ️ Backup automático en Firebase</span>
+      <button class="mclose" onclick="closeBackupInfoModal()">×</button>
+    </div>
+    <div class="mform" style="font-size:13px;line-height:1.5;color:#333">
+      <div style="background:#E8F5E9;border-left:3px solid #2E7D32;padding:10px 12px;border-radius:6px;margin-bottom:14px">
+        <strong>Tu negocio ya tiene 3 niveles de protección.</strong> Este diálogo te explica cuáles funcionan solos y cuáles requieren que actives algo en la consola.
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;color:#1B5E20;margin-bottom:4px">Nivel 0 · Replicación automática (gratis, ya activo)</div>
+        <div style="font-size:12px;color:#555">Firebase replica tus datos en múltiples servidores con 99.999% de disponibilidad. Protege contra fallos de hardware. NO protege contra borrados accidentales tuyos.</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;color:#1B5E20;margin-bottom:4px">Nivel 1 · Backup JSON manual (gratis, ya lo tienes)</div>
+        <div style="font-size:12px;color:#555">Botón "📥 Backup JSON" arriba. Descarga todo tu historial en un archivo. Recomendación: guardarlo en Google Drive 1 vez por semana.</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;color:#1B5E20;margin-bottom:4px">Nivel 2 · Point-in-Time Recovery (PITR) — REQUIERE ACTIVAR</div>
+        <div style="font-size:12px;color:#555;margin-bottom:6px">Recuperación a cualquier minuto dentro de los últimos 7 días. Costo: ~$0.30-0.50 USD/mes. Requiere plan Blaze (pay-as-you-go).</div>
+        <div style="font-size:11.5px;color:#2E7D32;background:#F1F8E9;padding:8px 10px;border-radius:6px"><strong>Cómo activarlo:</strong> Firebase Console → Firestore Database → Databases → toca tu database (default) → pestaña "Disaster recovery" → marca "Enable point-in-time recovery" → Save.</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;color:#1B5E20;margin-bottom:4px">Nivel 3 · Scheduled Backups — REQUIERE ACTIVAR</div>
+        <div style="font-size:12px;color:#555;margin-bottom:6px">Backups diarios o semanales automáticos con retención hasta 14 semanas. Costo: ~$0.50-1.00 USD/mes adicional. Requiere plan Blaze.</div>
+        <div style="font-size:11.5px;color:#2E7D32;background:#F1F8E9;padding:8px 10px;border-radius:6px"><strong>Cómo activarlo:</strong> Mismo lugar que PITR → columna "Scheduled backups" → Edit settings → activar Daily (retención 7 días) o Weekly (retención 4 semanas) → Save.</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;color:#1B5E20;margin-bottom:4px">Código del programa (GitHub)</div>
+        <div style="font-size:12px;color:#555">El código (HTML, JS, CSS) NO se guarda en Firebase — está en GitHub. Cada commit es una versión inmutable. Puedes volver a cualquier versión anterior desde History del repo.</div>
+      </div>
+      <div style="background:#FFF8E1;border-left:3px solid #F57F17;padding:10px 12px;border-radius:6px;margin-top:16px;font-size:12px;color:#555">
+        <strong>Mi recomendación:</strong> activa los niveles 2 y 3 esta semana. Son 5 clics en la consola y te dan tranquilidad por ~$1.50 USD/mes. Puedes abrir la consola ahora desde el botón de abajo. El archivo INSTRUCCIONES_FIREBASE_BACKUP.md que te entregué tiene los pasos exactos con screenshots descritos.
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeBackupInfoModal()">Cerrar</button>
+        <a class="btn" style="background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;flex:1;text-align:center;text-decoration:none;line-height:normal" href="https://console.firebase.google.com/project/gourmet-bites-cotizador/firestore/databases" target="_blank" onclick="closeBackupInfoModal()">🔥 Abrir Firebase Console</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app-assets.js?v=5.0.2"></script>
+<script src="app-core.js?v=5.0.2"></script>
+<script src="app-cotizar.js?v=5.0.2"></script>
+<script src="app-propuesta.js?v=5.0.2"></script>
+<script src="app-historial.js?v=5.0.2"></script>
+<script src="app-dashboard.js?v=5.0.2"></script>
 </body>
 </html>

@@ -1,13 +1,14 @@
 // ═══════════════════════════════════════════════════════════
-// app-core.js · v5.0.1b · 2026-04-20
+// app-core.js · v5.0.2 · 2026-04-20
 // Firebase wrapper, Auth (v5.0), Storage (v5.0), state global,
 // helpers, INIT, mode switching, search, transporte, cart,
 // navegación, clientes, autoTransition, getNextNumber.
-// v5.0.1b: borrado en cascada de propuestas convertidas + helper de PF hija.
+// v5.0.1b: borrado en cascada de propuestas convertidas.
+// v5.0.2: flag needsSync + helpers auto-sync + rango custom dashboard.
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.0.1b";
+const BUILD_VERSION="v5.0.2";
 const BUILD_DATE="2026-04-20";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -632,6 +633,157 @@ async function deleteHistoryItem(kind,id){
   else coll="proposals";
   await deleteDoc(doc(db,coll,id));
   quotesCache=quotesCache.filter(q=>!(q.kind===kind&&q.id===id));
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: AUTO-SYNC HELPERS
+// Cada vez que un pedido entra a un estado "agendable" (pedido, aprobada)
+// con fecha de entrega, se marca needsSync=true.
+// Cuando Luis comparte la agenda incremental, esos docs pasan a
+// needsSync=false + lastSyncAt=timestamp.
+// ═══════════════════════════════════════════════════════════
+
+// ¿Es un pedido con fecha de entrega futura en un estado agendable?
+function isAgendable(q){
+  if(!q||q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+  if(!q.eventDate)return false;
+  const hoy=new Date().toISOString().slice(0,10);
+  if(q.eventDate<hoy)return false;
+  const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(q.status))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(q.status));
+  return ok;
+}
+
+// Marca un doc como needsSync=true al guardarlo (llamar tras marcar pedido/aprobada).
+async function markAsNeedsSync(docId,kind){
+  if(!cloudOnline)return;
+  try{
+    const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    let coll;
+    if(kind==="quote")coll="quotes";
+    else if(docId&&docId.startsWith("GB-PF-"))coll="propfinals";
+    else coll="proposals";
+    const payload={needsSync:true,updatedAt:serverTimestamp()};
+    // audit stamp si está disponible (v5.0.0)
+    if(typeof auditStamp==="function"){Object.assign(payload,auditStamp())}
+    await updateDoc(doc(db,coll,docId),payload);
+    const local=quotesCache.find(x=>x.id===docId&&x.kind===kind);
+    if(local)local.needsSync=true;
+  }catch(e){console.warn("markAsNeedsSync error",docId,e)}
+}
+
+// Marca varios docs como synced=true tras compartir el .ics.
+async function markAsSynced(docs){
+  if(!cloudOnline||!docs||!docs.length)return;
+  try{
+    const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    const now=new Date().toISOString();
+    for(const q of docs){
+      let coll;
+      if(q.kind==="quote")coll="quotes";
+      else if(q.id&&q.id.startsWith("GB-PF-"))coll="propfinals";
+      else coll="proposals";
+      const payload={needsSync:false,lastSyncAt:now,updatedAt:serverTimestamp()};
+      if(typeof auditStamp==="function"){Object.assign(payload,auditStamp())}
+      try{
+        await updateDoc(doc(db,coll,q.id),payload);
+        q.needsSync=false;
+        q.lastSyncAt=now;
+      }catch(e){console.warn("markAsSynced fail "+q.id,e)}
+    }
+  }catch(e){console.warn("markAsSynced error",e)}
+}
+
+// Mantenimiento: fuerza a que todos los agendables futuros queden needsSync=true.
+// Útil si Luis cambia de teléfono o quiere re-sincronizar todo.
+async function markAllUnsyncedAsPending(){
+  if(!cloudOnline){alert("Sin conexión.");return}
+  try{
+    if(!quotesCache.length){await loadAllHistory()}
+    const pendientes=quotesCache.filter(isAgendable);
+    if(!pendientes.length){
+      if(typeof toast==="function")toast("No hay pedidos futuros agendables — nada que marcar","info");
+      else alert("No hay pedidos futuros agendables.");
+      return;
+    }
+    if(!confirm("🔁 Marcar TODOS los "+pendientes.length+" pedidos futuros agendables como 'pendientes de sincronizar'.\n\nEl banner verde de sync aparecerá arriba del dashboard con un conteo de "+pendientes.length+".\n\n¿Continuar?"))return;
+    showLoader("Marcando "+pendientes.length+" pedidos...");
+    const {db,doc,updateDoc,serverTimestamp}=window.fb;
+    let ok=0,fail=0;
+    for(const q of pendientes){
+      let coll;
+      if(q.kind==="quote")coll="quotes";
+      else if(q.id&&q.id.startsWith("GB-PF-"))coll="propfinals";
+      else coll="proposals";
+      const payload={needsSync:true,updatedAt:serverTimestamp()};
+      if(typeof auditStamp==="function"){Object.assign(payload,auditStamp())}
+      try{await updateDoc(doc(db,coll,q.id),payload);q.needsSync=true;ok++}
+      catch(e){fail++;console.warn("fail mark "+q.id,e)}
+    }
+    hideLoader();
+    if(typeof toast==="function")toast("🔁 "+ok+" pedido(s) marcados"+(fail?" · "+fail+" fallos":""),fail?"warn":"success");
+    if(curMode==="dash"&&typeof renderDashboard==="function")renderDashboard();
+    if(curMode==="hist"&&typeof renderHist==="function")renderHist();
+  }catch(e){hideLoader();alert("Error: "+(e.message||e));console.error(e)}
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: MODAL BACKUP INFO (abrir/cerrar)
+// ═══════════════════════════════════════════════════════════
+function openBackupInfoModal(){
+  const m=$("backup-info-modal");
+  if(m)m.classList.remove("hidden");
+}
+function closeBackupInfoModal(){
+  const m=$("backup-info-modal");
+  if(m)m.classList.add("hidden");
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: MODAL RANGO CUSTOM
+// ═══════════════════════════════════════════════════════════
+function openCustomRangeModal(){
+  const m=$("custom-range-modal");
+  if(!m)return;
+  // Pre-cargar con el rango actual si ya había custom activo
+  if(typeof dashCustomFrom==="string"&&dashCustomFrom)$("cr-from").value=dashCustomFrom;
+  if(typeof dashCustomTo==="string"&&dashCustomTo)$("cr-to").value=dashCustomTo;
+  m.classList.remove("hidden");
+}
+function closeCustomRangeModal(){
+  const m=$("custom-range-modal");
+  if(m)m.classList.add("hidden");
+}
+function setCustomRangePreset(kind){
+  const today=new Date();
+  const toIso=d=>d.toISOString().slice(0,10);
+  let from,to=toIso(today);
+  if(kind==="last7"){const d=new Date(today);d.setDate(d.getDate()-6);from=toIso(d)}
+  else if(kind==="last30"){const d=new Date(today);d.setDate(d.getDate()-29);from=toIso(d)}
+  else if(kind==="last90"){const d=new Date(today);d.setDate(d.getDate()-89);from=toIso(d)}
+  else if(kind==="ytd"){from=today.getFullYear()+"-01-01"}
+  else if(kind==="q1"){from=today.getFullYear()+"-01-01";to=today.getFullYear()+"-03-31"}
+  else if(kind==="prev-month"){
+    const y=today.getFullYear(),m=today.getMonth();
+    const firstPrev=new Date(y,m-1,1);
+    const lastPrev=new Date(y,m,0);
+    from=toIso(firstPrev);to=toIso(lastPrev);
+  }
+  if(from)$("cr-from").value=from;
+  if(to)$("cr-to").value=to;
+}
+function applyCustomRange(){
+  const f=($("cr-from").value||"").trim();
+  const t=($("cr-to").value||"").trim();
+  if(!f||!t){alert("Escoge ambas fechas.");return}
+  if(f>t){alert("La fecha 'Desde' debe ser menor o igual a 'Hasta'.");return}
+  if(typeof dashCustomFrom!=="undefined"){dashCustomFrom=f;dashCustomTo=t}
+  else{window.dashCustomFrom=f;window.dashCustomTo=t}
+  if(typeof dashPeriod!=="undefined")dashPeriod="custom";
+  else window.dashPeriod="custom";
+  closeCustomRangeModal();
+  // Marcar botón custom como activo
+  document.querySelectorAll(".dp-btn").forEach(b=>b.classList.toggle("act",b.dataset.p==="custom"));
+  if(typeof renderDashboard==="function")renderDashboard();
 }
 
 // ─── INIT ──────────────────────────────────────────────────

@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v5.0.1b · 2026-04-20
+// app-dashboard.js · v5.0.2 · 2026-04-20
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v4.12.1: cards clickeables (drill-down) + total real de propuestas.
 // v5.0.1b: drill-down agrupado por cliente + banner entregas HOY +
 //          botón Sincronizar agenda con Kathy/JP + excluir convertidas.
-// Termina con BOOTSTRAP (renderCats, initAuthObserver).
+// v5.0.2: banner sync pendiente + syncPendingOnly incremental + rango custom.
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -21,6 +21,9 @@ function getDocTotal(q){
 
 // ─── DASHBOARD ─────────────────────────────────────────────
 let dashPeriod="month";
+// v5.0.2: rango custom de fechas (solo usado si dashPeriod === "custom")
+let dashCustomFrom="";
+let dashCustomTo="";
 function setDashPeriod(p){
   dashPeriod=p;
   document.querySelectorAll(".dp-btn").forEach(b=>b.classList.toggle("act",b.dataset.p===p));
@@ -33,6 +36,13 @@ function getDashRange(){
   if(dashPeriod==="week"){const start=new Date(today);start.setDate(start.getDate()-6);return{start:start.toISOString().slice(0,10),end:todayIso,label:"Últimos 7 días ("+start.toISOString().slice(0,10)+" → "+todayIso+")"}}
   if(dashPeriod==="month"){const start=new Date(today.getFullYear(),today.getMonth(),1);return{start:start.toISOString().slice(0,10),end:todayIso,label:"Mes en curso ("+start.toISOString().slice(0,10).slice(0,7)+")"}}
   if(dashPeriod==="year"){const start=new Date(today.getFullYear(),0,1);return{start:start.toISOString().slice(0,10),end:todayIso,label:"Año en curso ("+today.getFullYear()+")"}}
+  // v5.0.2: rango custom
+  if(dashPeriod==="custom"&&dashCustomFrom&&dashCustomTo){
+    return {start:dashCustomFrom,end:dashCustomTo,label:"Rango personalizado ("+dashCustomFrom+" → "+dashCustomTo+")"};
+  }
+  // Fallback si custom pero sin fechas: comportarse como mes
+  const start=new Date(today.getFullYear(),today.getMonth(),1);
+  return{start:start.toISOString().slice(0,10),end:todayIso,label:"Mes en curso ("+start.toISOString().slice(0,10).slice(0,7)+")"};
 }
 function dateOfCreation(q){
   if(q.dateISO)return q.dateISO.slice(0,10);
@@ -45,9 +55,12 @@ async function renderDashboard(){
   if(!quotesCache.length){try{await loadAllHistory()}catch{}}
   // v4.13.0: banner de alerta si hay fantasmas
   renderFantasmasBanner();
-  // v5.0.1b: banners nuevos
+  // v5.0.1b: banners de entregas HOY y convertidas archivables
   renderBannerEntregasHoy();
   renderBannerConvertidasArchivables();
+  // v5.0.2: banner de sync pendiente + info de rango custom si aplica
+  renderBannerSync();
+  renderCustomRangeInfo();
   const range=getDashRange();
   $("dash-period-info").textContent=range.label;
   const inRange=fecha=>fecha&&fecha>=range.start&&fecha<=range.end;
@@ -850,6 +863,73 @@ async function syncAgendaAllFuture(){
     console.error("syncAgendaAllFuture error",e);
     alert("Error generando agenda: "+(e.message||e));
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: BANNER SYNC PENDIENTE
+// Aparece si hay pedidos agendables con needsSync:true.
+// Un tap genera .ics incremental SOLO con los pendientes, los marca synced tras compartir.
+// ═══════════════════════════════════════════════════════════
+function renderBannerSync(){
+  const el=$("dash-banner-sync");
+  if(!el)return;
+  // Solo docs agendables con needsSync explícitamente true
+  const pendientes=quotesCache.filter(q=>(typeof isAgendable==="function"?isAgendable(q):true)&&q.needsSync===true);
+  if(!pendientes.length){el.classList.add("hidden");el.innerHTML="";return}
+  el.classList.remove("hidden");
+  pendientes.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
+  const primeros=pendientes.slice(0,3).map(q=>(q.client||"—")+" "+q.eventDate).join(" · ");
+  const mas=pendientes.length>3?" · +"+(pendientes.length-3)+" más":"";
+  el.innerHTML='<div class="dbs-ic">📤</div>'+
+    '<div class="dbs-txt"><strong>'+pendientes.length+' pedido'+(pendientes.length!==1?'s':'')+' por sincronizar con Kathy y JP</strong><br><span style="font-size:11px;opacity:.85">'+primeros+mas+'</span></div>'+
+    '<button onclick="syncPendingOnly()">Sincronizar ('+pendientes.length+')</button>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: SINCRONIZAR SOLO PENDIENTES (INCREMENTAL)
+// Genera un .ics más pequeño con solo los docs con needsSync:true.
+// Tras compartir, marca todos como synced (needsSync:false, lastSyncAt:now).
+// ═══════════════════════════════════════════════════════════
+async function syncPendingOnly(){
+  try{
+    if(!quotesCache.length){await loadAllHistory()}
+    const pendientes=quotesCache.filter(q=>(typeof isAgendable==="function"?isAgendable(q):true)&&q.needsSync===true);
+    if(!pendientes.length){
+      if(typeof toast==="function")toast("No hay pedidos pendientes de sincronizar","info");
+      return;
+    }
+    pendientes.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
+    const resumen=pendientes.length+" pedido"+(pendientes.length!==1?'s':'')+" nuevo"+(pendientes.length!==1?'s':'');
+    if(!confirm("📤 Sincronizar pendientes con Kathy y JP\n\nSolo se incluyen los "+resumen+" que están pendientes.\n\nDespués de confirmar:\n  1. Se abre el menú compartir\n  2. Escoges WhatsApp → mandar a Kathy y a JP\n  3. Ellos abren el archivo → sus calendarios se actualizan\n\n¿Continuar?"))return;
+    // Construir .ics solo con los pendientes
+    const lines=[..._icsHeader()];
+    pendientes.forEach(q=>{lines.push(..._buildVeventsForDoc(q))});
+    lines.push(..._icsFooter());
+    const hoyIso=new Date().toISOString().slice(0,10);
+    const filename="GB-sync-"+hoyIso+".ics";
+    await shareOrDownloadIcs(filename,lines);
+    // Marcar como sincronizados
+    if(typeof markAsSynced==="function"){
+      await markAsSynced(pendientes);
+    }
+    if(typeof toast==="function")toast("✅ "+pendientes.length+" pedido(s) sincronizados","success");
+    renderDashboard();
+    if(curMode==="hist"&&typeof renderHist==="function")renderHist();
+  }catch(e){
+    console.error("syncPendingOnly error",e);
+    alert("Error: "+(e.message||e));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.2: Info del rango custom activo (banner gris arriba del dashboard)
+// ═══════════════════════════════════════════════════════════
+function renderCustomRangeInfo(){
+  const el=$("dash-custom-range-info");
+  if(!el)return;
+  if(dashPeriod!=="custom"||!dashCustomFrom||!dashCustomTo){el.classList.add("hidden");el.innerHTML="";return}
+  el.classList.remove("hidden");
+  el.innerHTML='📆 Rango personalizado activo: <strong>'+dashCustomFrom+'</strong> → <strong>'+dashCustomTo+'</strong> <button onclick="openCustomRangeModal()">Cambiar</button> <button onclick="setDashPeriod(\'month\')">Volver a Mes</button>';
 }
 
 // ═══════════════════════════════════════════════════════════
