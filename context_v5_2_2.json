@@ -1,0 +1,417 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Todo lo necesario para que un nuevo chat de Claude (o Luis mismo) retome el proyecto Gourmet Bites sin perder contexto. NO omitir detalles. NO asumir que el lector ya conoce el proyecto.",
+    "generado_el": "2026-04-21",
+    "generado_por": "Claude Opus 4.7 — asistente técnico del proyecto",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final"
+  },
+
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual": "v5.2.2 — HOTFIX DE 1 LÍNEA — resuelve BUG-001/002/003 de v5.2.0",
+    "version_anterior_estable_probada": "v5.1.0",
+    "fecha_ultima_actualizacion": "2026-04-21",
+    "url_produccion": "https://luisrandrade-collab.github.io/Cotizador/"
+  },
+
+  "estado_actual_2026_04_21_v522": {
+    "resumen_en_una_frase": "v5.2.2 aplica hotfix de 1 línea que resuelve los 3 bugs bloqueantes heredados de v5.2.0. Causa raíz encontrada con logs de consola: colisión `let histFilter` (app-core.js) + `var histFilter` (app-historial.js) producía SyntaxError en parseo → abortaba app-historial.js → Historial vacío + Dashboard KPIs vacíos. Fix: se removió la declaración huérfana de app-core.js. El resto del código estaba bien.",
+
+    "causa_raiz_confirmada_con_evidencia": {
+      "evidencia_pantalla_consola": [
+        "Uncaught SyntaxError: Identifier 'histFilter' has already been declared (at app-historial.js?v=5.2.1:1:1)",
+        "Uncaught ReferenceError: renderHist is not defined — at setMode (app-core.js?v=5.2.1:1095:17)",
+        "Uncaught (in promise) ReferenceError: METODOS_PAGO is not defined — at renderDashboard (app-dashboard.js?v=5.2.1:82:23)"
+      ],
+      "cascada_explicada": "SyntaxError en app-historial.js durante parseo → archivo ENTERO abortado → funciones y constantes del archivo (renderHist, METODOS_PAGO, FOLLOW_UP_META, etc) no existen en runtime → setMode('hist') explota, renderDashboard explota en línea 82 al usar METODOS_PAGO, el resto del dashboard cae por efecto dominó.",
+      "por_que_existia": "app-core.js tenía `let histFilter=\"all\"` como residuo muerto desde v5.0.x cuando el historial era más simple. En v5.1.0 se reorganizó el historial en 4 archivos y se introdujo el patrón defensivo `if(typeof X===\"undefined\")var X` en app-historial.js, pero nadie removió la declaración vieja en app-core.js. El bug estaba LATENTE desde v5.1.0 — probablemente v5.2.0 destapó la colisión por orden de carga o algún cambio colateral en app-dashboard.js.",
+      "por_que_v520_parecia_causante": "Los síntomas aparecieron después de subir v5.2.0, pero el bug ya estaba sembrado desde v5.1.0. v5.2.0 fue el detonante, no el origen."
+    },
+
+    "fix_aplicado_en_v522": {
+      "archivos_modificados": 3,
+      "lineas_de_codigo_ejecutable_cambiadas": 1,
+      "archivo_1": "app-core.js — removida línea 188 `let histFilter=\"all\";` + actualizado BUILD_VERSION a v5.2.2 + comentario de changelog en header",
+      "archivo_2": "index.html — cache-busting `?v=5.2.2` en los 7 script tags + actualizado comentario VERSION de línea 10",
+      "archivo_3": "context_v5_2_2.json — este archivo, actualizado",
+      "archivos_sin_tocar": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js", "app-dashboard.js"],
+      "validacion_pre_entrega": [
+        "node -c en los 7 .js → todos compilan",
+        "lxml parser en index.html → 0 errores estructurales",
+        "grep confirma `let histFilter` removido del código ejecutable (solo queda en comentario histórico)",
+        "grep confirma que app-historial.js línea 58 conserva su declaración defensiva `if(typeof histFilter===\"undefined\")var histFilter=\"all\"`",
+        "grep confirma 7 referencias a `?v=5.2.2` y 0 referencias viejas a `?v=5.2.1`"
+      ]
+    },
+
+    "instrucciones_deploy_para_luis": [
+      "Subir a GitHub Pages SOLO 2 archivos: app-core.js + index.html",
+      "El context_v5_2_2.json es para el próximo chat, no se sube al sitio",
+      "Luego Ctrl+F5 (hard reload) en el navegador",
+      "Verificar que header diga v5.2.2 · 2026-04-21",
+      "Verificar que Historial muestre las 11 cotizaciones/propuestas",
+      "Verificar que Dashboard muestre las 5 KPI cards llenas (Cotizado/Vendido/Entregado/Recaudado/Por cobrar)",
+      "Verificar que los botones de nav funcionen (ya funcionaban en v5.2.1 tras hard reload)"
+    ]
+  },
+
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION",
+      "app-cotizar.js": "módulo de cotizaciones (sin cambios desde v5.0.x)",
+      "app-propuesta.js": "módulo de propuestas / eventos (sin cambios desde v5.0.x)",
+      "app-historial.js": "historial + ciclo de vida + pagos + 4 archivos/sub-pestañas + buscador + botones rápidos Viva/Perdida. Contiene METODOS_PAGO, FOLLOW_UP_META, MOTIVOS_PERDIDA y las 3 variables histArchive/histFilter/histSearch",
+      "app-seguimiento.js": "pestaña seguimiento comercial (desde v5.0.4)",
+      "app-dashboard.js": "dashboard + pipeline activo + reportes + agenda + exports"
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/Cotizador/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password) · 3 usuarios: Luis, Kathy, JP · + Google Sign-In",
+    "firebase_plan": "Blaze (con cuota gratuita perpetua suficiente para el volumen actual)",
+    "backup_estado": "JSON manual disponible (botón 📥 Backup JSON en Mantenimiento) · botón Restaurar backup PENDIENTE (v5.2.3) · PITR y Scheduled Backups PENDIENTES de activar en Firebase Console"
+  },
+
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]",
+      "valores_internos": ["pendiente", "contactado", "activa", "perdida"],
+      "expuesto_a_usuario_v5_0_5": ["viva", "perdida"],
+      "regla_binaria": "pendiente/contactado/activa → VIVA. perdida → PERDIDA.",
+      "comportamiento_kpis": "perdida excluye de todos los KPIs igual que anulada. Las otras 3 suman normal pero aparecen con alerta visual si llevan >7 días sin toque."
+    }
+  },
+
+  "historial_versiones_detallado": [
+    {"version": "v4.12.7", "fecha": "2026-04-20", "highlights": "Fix PF + Nueva versión + cleanup fantasmas"},
+    {"version": "v4.13.0", "fecha": "2026-04-20", "highlights": "IndexedDB offline + bloqueo históricos + toast + Export JSON"},
+    {"version": "v5.0.0", "fecha": "2026-04-20", "tipo": "MAJOR", "highlights": "Firebase Auth + Storage + audit trail"},
+    {"version": "v5.0.1", "fecha": "2026-04-20", "highlights": "Google Sign-In + toggle password + menú cuenta"},
+    {"version": "v5.0.1b", "fecha": "2026-04-20", "highlights": "Convertidas ocultas + borrado cascada + drill-down agrupado + banner HOY + sync agenda"},
+    {"version": "v5.0.2", "fecha": "2026-04-20", "highlights": "Auto-sync needsSync + sync incremental + fechas flexibles + botón fantasmas + modal backup"},
+    {"version": "v5.0.3", "fecha": "2026-04-20", "highlights": "Estado 'anulada' + modal anular con motivo/devolución + filtro Anuladas + bloqueo borrado"},
+    {"version": "v5.0.4", "fecha": "2026-04-20", "highlights": "Filtro Pedidos consolidado · Pipeline Activo dashboard · pestaña Seguimiento · 4 estados followUp · WhatsApp/tel/correo directo · notas de seguimiento · modal perdida con 6 motivos · banner alerta >7d · módulo app-seguimiento.js NUEVO"},
+    {"version": "v5.0.5", "fecha": "2026-04-21", "highlights": "Binario VIVA/PERDIDA · filtro Vivas · reactivarPerdida · bloqueo conversión perdida→pedido · botón ♻️ Reactivar en perdidas"},
+    {"version": "v5.1.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ESTABLE · PROBADA EN PRODUCCIÓN", "highlights": "Historial reorganizado en 4 ARCHIVOS (Vivas/Pedidos/Perdidas/Anuladas) · buscador por palabras (cliente/número/productos, normaliza tildes, debounce 180ms) · sub-filtros contextuales por archivo · botones rápidos 🟢 Viva/❌ Perdida en tarjetas · adjuntar comprobante después del pago · fix capture=environment móvil (cámara Y galería). BUG LATENTE introducido aquí: la declaración `let histFilter` en app-core.js quedó huérfana al mover el manejo de estado del historial a app-historial.js, pero no se destapó hasta v5.2.0."},
+    {"version": "v5.2.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "DEFECTUOSA · BLOQUEANTE · reemplazada por v5.2.2", "highlights": "Rediseño dashboard (bento grid) + 3 reportes nuevos (conversión embudo, pérdidas por motivo, vista por cliente autocomplete) + badge novedades desde última visita (R5 simple con localStorage) + mantenimiento colapsable bajo toggle ⚙️ + try-catch por sección. DESTAPÓ el bug latente de v5.1.0 (colisión histFilter) — probablemente por cambios en app-dashboard.js que alteraron el orden de evaluación."},
+    {"version": "v5.2.1", "fecha": "2026-04-21", "tipo": "PATCH HOTFIX", "status": "DEFENSIVA PERO NO SUFICIENTE · superada por v5.2.2", "highlights": "Añadió _safe() wrappers + logs [Dashboard] para facilitar diagnóstico. Los logs revelaron el SyntaxError de histFilter que llevó al fix real de v5.2.2."},
+    {"version": "v5.2.2", "fecha": "2026-04-21", "tipo": "PATCH HOTFIX DEFINITIVO", "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN", "highlights": "Fix de 1 línea: removida `let histFilter=\"all\"` de app-core.js (línea 188). Esa línea chocaba con `var histFilter` de app-historial.js y rompía el parseo del archivo entero. Con esto resuelven BUG-001, BUG-002 y BUG-003 a la vez."}
+  ],
+
+  "archivos_de_cada_version": {
+    "v5_1_0_ESTABLE": {
+      "nota": "Rollback a esta versión ya no es necesario porque v5.2.2 resuelve los bugs. Pero los archivos siguen disponibles en el backup local de Luis como plan Z.",
+      "archivos_totales": 8
+    },
+    "v5_2_0_DEFECTUOSA": {
+      "nota": "NO USAR. Reemplazada por v5.2.2.",
+      "archivos_modificados_vs_v510": ["index.html (rediseño completo del mode-dash)", "app-core.js (BUILD_VERSION)", "app-dashboard.js (renderDashboard reescrito + 260 líneas nuevas)"]
+    },
+    "v5_2_1_HOTFIX_INTERMEDIO": {
+      "nota": "Fue útil porque los logs [Dashboard] permitieron identificar el SyntaxError de histFilter. Pero el fix real fue v5.2.2.",
+      "archivos_modificados_vs_v520": ["index.html (cache-busting)", "app-core.js (BUILD_VERSION)", "app-dashboard.js (_safe wrappers + logs)"]
+    },
+    "v5_2_2_HOTFIX_DEFINITIVO": {
+      "nota": "Esta es la versión viva. Fix de 1 línea.",
+      "archivos_a_subir_solo_estos_2": [
+        "app-core.js — removida línea 188 (let histFilter) + BUILD_VERSION v5.2.2 + comentario changelog",
+        "index.html — cache-busting ?v=5.2.2 en 7 script tags + comentario VERSION línea 10"
+      ],
+      "archivos_sin_cambios_vs_v521": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js", "app-dashboard.js"],
+      "cambios_tecnicos": [
+        "1 línea removida del código ejecutable (app-core.js:188)",
+        "+5 líneas de comentario changelog en header (app-core.js:18-22)",
+        "1 línea de BUILD_VERSION actualizada",
+        "1 línea de comentario VERSION actualizada (index.html:10)",
+        "7 URLs de script con cache-busting actualizado"
+      ]
+    }
+  },
+
+  "decisiones_arquitectura_importantes": {
+    "por_que_followUp_y_no_status_nuevo": "Un doc 'enviada' con followUp='perdida' sigue siendo una cotización enviada en su ciclo de vida — solo que comercialmente cerró sin venta. followUp es una capa ORTOGONAL al status.",
+    "por_que_archivos_historial_y_no_tags": "Con 50+ docs los tags planos se vuelven ruido. Archivos mutuamente exclusivos escalan mejor.",
+    "por_que_vivas_default_del_historial": "Es la vista operativa más usada: 'qué tengo sin cerrar que requiere seguimiento'. Pedidos es consulta, Perdidas/Anuladas son histórico.",
+    "por_que_r5_simple_y_no_fcm": "FCM real requiere Cloud Functions + Service Worker + tokens. R5 simple con localStorage resuelve el 80% del valor. Si no alcanza, v5.3 migra a FCM.",
+    "por_que_mantenimiento_colapsado": "Acciones destructivas que se usan ~1 vez al mes. Ocultarlas libera espacio + reduce clicks accidentales.",
+    "por_que_no_full_width_buttons": "Regla explícita de Luis: jamás botones de toda la columna de ancho. Los CTAs ancho-completo se reservan solo a la acción primaria de la pantalla.",
+    "por_que_try_catch_por_seccion": "Un dashboard es composición de widgets. Si uno falla, los demás no deberían caer con él. Patrón Error Boundary de React replicado con try-catch.",
+    "leccion_aprendida_v522": "El patrón `if(typeof X===\"undefined\")var X` es defensivo y correcto, pero SÓLO funciona si ninguna otra parte del código declara X con let o const. Al refactorizar, SIEMPRE buscar y eliminar declaraciones huérfanas del archivo anterior. Regla nueva: cuando se mueve estado de un archivo a otro, grep del identificador en TODO el código antes de entregar."
+  },
+
+  "ROADMAP_PENDIENTE": {
+    "v5_2_3_candidato_PATCH": {
+      "tipo": "PATCH — siguiente paso natural tras estabilización",
+      "descripcion": "Botón 'Restaurar backup JSON' (feature pedida por Luis). Requiere diseño UX previo: ¿merge o replace? ¿confirmación doble? ¿qué usuario puede hacerlo? ¿preview antes de escribir?",
+      "items": [
+        "Función importHistoryJson() con validación de formato",
+        "Modal con preview: 'Vas a restaurar X docs, Y clientes — ¿confirmas?'",
+        "Botón 📤 Restaurar backup en Mantenimiento (junto a 📥 Backup JSON)",
+        "Política de merge: mantener el doc más reciente por updatedAt, o sobrescribir siempre con el del backup (decidir con Luis)",
+        "Auditoría: registrar quién restauró y cuándo en audit trail"
+      ]
+    },
+
+    "v5_2_4_candidato_PATCH_cosmetico": {
+      "tipo": "PATCH — no urgente, cuando haya tiempo",
+      "items": [
+        "Normalizador one-shot de los 3 docs sin campo `status` (GB-2026-0101, 0102, 0103). El código ya los trata como 'enviada' por default, pero limpiarlos es prolijo.",
+        "Migrador de fotos base64 → Storage (pendiente desde v5.0)"
+      ]
+    },
+
+    "v5_3_candidato_MINOR": {
+      "tldr": "Notificaciones push reales + plantillas + refinamiento operativo",
+      "items": {
+        "notificaciones_push_fcm_real": {
+          "prioridad": "Media-alta — si R5 simple no alcanza tras 2-3 semanas de uso",
+          "descripcion": "Firebase Cloud Messaging con Cloud Functions para push en celular con app cerrada",
+          "costo_firebase": "$0/mes con volumen actual (cuota gratis Blaze)"
+        },
+        "plantillas_cotizacion": {"prioridad": "Media", "descripcion": "Guardar como 'plantilla' para reutilizar (ej: 'Coffee break 20 personas')"},
+        "plantillas_mensaje_whatsapp_seguimiento": {"prioridad": "Media", "descripcion": "3-5 plantillas configurables con variables {cliente}, {total}, {producto}"},
+        "recordatorios_whatsapp_automaticos": {"prioridad": "Media", "descripcion": "Saldo pendiente >N días → WhatsApp automático. Requiere WhatsApp Business API"},
+        "dashboard_comparativo": {"prioridad": "Baja-media", "descripcion": "Período actual vs anterior con flechas ↑↓"},
+        "exportar_excel": {"prioridad": "Baja", "descripcion": "Export historial/seguimiento/reportes a .xlsx. SheetJS ya está en CDN"},
+        "fotos_multiples_comentarios": {"prioridad": "Baja"},
+        "reactivar_anuladas": {"prioridad": "Baja"},
+        "motivos_configurables_settings": {"prioridad": "Baja"},
+        "dias_alerta_seguimiento_configurables": {"prioridad": "Baja"},
+        "followUpUpdatedAt_especifico": {"prioridad": "Baja"},
+        "buscador_expandido_historial": {"prioridad": "Baja"},
+        "archivado_convertidas_viejas": {"prioridad": "Baja"},
+        "reporte_cancelacion_post_entrega": {"prioridad": "Baja"}
+      }
+    },
+
+    "v5_5_candidato_MINOR_grande": {
+      "tldr": "Integraciones externas",
+      "items": {
+        "google_calendar_api": {"prioridad": "Media — si el .ics deja de alcanzar"},
+        "whatsapp_business_api": {"prioridad": "Media"},
+        "portal_cliente": {"prioridad": "Baja"}
+      }
+    },
+
+    "v6_0_candidato_MAJOR": {
+      "tipo": "Rediseño mayor",
+      "items": {
+        "multi_negocio": "Separar por tenant/workspace",
+        "reportes_contables": "Export Siesa, World Office, DIAN",
+        "modulo_inventario": "Gestión insumos/proveedores/compras"
+      }
+    }
+  },
+
+  "pendientes_operativos_no_de_codigo": {
+    "items": [
+      "Activar PITR (Point In Time Recovery) en Firebase Console — 5 min",
+      "Activar Scheduled Backups en Firebase",
+      "Ejecutar migrarFotosStorage() una vez (disponible en Mantenimiento)",
+      "Tras subir v5.2.2: confirmar que las 5 KPI cards reaparecen en Dashboard",
+      "Tras subir v5.2.2: confirmar que Historial muestra los 11 docs"
+    ]
+  },
+
+  "bugs_conocidos_abiertos": [],
+
+  "bugs_cerrados_en_versiones_anteriores": [
+    {
+      "id": "BUG-001",
+      "version_fix": "v5.2.2",
+      "severidad_original": "BLOQUEANTE",
+      "descripcion": "Dashboard con KPIs del período vacíos tras v5.2.0. Pipeline Activo sí funcionaba (se ejecuta antes del fallo), pero las 5 KPI cards (Cotizado/Vendido/Entregado/Recaudado/Por cobrar) y los reportes nuevos aparecían vacíos.",
+      "causa_real": "app-historial.js abortó por SyntaxError → METODOS_PAGO no existía → renderDashboard explotaba en línea 82",
+      "fix": "Remover `let histFilter=\"all\"` de app-core.js (residuo v5.0.x) que colisionaba con `var histFilter` de app-historial.js"
+    },
+    {
+      "id": "BUG-002",
+      "version_fix": "v5.2.1 (parcial por cache) + v5.2.2 (definitivo)",
+      "severidad_original": "BLOQUEANTE",
+      "descripcion": "Botones del top-nav (Cotización, Historial, Buscar, Seguimiento, Agenda) sin respuesta al tap tras v5.2.0.",
+      "causa_real": "Los botones SÍ respondían al HTML onclick, pero setMode('hist') llamaba renderHist() que no existía (por SyntaxError en app-historial.js), lanzando ReferenceError silencioso que el usuario percibía como 'no pasa nada'. Hard reload + v5.2.1 permitió que los botones respondieran pero seguían quebrando al cambiar de modo.",
+      "fix": "Mismo fix de 1 línea en v5.2.2: al cargar app-historial.js sin error, renderHist existe y setMode funciona end-to-end"
+    },
+    {
+      "id": "BUG-003",
+      "version_fix": "v5.2.2",
+      "severidad_original": "ALTA",
+      "descripcion": "Historial aparece vacío al acceder, pese a 11 docs confirmados en Firebase.",
+      "causa_real": "renderHist no existía porque app-historial.js fue abortado por SyntaxError",
+      "fix": "Mismo fix de 1 línea"
+    },
+    {
+      "id": "BUG-FIXED-001",
+      "version_fix": "v5.1.0",
+      "descripcion": "Propuestas vivas no tenían botones para marcarlas Viva/Perdida desde Historial",
+      "fix": "Botones rápidos 🟢 Viva / ❌ Perdida en tarjetas del archivo Vivas"
+    },
+    {
+      "id": "BUG-FIXED-002",
+      "version_fix": "v5.1.0",
+      "descripcion": "En móvil, input file de pagos tenía capture='environment' que forzaba cámara",
+      "fix": "Removido capture='environment' de inputs pago y entrega"
+    },
+    {
+      "id": "BUG-FIXED-003",
+      "version_fix": "v5.1.0",
+      "descripcion": "Pagos registrados sin foto no permitían adjuntar comprobante después",
+      "fix": "Botón 📎 'Adjuntar comprobante' por pago en modal Ver Pagos"
+    },
+    {
+      "id": "BUG-FIXED-004",
+      "version_fix": "v5.0.5",
+      "descripcion": "Cotizaciones perdidas se podían convertir a pedido",
+      "fix": "Bloqueo conversión perdida→pedido + botón ♻️ Reactivar"
+    },
+    {
+      "id": "BUG-FIXED-005",
+      "version_fix": "v5.0.4",
+      "descripcion": "Mona (Janeth) Acevedo en status en_produccion no aparecía en filtro 'Pedidos'",
+      "fix": "Filtro Pedidos consolida pedido + aprobada + en_produccion"
+    }
+  ],
+
+  "conversaciones_importantes_con_luis": [
+    {
+      "tema": "Diagnóstico del bug de v5.2.0",
+      "fecha": "2026-04-21 (chat v5.2.2)",
+      "decisiones": [
+        "Evitar rollback si es posible — ir por diagnóstico con consola real",
+        "Chat anterior entregó v5.2.1 como hotfix defensivo pero SIN diagnóstico real",
+        "Luis confirmó con screenshot de consola: SyntaxError en app-historial.js línea 1:1",
+        "Causa raíz: `let histFilter` en app-core.js chocando con `var histFilter` en app-historial.js",
+        "Fix aplicado en v5.2.2: remover 1 línea",
+        "Botón 'Restaurar backup' deferred a v5.2.3 para hacerlo con calma y buen diseño UX"
+      ]
+    },
+    {
+      "tema": "Reorganización del Historial",
+      "fecha": "2026-04-21",
+      "decisiones": [
+        "4 archivos sub-pestañas: Vivas 🟢 / Pedidos 🤝 / Perdidas ❌ / Anuladas ↩️",
+        "Cada archivo con sus sub-filtros propios",
+        "Buscador busca en: cliente + número + productos"
+      ]
+    },
+    {
+      "tema": "Botón rápido Viva/Perdida en tarjetas",
+      "fecha": "2026-04-21",
+      "decisiones": [
+        "Solo 2 botones: 🟢 Viva y ❌ Perdida",
+        "Tap en 🟢 Viva: pendiente→activa, contactado→activa, activa→toast 'ya está'",
+        "Tap en ❌ Perdida: abre modal de 6 motivos"
+      ]
+    },
+    {
+      "tema": "Rediseño del Dashboard (v5.2.0 — intento fallido)",
+      "fecha": "2026-04-21",
+      "principios_UX_establecidos": [
+        "Top-left = hot zone (Pipeline Activo arriba)",
+        "Bento-style grids para KPIs",
+        "Card-based layout con grid consistente",
+        "Tap targets ≥44px",
+        "Progressive disclosure (mantenimiento colapsado)",
+        "JAMÁS botones de toda la columna ancho (regla explícita Luis)",
+        "Agrupación con white space, no con líneas"
+      ]
+    }
+  ],
+
+  "tips_para_nuevo_chat_de_claude": {
+    "al_empezar": [
+      "Leer TODO este JSON primero",
+      "Preguntar a Luis cómo va la app antes de asumir que hay bugs",
+      "Si reporta un bug: pedir F12 → Console → screenshot ANTES de proponer fix",
+      "Respetar decisiones arquitectónicas ya tomadas",
+      "Respetar preferencias UX: jamás full-width buttons, bento grid, progressive disclosure"
+    ],
+    "al_hacer_cambios_de_codigo": [
+      "SIEMPRE subir BUILD_VERSION en app-core.js",
+      "SIEMPRE actualizar cache-busting ?v=X.X.X en TODOS los script tags de index.html",
+      "SIEMPRE actualizar comentario VERSION: en línea 10 de index.html",
+      "SIEMPRE actualizar este JSON de contexto antes de entregar archivos",
+      "SIEMPRE validar sintaxis JS con `node -c archivo.js` antes de entregar",
+      "SIEMPRE validar HTML con parser lxml o similar antes de entregar",
+      "SIEMPRE hacer grep de identificadores antes de declararlos en un archivo (evitar el bug de histFilter v5.2.2)",
+      "Usar _safe(fn,name) wrapper para cualquier sección nueva del dashboard",
+      "Preferir cambios pequeños y enfocados (1-2 archivos) sobre cambios grandes (muchos archivos). Las versiones estables de Luis han sido las pequeñas; las rotas han sido las grandes."
+    ],
+    "sobre_el_stack": [
+      "Firebase Blaze activo — cuota gratis sobra",
+      "GitHub Pages — Luis sube manual vía web de GitHub",
+      "No hay CI/CD — deploy manual drag-and-drop",
+      "quotesCache es la variable global con todos los docs",
+      "$() es helper equivalente a document.getElementById",
+      "fm() formatea montos a pesos colombianos",
+      "Las 3 variables del historial (histArchive, histFilter, histSearch) viven SOLO en app-historial.js con el patrón `if(typeof X===\"undefined\")var X`. NO redeclarar en ningún otro archivo."
+    ],
+    "sobre_luis": [
+      "Desarrollador técnico intermedio-avanzado",
+      "Trabaja en español — no inglesizar términos de negocio",
+      "Prefiere respuestas concisas pero completas",
+      "Valora honestidad técnica sobre comercialismo",
+      "Pide 'recomendación' cuando no sabe qué escoger — dar UNA sola con razón clara",
+      "Trabaja con presión de tiempo — priorizar urgente sobre perfecto",
+      "Prefiere cambios pequeños y enfocados sobre paquetes grandes"
+    ]
+  },
+
+  "instrucciones_mantenimiento_json": {
+    "REGLA_CRITICA": "Este JSON DEBE actualizarse CADA VEZ que se entrega una nueva versión. No es opcional.",
+    "cuando_actualizar": [
+      "Al entregar archivos de cualquier versión nueva",
+      "Al descubrir un bug nuevo",
+      "Al cerrar un bug",
+      "Al tomar una decisión arquitectónica importante",
+      "Al mover un item del roadmap a versión específica"
+    ],
+    "campos_que_SIEMPRE_actualizar": [
+      "_meta.generado_el → fecha actual",
+      "proyecto.version_actual → nueva versión",
+      "proyecto.fecha_ultima_actualizacion",
+      "estado_actual_* → renombrar con fecha/versión actual + nuevo resumen",
+      "historial_versiones_detallado → agregar entrada al FINAL",
+      "archivos_de_cada_version → agregar subsección de versión nueva",
+      "bugs_conocidos_abiertos / bugs_cerrados según corresponda",
+      "ROADMAP_PENDIENTE → remover items implementados"
+    ],
+    "formato_entrega_archivos_con_json": [
+      "Subir archivos modificados + este JSON actualizado",
+      "Nombre del JSON con versión: context_v5_2_2.json, context_v5_2_3.json, etc.",
+      "Recordar a Luis: 'Guarda este JSON para futuros chats'"
+    ],
+    "que_NO_poner_en_este_json": [
+      "Credenciales o API keys",
+      "Datos reales de clientes",
+      "Código fuente completo",
+      "Transcripciones literales de chat"
+    ]
+  },
+
+  "archivos_en_esta_entrega_v5_2_2": {
+    "subir_SOLO_estos_2_a_github_pages": [
+      "app-core.js — 1 línea removida + BUILD_VERSION v5.2.2 + comentario changelog",
+      "index.html — cache-busting ?v=5.2.2 + comentario VERSION"
+    ],
+    "guardar_para_proximo_chat": "context_v5_2_2.json",
+    "sin_cambios_vs_v5_2_1": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js", "app-dashboard.js"],
+    "total_archivos_del_proyecto": 8,
+    "breaking_changes": "Ninguno",
+    "resumen_cambios": "1 línea de código ejecutable removida + metadatos de versión"
+  }
+}
