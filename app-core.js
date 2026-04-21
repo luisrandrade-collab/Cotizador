@@ -11,10 +11,14 @@
 // v5.1.0: 4 sub-pestañas en Historial (Vivas/Pedidos/Perdidas/Anuladas) +
 //         buscador por palabras + botones rápidos Viva/Perdida en tarjetas +
 //         adjuntar comprobante después + fix capture cámara móvil.
+// v5.2.0: Dashboard rediseñado (bento grid, fix render robusto con try-catch
+//         por sección) + 3 reportes nuevos (conversión, pérdidas por motivo,
+//         vista por cliente) + badge de novedades desde última visita +
+//         mantenimiento colapsable bajo toggle.
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.1.0";
+const BUILD_VERSION="v5.2.0";
 const BUILD_DATE="2026-04-21";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
