@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-// app-historial.js · v5.0.1b · 2026-04-20
+// app-historial.js · v5.0.2 · 2026-04-20
 // Historial + ciclo de vida (order/approve/saldo) + pagos +
 // duplicar + features v4.12: foto entrega, notas producción,
 // notas entrega, quién entregó, recibido conforme, comentarios cliente.
 // v5.0.1b: filtro "Convertidas" oculta por default + badge "origen de PF".
+// v5.0.2: badge "pendiente sync" + marcar needsSync al confirmar pedido/aprobada.
 // ═══════════════════════════════════════════════════════════
 
 const METODOS_PAGO=["Efectivo","Nequi","Daviplata","Banco Falabella","Transferencia","Otro"];
@@ -86,6 +87,12 @@ async function renderHist(){
     const pagadoBadge=(_total>0&&_cobrado>=_total)?'<span class="hc-pagado-ok">💰 Pagado ✓</span>':(q.saldoData?'<span class="hc-saldo-ok">💰 Saldo ✓</span>':'');
     const prodBadge=q.produced?'<span class="hc-prod-ok">🔪 Producido</span>':'';
     const comentBadge=q.comentarioCliente?.texto?'<span class="hc-coment-ok">💬 Comentario</span>':'';
+    // v5.0.2: badge sync pendiente / sync OK (solo en docs agendables con fecha futura)
+    let syncBadge="";
+    if(typeof isAgendable==="function"&&isAgendable(q)){
+      if(q.needsSync)syncBadge='<span class="hc-sync-pending">📤 Pendiente sync</span>';
+      else if(q.lastSyncAt)syncBadge='<span class="hc-sync-ok">✓ Sync</span>';
+    }
     const actionBtns=[];
     // Ciclo de vida según tipo + status
     if(!isProp&&status==="enviada"){
@@ -130,7 +137,7 @@ async function renderHist(){
     const cardCls="hcard"+(status==="convertida"?" hc-convertida":"");
     const cardExtra=(status==="superseded"||q._wrongCollection)?' style="opacity:.65"':"";
     return '<div class="'+cardCls+'"'+cardExtra+' onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+pagadoBadge+prodBadge+comentBadge+'</div>'+
+      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+pagadoBadge+prodBadge+comentBadge+syncBadge+'</div>'+
       '<div><button class="dup-btn" onclick="openDuplicateModal(\''+q.kind+'\',\''+q.id+'\',event)" title="Duplicar">📋</button><button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div></div>'+
       '<div class="hc-date">'+ds+'</div>'+summary+actions+
       '</div>';
@@ -212,6 +219,9 @@ async function submitMarkAsOrder(){
       updatedAt:serverTimestamp()
     };
     if(pagos.length)patch.pagos=pagos;
+    // v5.0.2: al confirmar un pedido con fecha futura, queda needsSync=true automáticamente.
+    const hoyIso=new Date().toISOString().slice(0,10);
+    if(fechaEntrega&&fechaEntrega>=hoyIso)patch.needsSync=true;
     await updateDoc(doc(db,"quotes",quoteId),patch);
     const local=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
     if(local){
@@ -220,6 +230,7 @@ async function submitMarkAsOrder(){
       local.productionDate=productionDate;local.produced=produced;
       local.producedAt=patch.producedAt;
       if(pagos.length)local.pagos=pagos;
+      if(patch.needsSync)local.needsSync=true;
     }
     hideLoader();closeOrderModal();
     toast("✅ Pedido "+($("om-num").value)+" · Entrega "+fechaEntrega+" "+horaEntrega+" · Producción "+productionDate+(produced?" (✓ ya producido)":""),"success");
@@ -246,9 +257,12 @@ async function assignDeliveryDate(quoteId,ev){
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
     const patch={eventDate:fecha,horaEntrega:hora,updatedAt:serverTimestamp()};
     if(q.orderData){patch["orderData.fechaEntrega"]=fecha;patch["orderData.horaEntrega"]=hora}
+    // v5.0.2: fecha futura → needsSync
+    if(fecha>=hoy)patch.needsSync=true;
     await updateDoc(doc(db,"quotes",quoteId),patch);
     q.eventDate=fecha;q.horaEntrega=hora;
     if(q.orderData){q.orderData.fechaEntrega=fecha;q.orderData.horaEntrega=hora}
+    if(patch.needsSync)q.needsSync=true;
     hideLoader();renderHist();
     if(typeof renderDashboard==="function")renderDashboard();
   }catch(e){hideLoader();alert("Error: "+e.message)}
@@ -297,9 +311,14 @@ async function submitApproveProposal(){
     else coll="proposals";
     const patch={status:"aprobada",approvalData:approvalData,updatedAt:serverTimestamp()};
     if(pagos.length)patch.pagos=pagos;
+    // v5.0.2: si la propuesta aprobada tiene fecha de evento futura, marcar needsSync
+    const localPre=quotesCache.find(x=>x.id===propId&&x.kind===kind);
+    const eventDate=localPre?.eventDate;
+    const hoyIso=new Date().toISOString().slice(0,10);
+    if(eventDate&&eventDate>=hoyIso)patch.needsSync=true;
     await updateDoc(doc(db,coll,propId),patch);
     const local=quotesCache.find(x=>x.id===propId&&x.kind===kind);
-    if(local){local.status="aprobada";local.approvalData=approvalData;if(pagos.length)local.pagos=pagos}
+    if(local){local.status="aprobada";local.approvalData=approvalData;if(pagos.length)local.pagos=pagos;if(patch.needsSync)local.needsSync=true}
     hideLoader();closeApproveModal();
     toast("✓ Propuesta aprobada: "+($("am-num").value),"success");
     renderHist();
