@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════
-// app-historial.js · v4.12 · 2026-04-19
+// app-historial.js · v5.0.1b · 2026-04-20
 // Historial + ciclo de vida (order/approve/saldo) + pagos +
 // duplicar + features v4.12: foto entrega, notas producción,
 // notas entrega, quién entregó, recibido conforme, comentarios cliente.
+// v5.0.1b: filtro "Convertidas" oculta por default + badge "origen de PF".
 // ═══════════════════════════════════════════════════════════
 
 const METODOS_PAGO=["Efectivo","Nequi","Daviplata","Banco Falabella","Transferencia","Otro"];
@@ -28,9 +29,13 @@ async function renderHist(){
   el.innerHTML='<div class="empty"><div class="spinner" style="margin:0 auto 10px"></div><p>Cargando historial...</p></div>';
   try{await loadAllHistory()}catch(e){}
   if(!quotesCache.length){el.innerHTML='<div class="empty"><div class="ic">📁</div><p>No hay cotizaciones guardadas</p></div>';return}
-  const cnt={all:quotesCache.length,cot:0,prop:0,pedido:0,propfinal:0,aprobada:0,en_produccion:0};
+  // v5.0.1b: el filtro "all" ya NO incluye convertidas (quedan ocultas por default).
+  // Aparecen solo con filtro explícito "convertidas".
+  const cnt={all:0,cot:0,prop:0,pedido:0,propfinal:0,aprobada:0,en_produccion:0,convertidas:0};
   quotesCache.forEach(q=>{
     const s=q.status||"enviada";
+    if(s==="convertida"){cnt.convertidas++;return} // v5.0.1b: no suma en "all" ni en "prop"
+    cnt.all++;
     if(q.kind==="quote")cnt.cot++;else cnt.prop++;
     if(s==="pedido")cnt.pedido++;
     if(s==="propfinal")cnt.propfinal++;
@@ -38,13 +43,16 @@ async function renderHist(){
     if(s==="en_produccion")cnt.en_produccion++;
   });
   const filtered=quotesCache.filter(q=>{
+    const s=q.status||"enviada";
+    // v5.0.1b: convertidas solo aparecen con filtro explícito
+    if(histFilter==="convertidas")return s==="convertida";
+    if(s==="convertida")return false; // oculta por default en todos los otros filtros
     if(histFilter==="all")return true;
     if(histFilter==="cot")return q.kind==="quote";
     if(histFilter==="prop")return q.kind==="proposal";
-    const s=q.status||"enviada";
     return s===histFilter;
   });
-  const mkFilter=(k,label,n)=>'<button class="hist-filter '+(histFilter===k?"act":"")+'" onclick="setHistFilter(\''+k+'\')">'+label+'<span class="cnt">'+n+'</span></button>';
+  const mkFilter=(k,label,n,extraCls)=>'<button class="hist-filter '+(extraCls||"")+' '+(histFilter===k?"act":"")+'" onclick="setHistFilter(\''+k+'\')">'+label+'<span class="cnt">'+n+'</span></button>';
   const filtersBar='<div class="hist-filters">'+
     mkFilter("all","Todas",cnt.all)+
     mkFilter("cot","Cotizaciones",cnt.cot)+
@@ -52,7 +60,10 @@ async function renderHist(){
     mkFilter("pedido","Pedidos",cnt.pedido)+
     mkFilter("propfinal","P. Final",cnt.propfinal)+
     mkFilter("aprobada","Aprobadas",cnt.aprobada)+
-    mkFilter("en_produccion","En producción",cnt.en_produccion)+'</div>';
+    mkFilter("en_produccion","En producción",cnt.en_produccion)+
+    // v5.0.1b: filtro nuevo convertidas (aparece solo si hay alguna)
+    (cnt.convertidas>0?mkFilter("convertidas","Convertidas",cnt.convertidas,"convertidas-filter"):"")+
+    '</div>';
   if(!filtered.length){el.innerHTML=filtersBar+'<div class="empty"><div class="ic">🔍</div><p>Sin resultados para este filtro</p></div>';return}
   const cards=filtered.map(q=>{
     const dObj=q.createdAt?.toDate?.()||new Date(q.dateISO||Date.now());
@@ -66,6 +77,8 @@ async function renderHist(){
     // v4.12.7: badges de superseded y wrongCollection
     const supersededBadge=(status==="superseded")?'<span class="hc-superseded-badge">⬇️ Reemplazada</span>':'';
     const wrongCollBadge=q._wrongCollection?'<span class="hc-wrong-badge">⚠️ Fantasma</span>':'';
+    // v5.0.1b: badge "origen de PF-XXXX" para propuestas convertidas
+    const origenPfBadge=(status==="convertida"&&q.propFinalRef)?'<span class="hc-origen-pf">→ origen de '+q.propFinalRef+'</span>':'';
     const _pagos=getPagos(q);
     const _cobrado=totalCobrado(q);
     const _saldo=saldoPendiente(q);
@@ -113,10 +126,11 @@ async function renderHist(){
     const summary=isProp
       ?'<div class="hc-items">'+(q.sections||[]).length+' secciones · '+(q.pers||"?")+' personas</div>'
       :'<div class="hc-total">'+fm(q.total||0)+'</div><div class="hc-items">'+((q.cart||[]).length+(q.cust||[]).length)+' productos</div>';
-    // v4.12.7: aplicar opacity reducida a docs superseded/fantasmas para distinguir visualmente
+    // v5.0.1b: clase hc-convertida aplicada si es convertida (para opacity + borde lateral)
+    const cardCls="hcard"+(status==="convertida"?" hc-convertida":"");
     const cardExtra=(status==="superseded"||q._wrongCollection)?' style="opacity:.65"':"";
-    return '<div class="hcard"'+cardExtra+' onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+pagadoBadge+prodBadge+comentBadge+'</div>'+
+    return '<div class="'+cardCls+'"'+cardExtra+' onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+pagadoBadge+prodBadge+comentBadge+'</div>'+
       '<div><button class="dup-btn" onclick="openDuplicateModal(\''+q.kind+'\',\''+q.id+'\',event)" title="Duplicar">📋</button><button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div></div>'+
       '<div class="hc-date">'+ds+'</div>'+summary+actions+
       '</div>';

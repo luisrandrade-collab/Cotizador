@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v4.12.1 · 2026-04-19
+// app-dashboard.js · v5.0.1b · 2026-04-20
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v4.12.1: cards clickeables (drill-down) + total real de propuestas.
-// Termina con BOOTSTRAP (renderCats, renderPinPad, sessionStorage check).
+// v5.0.1b: drill-down agrupado por cliente + banner entregas HOY +
+//          botón Sincronizar agenda con Kathy/JP + excluir convertidas.
+// Termina con BOOTSTRAP (renderCats, initAuthObserver).
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -43,6 +45,9 @@ async function renderDashboard(){
   if(!quotesCache.length){try{await loadAllHistory()}catch{}}
   // v4.13.0: banner de alerta si hay fantasmas
   renderFantasmasBanner();
+  // v5.0.1b: banners nuevos
+  renderBannerEntregasHoy();
+  renderBannerConvertidasArchivables();
   const range=getDashRange();
   $("dash-period-info").textContent=range.label;
   const inRange=fecha=>fecha&&fecha>=range.start&&fecha<=range.end;
@@ -714,11 +719,42 @@ function openDashDetail(tipo){
     $("dash-detail-modal").classList.remove("hidden");
     return;
   }
-  // Render genérico para cotizado/vendido/entregado/cobrar
-  rows.sort((a,b)=>b.monto-a.monto);
-  const html=rows.length?rows.map(r=>docRow(r.q,r.monto,r.extra)).join(""):'<div class="dd-empty">Sin documentos en este corte.</div>';
+  // v5.0.1b: Render agrupado por cliente — ordenado por subtotal desc.
+  // Clientes con 1 solo doc también se muestran pero sin subtotal redundante.
+  const byClient={};
+  rows.forEach(r=>{
+    const cli=r.q.client||"(Sin cliente)";
+    if(!byClient[cli])byClient[cli]={total:0,items:[]};
+    byClient[cli].total+=r.monto;
+    byClient[cli].items.push(r);
+  });
+  const clientes=Object.keys(byClient).map(cli=>({cli,total:byClient[cli].total,items:byClient[cli].items,count:byClient[cli].items.length}));
+  clientes.sort((a,b)=>b.total-a.total);
+  // Ordenar los docs de cada cliente por monto desc
+  clientes.forEach(c=>c.items.sort((a,b)=>b.monto-a.monto));
+
+  let html="";
+  if(!rows.length){
+    html='<div class="dd-empty">Sin documentos en este corte.</div>';
+  }else{
+    html=clientes.map(c=>{
+      // Si el cliente tiene 1 doc, sin header separado (más limpio visualmente)
+      if(c.count===1){
+        return '<div class="dd-group">'+c.items.map(r=>docRow(r.q,r.monto,r.extra)).join("")+'</div>';
+      }
+      // Cliente con varios docs: header con subtotal
+      const header='<div class="dd-group-header">'+
+        '<div class="dgh-cli">'+c.cli+'</div>'+
+        '<div class="dgh-meta">'+c.count+' docs</div>'+
+        '<div class="dgh-total">'+fm(c.total)+'</div>'+
+      '</div>';
+      const items=c.items.map(r=>docRow(r.q,r.monto,r.extra)).join("");
+      return '<div class="dd-group">'+header+items+'</div>';
+    }).join("");
+  }
   $("dd-title").textContent=title;
-  $("dd-list").innerHTML='<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+'</div>'+html;
+  const summary='<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+' · '+clientes.length+' cliente'+(clientes.length!==1?'s':'')+'</div>';
+  $("dd-list").innerHTML=summary+html;
   $("dash-detail-modal").classList.remove("hidden");
 }
 function closeDashDetail(){$("dash-detail-modal").classList.add("hidden")}
@@ -735,6 +771,85 @@ function renderFantasmasBanner(){
   el.innerHTML='<div class="dbw-ic">⚠️</div>'+
     '<div class="dbw-txt">Se detectaron <strong>'+fantasmas.length+' doc(s) fantasma</strong> (PF mal guardados antes de v4.12.7). No suman al dashboard pero conviene limpiarlos.</div>'+
     '<button onclick="cleanupWrongDocs()">🧹 Limpiar ahora</button>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.1b: BANNER ENTREGAS HOY — aparece si hay pedidos con eventDate = hoy
+// Click en el banner lleva a la vista de Agenda.
+// ═══════════════════════════════════════════════════════════
+function renderBannerEntregasHoy(){
+  const el=$("dash-banner-hoy");
+  if(!el)return;
+  const hoyIso=new Date().toISOString().slice(0,10);
+  const entregasHoy=quotesCache.filter(q=>{
+    if(q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+    if(q.eventDate!==hoyIso)return false;
+    if(q.status==="entregado")return false; // ya entregado no aparece
+    const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(q.status))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(q.status));
+    return ok;
+  });
+  if(!entregasHoy.length){el.classList.add("hidden");el.innerHTML="";return}
+  el.classList.remove("hidden");
+  entregasHoy.sort((a,b)=>(a.horaEntrega||"").localeCompare(b.horaEntrega||""));
+  const clientesTxt=entregasHoy.slice(0,3).map(q=>(q.client||"—")+(q.horaEntrega?' '+q.horaEntrega:'')).join(" · ");
+  const mas=entregasHoy.length>3?' · +'+(entregasHoy.length-3)+' más':'';
+  el.innerHTML='<div class="dbh-ic">🔥</div>'+
+    '<div class="dbh-txt"><strong>'+entregasHoy.length+' entrega'+(entregasHoy.length!==1?'s':'')+' HOY</strong> · '+clientesTxt+mas+'</div>'+
+    '<div class="dbh-arrow">→</div>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.1b: BANNER CONVERTIDAS ARCHIVABLES — aparece si hay 3+ convertidas viejas.
+// Por ahora informativo (abrir filtro Convertidas del historial).
+// En v5.1 podría agregar archivado real con flag _archived.
+// ═══════════════════════════════════════════════════════════
+function renderBannerConvertidasArchivables(){
+  const el=$("dash-banner-convertidas");
+  if(!el)return;
+  const convertidas=quotesCache.filter(q=>!q._wrongCollection&&q.status==="convertida");
+  if(convertidas.length<3){el.classList.add("hidden");el.innerHTML="";return}
+  el.classList.remove("hidden");
+  el.innerHTML='<div class="dbi-ic">ℹ️</div>'+
+    '<div class="dbi-txt">Tienes <strong>'+convertidas.length+' propuestas convertidas</strong> en el histórico. Son el origen de Propuestas Finales ya firmadas — ocultas del historial por default.</div>'+
+    '<button onclick="setMode(\'hist\');setTimeout(()=>setHistFilter(\'convertidas\'),100)">Ver filtro</button>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.1b: SINCRONIZAR AGENDA CON KATHY Y JP
+// Genera un único .ics con todos los pedidos FUTUROS (hoy en adelante),
+// incluyendo eventos de Producción + Entrega con UIDs idempotentes.
+// El share sheet permite mandarlo por WhatsApp a Kathy y JP.
+// Cuando ellos abren el .ics, sus calendarios se ACTUALIZAN (no duplican).
+// ═══════════════════════════════════════════════════════════
+async function syncAgendaAllFuture(){
+  try{
+    if(!quotesCache.length){try{await loadAllHistory()}catch{}}
+    const hoyIso=new Date().toISOString().slice(0,10);
+    // Pedidos agendados vivos con fecha futura (incluye hoy)
+    const futuros=quotesCache.filter(q=>{
+      if(q._wrongCollection||q.status==="superseded"||q.status==="convertida")return false;
+      if(!q.eventDate||q.eventDate<hoyIso)return false;
+      const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(q.status))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(q.status));
+      return ok;
+    });
+    if(!futuros.length){
+      alert("📤 Sincronizar agenda\n\nNo hay pedidos agendados con fecha futura para compartir.\n\nLos pedidos se agendan cuando los marcas como \"pedido\" (cotización) o \"aprobada\" (propuesta), y les asignas fecha de entrega.");
+      return;
+    }
+    futuros.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
+    // Construir el .ics usando helpers existentes
+    const lines=[..._icsHeader()];
+    futuros.forEach(q=>{lines.push(..._buildVeventsForDoc(q))});
+    lines.push(..._icsFooter());
+    const filename="Gourmet-Bites-Agenda-"+hoyIso+".ics";
+    const resumen=futuros.length+" pedido"+(futuros.length!==1?'s':'')+" · "+futuros.reduce((s,q)=>s+2,0)+" eventos (prod + entrega por pedido)";
+    if(!confirm("📤 Sincronizar agenda con Kathy y JP\n\nSe va a generar un archivo .ics con:\n  "+resumen+"\n\nDespués de confirmar:\n  1. Se abre el menú compartir\n  2. Escoges WhatsApp\n  3. Mandas a Kathy y a JP\n  4. Ellos abren el archivo en su teléfono y se AGREGA/ACTUALIZA en sus calendarios (no duplica)\n\n¿Continuar?"))return;
+    await shareOrDownloadIcs(filename,lines);
+    if(typeof toast==="function")toast("✅ Agenda lista para compartir · "+futuros.length+" pedidos","success");
+  }catch(e){
+    console.error("syncAgendaAllFuture error",e);
+    alert("Error generando agenda: "+(e.message||e));
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

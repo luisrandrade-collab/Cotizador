@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════════
-// app-core.js · v4.12 · 2026-04-19
-// Firebase wrapper, PIN (sessionStorage únicamente), state global,
+// app-core.js · v5.0.1b · 2026-04-20
+// Firebase wrapper, Auth (v5.0), Storage (v5.0), state global,
 // helpers, INIT, mode switching, search, transporte, cart,
 // navegación, clientes, autoTransition, getNextNumber.
+// v5.0.1b: borrado en cascada de propuestas convertidas + helper de PF hija.
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.0.0";
+const BUILD_VERSION="v5.0.1b";
 const BUILD_DATE="2026-04-20";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -260,12 +261,125 @@ async function logoutSession(){
   }
 }
 
+// v5.0.1: Toggle password visibility (icono ojo en el login)
+function togglePasswordVisibility(){
+  const inp=$("login-password");
+  const btn=$("login-pw-toggle");
+  if(!inp)return;
+  if(inp.type==="password"){
+    inp.type="text";
+    if(btn)btn.textContent="🙈";
+  }else{
+    inp.type="password";
+    if(btn)btn.textContent="👁️";
+  }
+}
+
+// v5.0.1: Sign in con Google (popup — fallback a redirect en caso de bloqueo)
+async function signInWithGoogle(){
+  const errEl=$("pin-err");
+  const gbtn=$("login-google-btn");
+  if(errEl)errEl.classList.remove("show");
+  if(gbtn){gbtn.disabled=true;gbtn.style.opacity=".6"}
+  try{
+    await fbReady();
+    const {auth,googleProvider,signInWithPopup,signInWithRedirect}=window.fb;
+    try{
+      await signInWithPopup(auth,googleProvider);
+      // onAuthStateChanged se encarga
+    }catch(e){
+      // Popup bloqueado → fallback a redirect
+      if(e?.code==="auth/popup-blocked"||e?.code==="auth/popup-closed-by-user"||e?.code==="auth/cancelled-popup-request"){
+        if(e.code==="auth/popup-closed-by-user"||e.code==="auth/cancelled-popup-request"){
+          // Usuario canceló — no mostramos error
+          if(gbtn){gbtn.disabled=false;gbtn.style.opacity="1"}
+          return;
+        }
+        console.warn("Popup bloqueado, usando redirect");
+        await signInWithRedirect(auth,googleProvider);
+        return;
+      }
+      throw e;
+    }
+  }catch(e){
+    console.warn("Google sign-in falló:",e);
+    let msg="No se pudo iniciar sesión con Google";
+    if(e?.code==="auth/account-exists-with-different-credential")msg="Este email ya existe con otro método. Usa email+contraseña.";
+    else if(e?.code==="auth/network-request-failed")msg="Sin conexión a internet";
+    else if(e?.code==="auth/user-disabled")msg="Esta cuenta está deshabilitada";
+    else if(e?.code==="auth/unauthorized-domain")msg="Dominio no autorizado en Firebase Console";
+    if(errEl){errEl.textContent=msg;errEl.classList.add("show")}
+    if(gbtn){gbtn.disabled=false;gbtn.style.opacity="1"}
+  }
+}
+
+// v5.0.1: Menú de cuenta del usuario (cambiar contraseña / cerrar sesión)
+function openUserMenu(){
+  if(!currentUser){logoutSession();return}
+  const email=currentUser.email||"(sin email)";
+  // Detectar provider: Google no tiene password, email/password sí
+  const providerIds=(currentUser.providerData||[]).map(p=>p.providerId);
+  const isGoogleOnly=providerIds.length===1&&providerIds[0]==="google.com";
+  const opts=[
+    "1 → Cambiar contraseña"+(isGoogleOnly?" (no disponible — cuenta Google)":""),
+    "2 → Cerrar sesión",
+    "3 → Cancelar"
+  ].join("\n");
+  const choice=prompt("👤 "+email+"\n\n"+opts+"\n\nEscribe 1, 2 o 3:");
+  if(!choice)return;
+  const c=choice.trim();
+  if(c==="1"){
+    if(isGoogleOnly){alert("Tu cuenta entra con Google. La contraseña se gestiona en tu cuenta de Google, no aquí.");return}
+    openChangePassword();
+  }else if(c==="2"){
+    logoutSession();
+  }
+}
+
+// v5.0.1: Cambiar contraseña (requiere re-autenticación con la actual)
+async function openChangePassword(){
+  if(!currentUser){alert("Debes estar autenticado");return}
+  const email=currentUser.email;
+  const current=prompt("🔐 Cambiar contraseña\n\nIngresa tu contraseña ACTUAL:");
+  if(!current)return;
+  const nueva=prompt("Ingresa la contraseña NUEVA (mínimo 6 caracteres):");
+  if(!nueva)return;
+  if(nueva.length<6){alert("La nueva contraseña debe tener al menos 6 caracteres.");return}
+  const nueva2=prompt("Confirma la contraseña NUEVA:");
+  if(nueva2!==nueva){alert("Las contraseñas no coinciden. Intenta de nuevo.");return}
+  try{
+    showLoader("Actualizando...");
+    await fbReady();
+    const {auth,EmailAuthProvider,reauthenticateWithCredential,updatePassword}=window.fb;
+    const cred=EmailAuthProvider.credential(email,current);
+    await reauthenticateWithCredential(auth.currentUser,cred);
+    await updatePassword(auth.currentUser,nueva);
+    hideLoader();
+    alert("✅ Contraseña actualizada. Úsala en tu próximo inicio de sesión.");
+  }catch(e){
+    hideLoader();
+    console.warn("Change password falló:",e);
+    let msg="No se pudo cambiar la contraseña";
+    if(e?.code==="auth/wrong-password"||e?.code==="auth/invalid-credential")msg="La contraseña actual es incorrecta";
+    else if(e?.code==="auth/weak-password")msg="Contraseña nueva muy débil (mínimo 6 caracteres)";
+    else if(e?.code==="auth/requires-recent-login")msg="Por seguridad, cierra sesión y vuelve a entrar antes de cambiar la contraseña";
+    else if(e?.code==="auth/too-many-requests")msg="Demasiados intentos. Espera unos minutos.";
+    alert("❌ "+msg);
+  }
+}
+
 // v5.0: Observador de auth. Llamado desde bootstrap.
 // Si hay user → esconde overlay + initApp. Si no → muestra overlay.
 function initAuthObserver(){
   const fn=()=>{
     if(!window.fb?.onAuthStateChanged)return setTimeout(fn,100);
-    const {auth,onAuthStateChanged}=window.fb;
+    const {auth,onAuthStateChanged,getRedirectResult}=window.fb;
+    // v5.0.1: procesar resultado de redirect de Google (si veníamos de un redirect login)
+    if(getRedirectResult){
+      getRedirectResult(auth).catch(e=>{
+        if(e?.code&&e.code!=="auth/no-auth-event")console.warn("getRedirectResult:",e);
+      });
+    }
     onAuthStateChanged(auth,(user)=>{
       currentUser=user;
       const overlay=$("pin-overlay");
@@ -785,18 +899,166 @@ function showClientHistoryPanel(name,modo){
 }
 
 // ─── DATA: load/save quote (cotización + propuesta) ────────
+// v5.0.1b: helper que encuentra la PF hija de una propuesta convertida.
+// Devuelve el doc de la PF o null si no hay.
+function findChildPF(propId){
+  if(!propId)return null;
+  return quotesCache.find(x=>x.kind==="proposal"&&x.sourceProposal===propId&&!x._wrongCollection&&x.status!=="superseded")||null;
+}
+
+// v5.0.1b: ¿la PF hija está en estado "seguro" para borrar en cascada?
+// Segura = propfinal o aprobada SIN pagos registrados ni entrega registrada.
+// NO segura = en_produccion, entregado, o con pagos/entrega registrada.
+function isPFSafeToDelete(pf){
+  if(!pf)return true;
+  if(["en_produccion","entregado"].includes(pf.status||""))return false;
+  const pagos=getPagos(pf);
+  if(pagos&&pagos.length>0)return false;
+  if(pf.entregaData)return false;
+  return true;
+}
+
 async function delHistItem(kind,id,ev){
   ev.stopPropagation();
-  // v4.12.3: bloquear borrado si ya pasó de "enviada" — un pedido confirmado se modifica, no se borra
+  // v5.0.1b: reglas de borrado más granulares con detección de cascada.
+  //   Cotizaciones: solo se pueden borrar ENVIADAS.
+  //   Propuestas: borrables excepto en_produccion/entregado, con cascada para "convertida".
   const q=quotesCache.find(x=>x.id===id&&x.kind===kind);
   const status=q?.status||"enviada";
-  if(status!=="enviada"){
-    alert("⚠️ No se puede eliminar.\n\n"+id+" ya está en estado \""+(STATUS_META[status]?.label||status)+"\".\n\nUna vez una cotización se confirma como pedido (o se aprueba, produce, entrega) queda como registro permanente.\n\nPara anularla:\n1. Ábrela y déjala en blanco (productos en 0 / cliente en 0).\n2. Anota en las notas el motivo de anulación.");
+  const hardBlock=["en_produccion","entregado"];
+  if(hardBlock.includes(status)){
+    alert("⚠️ No se puede eliminar.\n\n"+id+" está en estado \""+(STATUS_META[status]?.label||status)+"\".\n\nDocumentos en producción o entregados son registro histórico financiero. No se borran — se anulan dejando los productos en 0 y notas del motivo.");
     return;
   }
-  if(!confirm("¿Eliminar "+id+"? Esta cotización está en estado ENVIADA — aún no se ha confirmado como pedido."))return;
-  try{showLoader("Eliminando...");await deleteHistoryItem(kind,id);hideLoader();renderHist()}
+  // Cotizaciones: solo enviada (mantiene regla v4.12.3)
+  if(kind==="quote"&&status!=="enviada"){
+    alert("⚠️ No se puede eliminar.\n\n"+id+" ya está en estado \""+(STATUS_META[status]?.label||status)+"\".\n\nUna cotización confirmada como pedido queda como registro permanente. Para anularla ábrela y déjala con productos en 0 y notas del motivo.");
+    return;
+  }
+  // v5.0.1b: CASO ESPECIAL — propuesta convertida con PF hija viva
+  if(status==="convertida"){
+    const pfHija=findChildPF(id);
+    if(pfHija){
+      openCascadeDelModal(q,pfHija);
+      return;
+    }
+    // Convertida sin PF hija detectable (raro, PF fue borrada antes) → flujo normal
+  }
+  // Propuestas: confirmación reforzada según estado
+  let confirmMsg;
+  if(status==="enviada"){
+    confirmMsg="¿Eliminar "+id+"? Esta propuesta está en estado ENVIADA — aún no se ha aprobado.";
+  }else if(status==="propfinal"){
+    confirmMsg="⚠️ "+id+" es una PROPUESTA FINAL.\n\n¿Estás seguro de eliminarla? Esta acción es permanente.\n\nSi solo quieres actualizarla, usa 🔄 Nueva versión desde la card.";
+  }else if(status==="aprobada"){
+    confirmMsg="⚠️⚠️ "+id+" está APROBADA (cliente firmó).\n\nEliminarla borra el registro del compromiso comercial. ¿Estás SEGURO?";
+  }else if(status==="convertida"){
+    confirmMsg="ℹ️ "+id+" fue CONVERTIDA a Propuesta Final pero la PF hija ya no existe.\n\nEs seguro eliminar esta propuesta base.\n\n¿Continuar?";
+  }else if(status==="superseded"){
+    confirmMsg="¿Eliminar "+id+"? Esta propuesta fue REEMPLAZADA por una versión nueva — se puede borrar sin afectar la versión vigente.";
+  }else{
+    confirmMsg="¿Eliminar "+id+" ("+(STATUS_META[status]?.label||status)+")?";
+  }
+  if(!confirm(confirmMsg))return;
+  // Doble confirmación si es aprobada (más crítica)
+  if(status==="aprobada"){
+    const typed=prompt("Para confirmar, escribe exactamente:  BORRAR "+id);
+    if(typed!=="BORRAR "+id){alert("No se eliminó — la confirmación no coincidió.");return}
+  }
+  try{showLoader("Eliminando...");await deleteHistoryItem(kind,id);hideLoader();renderHist();if(typeof toast==="function")toast("🗑️ "+id+" eliminado","success")}
   catch(e){hideLoader();alert("Error: "+e.message)}
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.0.1b: MODAL DE BORRADO EN CASCADA
+// Para propuestas convertidas que tienen PF hija viva.
+// ═══════════════════════════════════════════════════════════
+let _cascadeDelCtx=null;
+function openCascadeDelModal(propBase,pfHija){
+  _cascadeDelCtx={propBase,pfHija};
+  const safe=isPFSafeToDelete(pfHija);
+  const pfStatus=STATUS_META[pfHija.status||"propfinal"]?.label||pfHija.status;
+  const pagos=getPagos(pfHija);
+  const tieneEntrega=!!pfHija.entregaData;
+  const motivosNoSeguro=[];
+  if(pagos&&pagos.length>0)motivosNoSeguro.push("tiene "+pagos.length+" pago(s) registrado(s)");
+  if(tieneEntrega)motivosNoSeguro.push("tiene entrega registrada");
+  if(["en_produccion","entregado"].includes(pfHija.status))motivosNoSeguro.push("está en estado "+pfStatus);
+
+  let html='<div style="font-size:13px;line-height:1.5;color:#333;margin-bottom:14px">';
+  html+='<p style="margin:0 0 10px"><strong>'+propBase.id+'</strong> es la propuesta base que generó una Propuesta Final viva:</p>';
+  html+='<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px">';
+  html+='<div><strong style="color:#E65100">'+pfHija.id+'</strong> · '+(pfHija.client||"—")+'</div>';
+  html+='<div style="color:#555;margin-top:4px">Estado: <strong>'+pfStatus+'</strong> · Total: '+fm(pfHija.total||0);
+  if(pagos&&pagos.length>0)html+=' · 💵 '+pagos.length+' pago(s)';
+  if(tieneEntrega)html+=' · 🎉 entregada';
+  html+='</div></div>';
+  html+='</div>';
+
+  if(!safe){
+    html+='<div style="background:#FFEBEE;border:1.5px solid #EF5350;border-radius:8px;padding:12px;margin:10px 0;color:#B71C1C;font-size:12.5px;line-height:1.5">';
+    html+='<strong>🔒 Borrado en cascada NO DISPONIBLE</strong><br>';
+    html+='La PF hija no se puede borrar porque '+motivosNoSeguro.join(", ")+'. Es registro histórico financiero.<br><br>';
+    html+='Las únicas opciones son:';
+    html+='</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
+    html+='<button class="btn bo" style="background:#ECEFF1;color:#455A64" onclick="closeCascadeDelModal()">Cancelar — no borrar nada</button>';
+    html+='<button class="btn" style="background:linear-gradient(135deg,#FF9800,#E65100);color:#fff" onclick="executeDelProposalOnly()">⚠️ Borrar solo la propuesta base (PF quedará huérfana)</button>';
+    html+='<div style="font-size:10.5px;color:#757575;text-align:center;margin-top:4px;line-height:1.4">Si borras solo la propuesta base, la PF seguirá existiendo<br>pero NO podrás usar 🔄 Nueva versión en ella.</div>';
+    html+='</div>';
+  }else{
+    html+='<div style="background:#E8F5E9;border:1.5px solid #81C784;border-radius:8px;padding:12px;margin:10px 0;color:#1B5E20;font-size:12.5px;line-height:1.5">';
+    html+='<strong>✅ Borrado en cascada disponible</strong><br>';
+    html+='La PF hija está en estado <strong>'+pfStatus+'</strong> sin pagos ni entrega registrada — se puede eliminar junto con la propuesta base de forma segura.';
+    html+='</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
+    html+='<button class="btn bo" style="background:#ECEFF1;color:#455A64" onclick="closeCascadeDelModal()">Cancelar — no borrar nada</button>';
+    html+='<button class="btn" style="background:linear-gradient(135deg,#FF9800,#E65100);color:#fff" onclick="executeDelProposalOnly()">Borrar solo la propuesta base (PF queda huérfana)</button>';
+    html+='<button class="btn" style="background:linear-gradient(135deg,#D32F2F,#B71C1C);color:#fff" onclick="executeDelCascade()">🗑️ Borrar en CASCADA (propuesta + PF) — triple confirmación</button>';
+    html+='</div>';
+  }
+  $("cascade-del-body").innerHTML=html;
+  $("cascade-del-modal").classList.remove("hidden");
+}
+function closeCascadeDelModal(){
+  $("cascade-del-modal").classList.add("hidden");
+  _cascadeDelCtx=null;
+}
+async function executeDelProposalOnly(){
+  if(!_cascadeDelCtx)return;
+  const {propBase,pfHija}=_cascadeDelCtx;
+  if(!confirm("⚠️ Borrar solo "+propBase.id+"\n\nLa PF "+pfHija.id+" quedará HUÉRFANA — no podrás usar 🔄 Nueva versión sobre ella.\n\n¿Confirmar?"))return;
+  closeCascadeDelModal();
+  try{
+    showLoader("Eliminando propuesta base...");
+    await deleteHistoryItem("proposal",propBase.id);
+    hideLoader();
+    if(typeof toast==="function")toast("🗑️ "+propBase.id+" eliminado — la PF quedó huérfana","warn");
+    renderHist();
+    if(curMode==="dash"&&typeof renderDashboard==="function")renderDashboard();
+  }catch(e){hideLoader();alert("Error: "+e.message);console.error(e)}
+}
+async function executeDelCascade(){
+  if(!_cascadeDelCtx)return;
+  const {propBase,pfHija}=_cascadeDelCtx;
+  const phrase="BORRAR EN CASCADA "+propBase.id;
+  const typed=prompt("🗑️ BORRADO EN CASCADA\n\nSe van a eliminar PERMANENTEMENTE:\n  • "+propBase.id+" (propuesta base)\n  • "+pfHija.id+" (Propuesta Final hija)\n\nPara confirmar, escribe exactamente:\n"+phrase);
+  if(typed!==phrase){alert("No se eliminó — la confirmación no coincidió.");return}
+  closeCascadeDelModal();
+  try{
+    showLoader("Eliminando en cascada...");
+    // Primero borramos la PF hija (está en propfinals/)
+    const {db,doc,deleteDoc}=window.fb;
+    await deleteDoc(doc(db,"propfinals",pfHija.id));
+    // Después la propuesta base (está en proposals/)
+    await deleteDoc(doc(db,"proposals",propBase.id));
+    // Limpiar cache local
+    quotesCache=quotesCache.filter(x=>!(x.id===propBase.id||x.id===pfHija.id));
+    hideLoader();
+    if(typeof toast==="function")toast("🗑️ Eliminados "+propBase.id+" + "+pfHija.id,"success");
+    renderHist();
+    if(curMode==="dash"&&typeof renderDashboard==="function")renderDashboard();
+  }catch(e){hideLoader();alert("Error en cascada: "+e.message);console.error(e)}
 }
 
 async function loadQuote(kind,id){

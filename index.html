@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-20-v5.0.0-firebase-auth-storage-rango-precios -->
+<!-- VERSION: 2026-04-20-v5.0.1b-hide-convertidas-cascade-delete-grouped-drilldown-sync-agenda -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -15,7 +15,7 @@
 // Firebase SDK v10 — v5.0.0: Auth + Storage + persistencia offline
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, limit, runTransaction, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
@@ -44,11 +44,16 @@ try {
 // v5.0.0: Auth + Storage
 const auth = getAuth(app);
 const storage = getStorage(app);
+// v5.0.1: Google Sign-In provider
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 window.fb = {
   db, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, limit, runTransaction, serverTimestamp, writeBatch,
   // v5.0.0: Auth
   auth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
+  // v5.0.1: Google Sign-In + change password
+  googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, updatePassword, EmailAuthProvider, reauthenticateWithCredential,
   // v5.0.0: Storage
   storage, storageRef, uploadBytes, getDownloadURL, deleteObject
 };
@@ -238,12 +243,24 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 /* v5.0: Login form styles */
 .login-instr{font-size:14px;color:var(--soft);margin-bottom:20px;letter-spacing:.5px}
 .login-form{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px;margin-top:10px}
-.login-input{padding:14px 16px;border:1.5px solid rgba(201,169,110,.35);border-radius:10px;background:rgba(255,255,255,.08);color:var(--wh);font-family:'DM Sans',sans-serif;font-size:15px;-webkit-appearance:none}
+.login-input{padding:14px 16px;border:1.5px solid rgba(201,169,110,.35);border-radius:10px;background:rgba(255,255,255,.08);color:var(--wh);font-family:'DM Sans',sans-serif;font-size:15px;-webkit-appearance:none;width:100%}
 .login-input::placeholder{color:rgba(255,255,255,.4)}
 .login-input:focus{outline:none;border-color:var(--gd);background:rgba(255,255,255,.12)}
+/* v5.0.1: password field wrapper with eye toggle */
+.login-pw-wrap{position:relative;display:flex;align-items:center}
+.login-pw-wrap .login-input{padding-right:46px}
+.login-pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--gd);font-size:20px;padding:8px 10px;cursor:pointer;line-height:1;border-radius:6px}
+.login-pw-toggle:active{background:rgba(201,169,110,.15)}
 .login-btn{padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--gd),#a68855);color:var(--wh);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.5px;margin-top:4px}
 .login-btn:active{transform:scale(.98)}
 .login-btn:disabled{opacity:.6;cursor:wait}
+/* v5.0.1: Google sign-in button */
+.login-divider{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:rgba(255,255,255,.4);font-size:11px;letter-spacing:1px}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:rgba(201,169,110,.25)}
+.login-google{padding:12px 14px;border:1.5px solid rgba(255,255,255,.25);border-radius:10px;background:var(--wh);color:#3c4043;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.2px}
+.login-google:active{transform:scale(.98);background:#f5f5f5}
+.login-google:disabled{opacity:.6;cursor:wait}
+.login-google svg{width:18px;height:18px;flex-shrink:0}
 .login-link{background:none;border:none;color:var(--gd);font-size:12px;cursor:pointer;padding:6px;text-decoration:underline;font-family:'DM Sans',sans-serif}
 .login-link:active{opacity:.7}
 .pin-dots{display:flex;gap:14px;margin-bottom:30px}
@@ -298,6 +315,38 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 /* v4.13.0: Botón export agenda JSON */
 .dash-export-btn{background:#ECEFF1;color:#455A64;border:1px solid #B0BEC5;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-left:auto}
 .dash-export-btn:active{transform:scale(.97)}
+/* ══════ v5.0.1b: banner de entregas HOY ══════ */
+.dash-banner-hoy{background:linear-gradient(135deg,#FFEBEE,#FFCDD2);border:1.5px solid #EF5350;border-left:4px solid #C62828;border-radius:10px;padding:12px 14px;margin:0 0 14px 0;display:flex;align-items:center;gap:10px;color:#B71C1C;font-size:13px;line-height:1.4;cursor:pointer;animation:bannerPulse 2s ease-in-out infinite}
+.dash-banner-hoy .dbh-ic{font-size:22px;flex-shrink:0}
+.dash-banner-hoy .dbh-txt{flex:1;min-width:0}
+.dash-banner-hoy .dbh-txt strong{color:#B71C1C;font-weight:800}
+.dash-banner-hoy .dbh-arrow{color:#C62828;font-size:18px;flex-shrink:0}
+@keyframes bannerPulse{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,0)}50%{box-shadow:0 0 0 4px rgba(198,40,40,.2)}}
+/* ══════ v5.0.1b: banner de convertidas archivables ══════ */
+.dash-banner-info{background:linear-gradient(135deg,#E3F2FD,#BBDEFB);border:1.5px solid #64B5F6;border-left:4px solid #1976D2;border-radius:10px;padding:10px 14px;margin:0 0 14px 0;display:flex;align-items:center;gap:10px;color:#0D47A1;font-size:12px;line-height:1.4}
+.dash-banner-info .dbi-ic{font-size:18px;flex-shrink:0}
+.dash-banner-info .dbi-txt{flex:1;min-width:0}
+.dash-banner-info button{background:#1976D2;color:#fff;border:none;padding:7px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif}
+.dash-banner-info button:active{transform:scale(.97)}
+/* ══════ v5.0.1b: botón sincronizar agenda con Kathy y JP ══════ */
+.sync-agenda-btn{display:block;width:100%;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;border:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:12px;box-shadow:0 2px 8px rgba(27,94,32,.25)}
+.sync-agenda-btn:active{transform:scale(.98)}
+.sync-agenda-btn .sab-sub{display:block;font-size:10px;font-weight:500;opacity:.9;margin-top:2px}
+/* ══════ v5.0.1b: etiqueta "origen de PF" en convertidas ══════ */
+.hc-origen-pf{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;background:#E8EAF6;color:#3F51B5;border:1px solid #9FA8DA;vertical-align:middle;font-style:italic}
+/* ══════ v5.0.1b: drill-down agrupado por cliente ══════ */
+.dd-group{margin-bottom:14px}
+.dd-group-header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#F5F5F5;border-left:3px solid #1976D2;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;color:#212121}
+.dd-group-header .dgh-cli{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-group-header .dgh-meta{font-size:10px;color:#616161;font-weight:600;margin-right:10px}
+.dd-group-header .dgh-total{font-size:13px;font-weight:800;color:#1976D2}
+.dd-group .dd-row{border-radius:0;margin-bottom:0;border-top:none}
+.dd-group .dd-row:last-child{border-radius:0 0 6px 6px;margin-bottom:0}
+/* ══════ v5.0.1b: filtro "Convertidas" en historial ══════ */
+.hist-filter.convertidas-filter{background:#E8EAF6;color:#3F51B5;border-color:#9FA8DA}
+.hist-filter.convertidas-filter.act{background:#3F51B5;color:#fff;border-color:#3F51B5}
+/* ══════ v5.0.1b: tarjeta con opacity para convertidas ocultas ══════ */
+.hcard.hc-convertida{opacity:.7;border-left:3px solid #9FA8DA}
 /* v4.13.0: Indicador de offline activo */
 .cloud-ind.offline-cache{background:#FFF3E0;color:#E65100}
 .hist-filters{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:4px}
@@ -535,12 +584,20 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 <div id="pin-overlay" class="pin-overlay">
   <div class="pin-logo">Gourmet Bites</div>
   <div class="pin-tag">BY ANDRADE MATUK</div>
-  <div class="pin-build"><span>Cotizador</span><span class="hb-sep">·</span><span class="hb-prod" id="pin-ver">v5.0.0</span><span class="hb-sep">·</span><span id="pin-date">2026-04-20</span></div>
+  <div class="pin-build"><span>Cotizador</span><span class="hb-sep">·</span><span class="hb-prod" id="pin-ver">v5.0.1</span><span class="hb-sep">·</span><span id="pin-date">2026-04-20</span></div>
   <div class="login-instr">Ingresa con tu cuenta</div>
   <form id="login-form" class="login-form" onsubmit="return submitLogin(event)">
     <input type="email" id="login-email" class="login-input" placeholder="correo@gourmetbites.co" autocomplete="email" required>
-    <input type="password" id="login-password" class="login-input" placeholder="Contraseña" autocomplete="current-password" required>
+    <div class="login-pw-wrap">
+      <input type="password" id="login-password" class="login-input" placeholder="Contraseña" autocomplete="current-password" required>
+      <button type="button" class="login-pw-toggle" id="login-pw-toggle" onclick="togglePasswordVisibility()" aria-label="Mostrar/ocultar contraseña">👁️</button>
+    </div>
     <button type="submit" class="login-btn" id="login-submit">Entrar</button>
+    <div class="login-divider">O</div>
+    <button type="button" class="login-google" id="login-google-btn" onclick="signInWithGoogle()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continuar con Google
+    </button>
     <button type="button" class="login-link" onclick="openForgotPassword()">¿Olvidaste tu contraseña?</button>
   </form>
   <div class="pin-err" id="pin-err"></div>
@@ -550,7 +607,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 <div id="cloud-ind" class="cloud-ind off">⚫ Sin conexión</div>
 
 <div class="hdr">
-  <button class="hdr-logout" onclick="logoutSession()" title="Cerrar sesión">🔒</button>
+  <button class="hdr-logout" onclick="openUserMenu()" title="Cuenta (cambiar contraseña / cerrar sesión)">👤</button>
   <img id="hdr-logo" alt="Gourmet Bites">
   <div class="hdr-brand">Gourmet Bites</div>
   <div class="hdr-sub">By Andrade Matuk</div>
@@ -580,6 +637,10 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
   <!-- v4.13.0: banner de advertencia si hay docs fantasmas detectados -->
   <div id="dash-warn-fantasmas" class="dash-banner-warn hidden"></div>
+  <!-- v5.0.1b: banner de entregas HOY (aparece solo si hay) -->
+  <div id="dash-banner-hoy" class="dash-banner-hoy hidden" onclick="setMode('cal')"></div>
+  <!-- v5.0.1b: banner de convertidas archivables (aparece solo si hay 3+ de meses anteriores) -->
+  <div id="dash-banner-convertidas" class="dash-banner-info hidden"></div>
   <div class="dash-period-info" id="dash-period-info"></div>
   <div class="dash-grid" id="dash-cards"></div>
   <div class="dash-section">
@@ -589,6 +650,8 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   <div class="dash-section">
     <div class="dash-stit">📅 Próximas entregas</div>
     <div id="dash-upcoming"></div>
+    <!-- v5.0.1b: botón sincronizar agenda consolidada con Kathy y JP -->
+    <button class="sync-agenda-btn" onclick="syncAgendaAllFuture()">📤 Sincronizar agenda con Kathy y JP<span class="sab-sub">Genera un .ics con todos los pedidos futuros · compartir por WhatsApp</span></button>
   </div>
   <div class="dash-section">
     <div class="dash-stit">⚠️ Pendientes por cobrar</div>
@@ -1141,11 +1204,23 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.0.0"></script>
-<script src="app-core.js?v=5.0.0"></script>
-<script src="app-cotizar.js?v=5.0.0"></script>
-<script src="app-propuesta.js?v=5.0.0"></script>
-<script src="app-historial.js?v=5.0.0"></script>
-<script src="app-dashboard.js?v=5.0.0"></script>
+<!-- v5.0.1b: Modal de borrado en cascada para convertidas con PF hija -->
+<div id="cascade-del-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeCascadeDelModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#D32F2F,#B71C1C)">
+      <span class="mtitle">🗑️ Borrar propuesta convertida</span>
+      <button class="mclose" onclick="closeCascadeDelModal()">×</button>
+    </div>
+    <div class="mform" id="cascade-del-body">
+    </div>
+  </div>
+</div>
+
+<script src="app-assets.js?v=5.0.1b"></script>
+<script src="app-core.js?v=5.0.1b"></script>
+<script src="app-cotizar.js?v=5.0.1b"></script>
+<script src="app-propuesta.js?v=5.0.1b"></script>
+<script src="app-historial.js?v=5.0.1b"></script>
+<script src="app-dashboard.js?v=5.0.1b"></script>
 </body>
 </html>
