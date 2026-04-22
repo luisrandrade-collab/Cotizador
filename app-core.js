@@ -44,10 +44,20 @@
 //         timestamp (YYYY-MM-DD_HHhMM) para no sobrescribir.
 //         Pendientes v5.4.1: Bloque B (versionado PDF + copia Storage),
 //         Bloque D (botón 🔪 Producido inline en dashboard urgente).
+// v5.4.1: Bloque D — chip 🔪 Producido inline en tarjetas de Operación
+//         Urgente 3d (Por producir + Por entregar). Ahorra un tap para
+//         marcar producido sin abrir el doc. toggleProduced ya existía.
+//         Bloque B — PDF versionado con copia en Firebase Storage. Cada
+//         regeneración de PDF incrementa pdfRegenCount, agrega una entrada
+//         a pdfHistorial (version, url, fecha, generadoPor) y sube el blob
+//         a pdfs/{kind}/{docId}/v{N}_{timestamp}.pdf. Nombre local mantiene
+//         sin sufijo en v1; v2+ usan _v02, _v03. Botón 📎 Ver PDFs anteriores
+//         en el detalle del historial. Upload es best-effort: si Storage falla,
+//         el PDF local igual se entrega.
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.4.0";
+const BUILD_VERSION="v5.4.1";
 const BUILD_DATE="2026-04-22";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -79,6 +89,87 @@ async function savePdf(doc,filename){
   }catch(e){console.warn("savePdf blob falló, fallback a doc.save():",e)}
   // Fallback: descarga directa (desktop o navegadores sin Web Share)
   doc.save(filename);
+}
+
+// ─── v5.4.1 (Bloque B): PDF versionado + copia en Firebase Storage ─────
+// Envuelve savePdf existente + sube una copia a Storage + actualiza el
+// pdfHistorial del doc en Firestore para que Luis pueda recuperar PDFs
+// previos si regeneró uno nuevo.
+//
+// Parámetros:
+//   doc          · objeto jsPDF listo
+//   baseName     · nombre base del archivo SIN extensión ni version
+//                  (ej: "GB-2026-0110_Adriana_Pulido")
+//   kind         · "quote" | "proposal" | "propfinal"
+//   docId        · ID del doc en Firestore (ej: "GB-2026-0110")
+//
+// Flujo:
+//   1. Calcula el próximo número de versión leyendo pdfRegenCount del q en cache
+//   2. Nombre local: baseName.pdf (v1) o baseName_v02.pdf, _v03.pdf...
+//   3. Sube blob a Storage en pdfs/{kind}/{docId}/v{N}_{timestamp}.pdf
+//   4. Obtiene downloadURL
+//   5. Actualiza Firestore: pdfRegenCount++, pdfHistorial push {version,url,fecha,generadoPor}
+//   6. Llama savePdf local (share/descarga)
+//
+// Retrocompat: si algo de Storage falla, el PDF local igual se entrega al
+// usuario. El Storage upload es best-effort, no bloqueante para el flujo.
+async function savePdfConCopiaStorage(doc,baseName,kind,docId){
+  if(!kind||!docId){
+    // Fallback: si faltan datos, comportamiento igual que savePdf clásico
+    console.warn("[savePdfConCopiaStorage] faltan kind/docId, uso savePdf simple");
+    return savePdf(doc,baseName+".pdf");
+  }
+  // 1. Calcular próxima versión
+  const coll=kind==="quote"?"quotes":(kind==="propfinal"?"propfinals":"proposals");
+  const q=(quotesCache||[]).find(x=>x.id===docId);
+  const prevCount=(q&&typeof q.pdfRegenCount==="number")?q.pdfRegenCount:0;
+  const nextVersion=prevCount+1;
+  // 2. Nombre local: v1 sin sufijo para no cambiar comportamiento esperado,
+  //    v2+ con _v02, _v03 para que ordenen bien en descargas
+  const versionSuffix=nextVersion===1?"":"_v"+String(nextVersion).padStart(2,"0");
+  const localFilename=baseName+versionSuffix+".pdf";
+  // Preparar blob una sola vez (reusar para Storage y para savePdf)
+  let blob=null;
+  try{blob=doc.output("blob")}
+  catch(e){console.warn("[savePdfConCopiaStorage] output blob falló:",e)}
+  // 3-5. Intentar subir a Storage y actualizar Firestore (best-effort)
+  if(blob&&cloudOnline){
+    try{
+      await fbReady();
+      const _p=n=>String(n).padStart(2,"0");
+      const _now=new Date();
+      const stamp=_now.getFullYear()+"-"+_p(_now.getMonth()+1)+"-"+_p(_now.getDate())+"_"+_p(_now.getHours())+"h"+_p(_now.getMinutes());
+      const storagePath="pdfs/"+kind+"/"+docId+"/v"+String(nextVersion).padStart(2,"0")+"_"+stamp+".pdf";
+      const url=await uploadToStorage(blob,storagePath);
+      // Actualizar pdfHistorial y pdfRegenCount en Firestore
+      const {db,doc:fsDoc,updateDoc,serverTimestamp}=window.fb;
+      const entry={
+        version:nextVersion,
+        url:url,
+        path:storagePath,
+        fecha:_now.toISOString(),
+        generadoPor:(currentUser&&(currentUser.displayName||currentUser.email))||"desconocido",
+        filename:localFilename
+      };
+      const prevHist=(q&&Array.isArray(q.pdfHistorial))?q.pdfHistorial:[];
+      const newHist=prevHist.concat([entry]);
+      await updateDoc(fsDoc(db,coll,docId),{
+        pdfRegenCount:nextVersion,
+        pdfHistorial:newHist,
+        updatedAt:serverTimestamp()
+      });
+      // Actualizar cache local
+      if(q){q.pdfRegenCount=nextVersion;q.pdfHistorial=newHist}
+      console.log("[savePdfConCopiaStorage] v"+nextVersion+" subida OK:",storagePath);
+    }catch(e){
+      // NO bloquear — el PDF local se entrega igual
+      console.warn("[savePdfConCopiaStorage] subida a Storage falló (no bloqueante):",e);
+    }
+  }else if(!cloudOnline){
+    console.warn("[savePdfConCopiaStorage] offline — PDF solo local, sin copia Storage");
+  }
+  // 6. Entregar PDF local al usuario (share/descarga)
+  return savePdf(doc,localFilename);
 }
 
 // ─── CATÁLOGO DE PRODUCTOS ─────────────────────────────────

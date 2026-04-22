@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-22-v5.4.0-parcial-notas-propagan-produccion-flexible-backups-timestamp -->
+<!-- VERSION: 2026-04-22-v5.4.1-bloque-D-chip-producido-inline-bloque-B-pdf-versionado-storage -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -520,6 +520,14 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .urgent-empty{font-size:10px;color:var(--soft);font-style:italic;text-align:center;padding:14px 4px;flex:1;display:flex;align-items:center;justify-content:center}
 .urgent-d-today{color:#C62828;font-weight:700}
 .urgent-d-tomorrow{color:#E65100;font-weight:600}
+/* v5.4.1 (Bloque D): chip Producido inline en tarjetas urgentes */
+.urgent-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.urgent-item-txt{flex:1;min-width:0}
+.urgent-item-act{flex-shrink:0;align-self:center}
+.urgent-prod-chip{font-size:10px;font-weight:700;padding:5px 9px;border-radius:14px;background:#FFF3E0;color:#E65100;border:1px solid #FFB300;cursor:pointer;font-family:'DM Sans',sans-serif;line-height:1;transition:all .12s;white-space:nowrap;-webkit-appearance:none}
+.urgent-prod-chip:hover{background:#FFE0B2}
+.urgent-prod-chip:active{background:#FFB300;color:#fff;transform:scale(.95)}
+.urgent-prod-done{font-size:9.5px;font-weight:700;padding:4px 8px;border-radius:14px;background:#E8F5E9;color:#1B5E20;border:1px solid #81C784;white-space:nowrap;display:inline-block}
 
 /* ════════════ v5.3.0: Secciones colapsables progressive disclosure ════════════ */
 .dash-collapsible{background:#fff;border-radius:10px;margin:10px 0;overflow:hidden;box-shadow:var(--sh)}
@@ -775,6 +783,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .hc-btn-pagos-ver{background:#F3E5F5;color:#6A1B9A;border:1px solid #BA68C8}
 .hc-btn-ics{background:#E1F5FE;color:#01579B;border:1px solid #4FC3F7}
 .hc-btn-coment{background:#FFF8E1;color:#827717;border:1px solid #DCE775}
+.hc-btn-pdfs{background:#ECEFF1;color:#263238;border:1px solid #90A4AE}
 .hc-pagado-ok{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#E8F5E9;color:#1B5E20;border:1px solid #66BB6A;vertical-align:middle}
 .hc-prod-ok{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFF3E0;color:#E65100;border:1px solid #FB8C00;vertical-align:middle}
 .hc-coment-ok{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:4px;background:#FFF8E1;color:#827717;border:1px solid #DCE775;vertical-align:middle}
@@ -1877,12 +1886,33 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.4.0"></script>
-<script src="app-core.js?v=5.4.0"></script>
-<script src="app-cotizar.js?v=5.4.0"></script>
-<script src="app-propuesta.js?v=5.4.0"></script>
-<script src="app-historial.js?v=5.4.0"></script>
-<script src="app-seguimiento.js?v=5.4.0"></script>
-<script src="app-dashboard.js?v=5.4.0"></script>
+<!-- v5.4.1 (Bloque B): Modal Historial de PDFs generados -->
+<div id="pdf-hist-modal" class="modal-overlay hidden" onclick="if(event.target===this)closePdfHistorialModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#455A64,#263238)">
+      <span class="mtitle">📎 Historial de PDFs</span>
+      <button class="mclose" onclick="closePdfHistorialModal()">×</button>
+    </div>
+    <div class="mform">
+      <div style="background:#ECEFF1;border-left:3px solid #455A64;padding:10px 12px;border-radius:6px;font-size:12px;color:#263238;margin-bottom:14px">
+        <strong id="ph-doc-id">—</strong> · <span id="ph-doc-cli">—</span><br>
+        <span id="ph-doc-meta" style="font-size:11px;color:#555"></span>
+      </div>
+      <div style="font-size:11px;color:#607D8B;margin-bottom:10px;line-height:1.4">
+        Cada vez que regeneras el PDF queda una copia en la nube. La versión ACTUAL es la última generada.
+      </div>
+      <div id="ph-list" style="max-height:55vh;overflow-y:auto"></div>
+      <button class="btn" style="background:#ECEFF1;color:#455A64;width:100%;margin-top:10px" onclick="closePdfHistorialModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app-assets.js?v=5.4.1"></script>
+<script src="app-core.js?v=5.4.1"></script>
+<script src="app-cotizar.js?v=5.4.1"></script>
+<script src="app-propuesta.js?v=5.4.1"></script>
+<script src="app-historial.js?v=5.4.1"></script>
+<script src="app-seguimiento.js?v=5.4.1"></script>
+<script src="app-dashboard.js?v=5.4.1"></script>
 </body>
 </html>

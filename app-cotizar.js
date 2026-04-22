@@ -285,6 +285,10 @@ async function genPDF(){
     doc.text(firmanteSelCot.cargo,mg,y);
     const pg=doc.getNumberOfPages();for(let i=1;i<=pg;i++){doc.setPage(i);doc.setDrawColor(201,169,110);doc.setLineWidth(0.3);doc.line(30,H-14,W-30,H-14);doc.setFontSize(14);doc.setTextColor(26,26,26);doc.text("WhatsApp +57 310 444 1588",mg,H-7);doc.text("@GourmetBitesbyAndradeMatuk",W-mg,H-7,{align:"right"})}
     // v4.12.2: usar Web Share API en iOS/Android para evitar fuga del blob URL en WhatsApp
-    await savePdf(doc,currentQuoteNumber+"_"+cl.replace(/\s+/g,"_")+".pdf");
+    // v5.4.1 (Bloque B): usar savePdfConCopiaStorage para versionar + copia en Storage.
+    // currentQuoteNumber es a la vez el docId en Firestore (confirmado: los
+    // getDoc(doc(db,"quotes",currentQuoteNumber)) de saveCurrentQuote lo usan así).
+    const baseName=currentQuoteNumber+"_"+cl.replace(/\s+/g,"_");
+    await savePdfConCopiaStorage(doc,baseName,"quote",currentQuoteNumber);
   }catch(err){alert("Error generando PDF: "+err.message);console.error(err)}
 }
