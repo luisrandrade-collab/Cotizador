@@ -146,6 +146,12 @@ async function saveCurrentQuote(silent){
       att:$("f-att").value,mail:$("f-mail").value,tel:$("f-tel").value,dir:$("f-dir").value,
       city:getCityName(),cityType:$("f-city").value,trCustom:$("f-tr-custom").value,
       deliv:getDelivStr(),
+      // v5.4.0: guardar momentos y fecha de entrega como campos estructurados
+      // para propagarlos al modal de pedido (antes solo quedaban como string concatenado
+      // en `deliv` y se perdían al convertir → instrucciones críticas como "sin nueces"
+      // o "es regalo para XXX" no llegaban a producción).
+      momentosArr:(typeof getMomentos==="function"?getMomentos():[]),
+      eventDate:($("f-date")?.value||""),
       cart:cart.map(i=>({id:i.id,n:i.n,d:i.d||"",u:i.u||"",p:i.p,origP:i.origP||i.p,qty:i.qty,edited:!!i.edited})),
       cust:cust.map(i=>({n:i.n,p:i.p,d:i.d||"",u:i.u||"",qty:i.qty})),
       total:getTotal(),status:prevStatus,

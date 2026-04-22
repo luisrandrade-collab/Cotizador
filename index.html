@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-21-v5.3.0-progressive-disclosure-urgente-3d-chips-compactos -->
+<!-- VERSION: 2026-04-22-v5.4.0-parcial-notas-propagan-produccion-flexible-backups-timestamp -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -1419,11 +1419,11 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
         <div class="mf-field"><label>Hora de entrega *</label><input type="time" id="om-entrega-hora" required></div>
       </div>
       <div class="mf-row">
-        <div class="mf-field"><label>Fecha de producción (auto)</label><input type="date" id="om-prod-fecha" readonly style="background:var(--cl);color:var(--mid)"></div>
+        <div class="mf-field"><label>Fecha de producción <span style="font-size:10px;color:#888;font-weight:400">(editable)</span></label><input type="date" id="om-prod-fecha"></div>
         <div class="mf-field" style="display:flex;align-items:flex-end"><label style="cursor:pointer"><input type="checkbox" id="om-produced" style="vertical-align:middle;margin-right:6px"> Ya está producido</label></div>
       </div>
-      <div class="mf-intro" style="font-size:11px;background:#FFF3E0;border-color:#FFB74D;color:#E65100">💡 Producción = 1 día antes de la entrega (automático, por definición). En el calendario se asigna un bloque de 5 min desde las 8:00 AM, ordenado por hora de entrega del día siguiente. Marca "Ya está producido" si lo armaste antes.</div>
-      <div class="mf-field"><label>Notas de producción (Kathy/JP) — irán al evento de producción del .ics</label><textarea id="om-notas-prod" placeholder="Ej: usar moldes pequeños, alergia gluten, doble porción de tahinne..."></textarea></div>
+      <div class="mf-intro" style="font-size:11px;background:#FFF3E0;border-color:#FFB74D;color:#E65100">💡 Producción se auto-llena 1 día antes de la entrega. <strong>Puedes editarla</strong> si produces el mismo día o con más anticipación. Si pones producción = entrega, la app pedirá confirmación.</div>
+      <div class="mf-field"><label>⚠️ Notas de producción (Kathy/JP) — irán al .ics <span style="font-size:10px;color:#888;font-weight:400">· se pre-llenan con las notas de la cotización</span></label><textarea id="om-notas-prod" placeholder="Ej: sin nueces · regalo para María, incluir nota 'Feliz cumple' · doble tahinne · alergia gluten..."></textarea></div>
       <div class="mf-row">
         <div class="mf-field"><label>Monto del anticipo</label><input type="number" id="om-anticipo" placeholder="0" inputmode="numeric"></div>
         <div class="mf-field"><label>Método de pago</label><select id="om-metodo"><option value="">— Sin anticipo aún —</option><option value="Nequi">Nequi</option><option value="Daviplata">Daviplata</option><option value="Banco Falabella">Banco Falabella</option><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option><option value="Otro">Otro</option></select></div>
@@ -1450,7 +1450,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
         <div class="mf-field"><label>Monto anticipo 50%</label><input type="number" id="am-anticipo" placeholder="0" inputmode="numeric"></div>
         <div class="mf-field"><label>Método de pago</label><select id="am-metodo"><option value="">— Sin anticipo aún —</option><option value="Nequi">Nequi</option><option value="Daviplata">Daviplata</option><option value="Banco Falabella">Banco Falabella</option><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option><option value="Otro">Otro</option></select></div>
       </div>
-      <div class="mf-field"><label>Notas de producción (van al .ics)</label><textarea id="am-notas-prod" placeholder="Detalles para que Kathy/JP tengan en cuenta el día de producción"></textarea></div>
+      <div class="mf-field"><label>⚠️ Notas de producción — irán al .ics <span style="font-size:10px;color:#888;font-weight:400">· se pre-llenan con el momento de la propuesta</span></label><textarea id="am-notas-prod" placeholder="Detalles para que Kathy/JP tengan en cuenta el día de producción"></textarea></div>
       <div class="mf-field"><label>Notas generales (opcional)</label><textarea id="am-notas" placeholder="Comprobante, confirmación, contacto, etc."></textarea></div>
       <button class="mf-submit blue" onclick="submitApproveProposal()">Confirmar aprobación</button>
     </div>
@@ -1877,12 +1877,12 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
-<script src="app-assets.js?v=5.3.0"></script>
-<script src="app-core.js?v=5.3.0"></script>
-<script src="app-cotizar.js?v=5.3.0"></script>
-<script src="app-propuesta.js?v=5.3.0"></script>
-<script src="app-historial.js?v=5.3.0"></script>
-<script src="app-seguimiento.js?v=5.3.0"></script>
-<script src="app-dashboard.js?v=5.3.0"></script>
+<script src="app-assets.js?v=5.4.0"></script>
+<script src="app-core.js?v=5.4.0"></script>
+<script src="app-cotizar.js?v=5.4.0"></script>
+<script src="app-propuesta.js?v=5.4.0"></script>
+<script src="app-historial.js?v=5.4.0"></script>
+<script src="app-seguimiento.js?v=5.4.0"></script>
+<script src="app-dashboard.js?v=5.4.0"></script>
 </body>
 </html>

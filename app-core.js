@@ -33,11 +33,22 @@
 //         Otros operativos (Recaudo/Próximas 14d/Por cobrar/Comentarios), Opciones
 //         avanzadas. Estado expandido persistido en localStorage. Drill-down usa
 //         chips compactos (NO full-width) para Viva/Perdida/Reactivar + Pedido/Aprobar.
+// v5.4.0: PARCIAL (Bloques A+C+E) — Instrucciones especiales del pedido se
+//         propagan de cotización a modal de pedido (campo momentos/fecha entrega
+//         ahora se guarda estructurado en `momentos` array + `eventDate`, no solo
+//         como string `deliv`). Al convertir a pedido, `om-notas-prod` se pre-llena
+//         con los momentos si existen → así la nota crítica ("sin nueces",
+//         "es regalo para XXX") llega a producción y al .ics. Producción flexible:
+//         `om-prod-fecha` ya no readonly; default sigue siendo entrega−1d pero se
+//         puede editar. Si producción = entrega se pide confirmación. Backups con
+//         timestamp (YYYY-MM-DD_HHhMM) para no sobrescribir.
+//         Pendientes v5.4.1: Bloque B (versionado PDF + copia Storage),
+//         Bloque D (botón 🔪 Producido inline en dashboard urgente).
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.3.0";
-const BUILD_DATE="2026-04-21";
+const BUILD_VERSION="v5.4.0";
+const BUILD_DATE="2026-04-22";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
 const APP_YEAR=new Date().getFullYear();

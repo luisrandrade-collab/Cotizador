@@ -416,18 +416,70 @@ function openOrderModal(quoteId,ev){
   const prodDefault=new Date(entregaDate.getTime()-86400000);
   const prodIso=prodDefault<new Date(hoy+"T00:00:00")?hoy:prodDefault.toISOString().slice(0,10);
   $("om-prod-fecha").value=q.productionDate||prodIso;
+  // v5.4.0 (Bloque C): producción editable. Al cambiar fecha entrega, recalcula default
+  // de producción (entrega - 1d) SOLO si el usuario no la ha editado manualmente.
+  // También sincroniza min/max del input de producción.
+  $("om-prod-fecha").removeAttribute("readonly");
+  $("om-prod-fecha").style.background="";
+  $("om-prod-fecha").style.color="";
+  $("om-prod-fecha").dataset.userEdited="0";
+  $("om-prod-fecha").min=hoy;
+  $("om-prod-fecha").max=entrega;
+  $("om-prod-fecha").oninput=function(){this.dataset.userEdited="1"};
   $("om-produced").checked=!!q.produced;
   $("om-entrega-fecha").oninput=function(){
     const e=this.value;if(!e)return;
     const eD=new Date(e+"T00:00:00");
     const pD=new Date(eD.getTime()-86400000);
     const h=new Date(hoy+"T00:00:00");
-    $("om-prod-fecha").value=(pD<h?hoy:pD.toISOString().slice(0,10));
+    const newProdDefault=(pD<h?hoy:pD.toISOString().slice(0,10));
+    // Solo auto-actualiza si el usuario no la tocó
+    if($("om-prod-fecha").dataset.userEdited!=="1"){
+      $("om-prod-fecha").value=newProdDefault;
+    }
+    $("om-prod-fecha").max=e;
   };
   $("om-anticipo").value="";
   $("om-metodo").value="";
   $("om-notas").value="";
-  $("om-notas-prod").value=q.orderData?.notasProduccion||"";
+  // v5.4.0 (Bloque A): pre-llenar notas de producción con los momentos/instrucciones
+  // de la cotización original si no hay notas previas guardadas en orderData.
+  // Así las instrucciones críticas ("sin nueces", "es regalo", "entregar a X") que el
+  // cliente escribió en el paso de fecha de la cotización llegan a producción y al .ics
+  // en vez de perderse.
+  let notaProdDefault="";
+  if(q.orderData?.notasProduccion){
+    notaProdDefault=q.orderData.notasProduccion;
+  }else{
+    // Reconstruir a partir de momentos/instrucciones de la cotización
+    const parts=[];
+    const estandares=["Desayuno","Almuerzo","Cena","Coffee Break","Cóctel","Picada","Mañana","Tarde","Noche"];
+    // Momentos guardados como array (v5.4.0+): filtra valores tipo checkbox estándar y deja solo el texto libre
+    if(Array.isArray(q.momentosArr)&&q.momentosArr.length){
+      const libres=q.momentosArr.filter(m=>m&&!estandares.includes(m));
+      if(libres.length)parts.push(libres.join(" · "));
+    }
+    // Fallback defensivo para cotizaciones legacy (pre-v5.4.0): extraer del string `deliv`
+    // Formato típico: "22 de mayo de 2026 — Regalo para X, incluir nota..."
+    // Filtra si el texto extraído es solo un momento estándar (ej "Almuerzo") para no meter ruido.
+    if(!parts.length&&q.deliv&&typeof q.deliv==="string"&&q.deliv.includes(" — ")){
+      const parteDespues=q.deliv.split(" — ").slice(1).join(" — ").trim();
+      // Solo agregar si no es una lista de solo momentos estándar (ej "Almuerzo, Cena")
+      const tokens=parteDespues.split(",").map(s=>s.trim()).filter(Boolean);
+      const hayTextoLibre=tokens.some(t=>!estandares.includes(t));
+      if(parteDespues&&hayTextoLibre)parts.push(parteDespues);
+    }
+    notaProdDefault=parts.join(" · ");
+  }
+  $("om-notas-prod").value=notaProdDefault;
+  // Si la nota viene de la cotización (no editada antes), resaltamos visualmente
+  if(notaProdDefault&&!q.orderData?.notasProduccion){
+    $("om-notas-prod").style.background="#FFF8E1";
+    $("om-notas-prod").style.borderColor="#FFB300";
+  }else{
+    $("om-notas-prod").style.background="";
+    $("om-notas-prod").style.borderColor="";
+  }
   $("om-num").dataset.quoteId=q.id;
   $("order-modal").classList.remove("hidden");
 }
@@ -442,16 +494,37 @@ async function submitMarkAsOrder(){
   const horaEntrega=$("om-entrega-hora").value;
   if(!fechaEntrega){alert("Ingresa la fecha de entrega");return}
   if(!horaEntrega){alert("Ingresa la hora de entrega");return}
-  // v4.12.6: producción es SIEMPRE entrega − 1 día (por definición, no editable)
-  const _entD=new Date(fechaEntrega+"T00:00:00");
-  const _prodD=new Date(_entD.getTime()-86400000);
-  const productionDate=_prodD.toISOString().slice(0,10);
+  // v5.4.0 (Bloque C): producción ahora es EDITABLE. Default sigue siendo entrega-1d
+  // pero el usuario puede ponerla el mismo día de la entrega si así lo necesita.
+  // Validaciones: no puede ser en el pasado, no puede ser después de la entrega.
+  // Si es el mismo día que la entrega, se pide confirmación explícita.
+  const todayIso=new Date().toISOString().slice(0,10);
+  let productionDate=$("om-prod-fecha").value;
+  if(!productionDate){
+    // Fallback defensivo si alguien vació el campo: re-calcular entrega-1d
+    const _entD=new Date(fechaEntrega+"T00:00:00");
+    const _prodD=new Date(_entD.getTime()-86400000);
+    productionDate=_prodD.toISOString().slice(0,10);
+    if(productionDate<todayIso)productionDate=todayIso;
+  }
+  if(productionDate<todayIso){
+    alert("⚠️ La fecha de producción no puede estar en el pasado.\nHoy: "+todayIso+"\nProducción ingresada: "+productionDate);
+    return;
+  }
+  if(productionDate>fechaEntrega){
+    alert("⚠️ La fecha de producción no puede ser posterior a la entrega.\nEntrega: "+fechaEntrega+"\nProducción: "+productionDate);
+    return;
+  }
+  if(productionDate===fechaEntrega){
+    if(!confirm("⚡ Producción y entrega el MISMO día ("+fechaEntrega+" "+horaEntrega+").\n\n¿Confirmas que tienes el tiempo para producir y entregar hoy mismo?\n\n(Normal es producir el día anterior — esto es solo para casos especiales.)")){
+      return;
+    }
+  }
   const produced=$("om-produced").checked;
   const anticipo=parseInt($("om-anticipo").value)||0;
   const metodo=$("om-metodo").value;
   const notas=$("om-notas").value.trim();
   const notasProd=$("om-notas-prod").value.trim();
-  const todayIso=new Date().toISOString().slice(0,10);
   const orderData={
     fechaAprobacion:fecha,fechaEntrega:fechaEntrega,horaEntrega:horaEntrega,
     productionDate:productionDate,produced:produced,
@@ -532,7 +605,23 @@ function openApproveModal(propId,kind,ev){
   $("am-anticipo").value="";
   $("am-metodo").value="";
   $("am-notas").value="";
-  $("am-notas-prod").value=p.approvalData?.notasProduccion||"";
+  // v5.4.0 (Bloque A): pre-llenar notas de producción con el campo `momento` de la
+  // propuesta si no hay notas previas — así instrucciones/contextos del evento
+  // llegan a producción y al .ics sin tener que volver a digitarlos.
+  let notaProdDefault="";
+  if(p.approvalData?.notasProduccion){
+    notaProdDefault=p.approvalData.notasProduccion;
+  }else if(p.momento&&typeof p.momento==="string"&&p.momento.trim()){
+    notaProdDefault=p.momento.trim();
+  }
+  $("am-notas-prod").value=notaProdDefault;
+  if(notaProdDefault&&!p.approvalData?.notasProduccion){
+    $("am-notas-prod").style.background="#FFF8E1";
+    $("am-notas-prod").style.borderColor="#FFB300";
+  }else{
+    $("am-notas-prod").style.background="";
+    $("am-notas-prod").style.borderColor="";
+  }
   $("am-num").dataset.propId=p.id;
   $("am-num").dataset.propKind=kind;
   $("approve-modal").classList.remove("hidden");
