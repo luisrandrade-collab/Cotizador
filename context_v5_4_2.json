@@ -1,0 +1,810 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Todo lo necesario para que un nuevo chat de Claude (o Luis mismo) retome el proyecto Gourmet Bites sin perder contexto.",
+    "generado_el": "2026-04-22",
+    "generado_por": "Claude Opus 4.7 — asistente técnico del proyecto (sesión v5.4.2)",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": [
+        "Luis",
+        "Kathy",
+        "JP"
+      ]
+    },
+    "version_actual": "v5.4.2 ESTABLE — checkbox producido fix + UX-002 cerrado + restaurar backup JSON + navegador global de PDFs",
+    "version_anterior_estable_probada": "v5.4.1 COMPLETA (Bloques B + D) — chip 🔪 producido inline + PDF versionado con copia Storage",
+    "fecha_ultima_actualizacion": "2026-04-22",
+    "url_produccion": "https://luisrandrade-collab.github.io/Cotizador/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION. isFollowable/getPipelineActivo/setFollowUp normalizan docs sin status (v5.2.3). v5.4.1: savePdfConCopiaStorage agregado — wrappea savePdf + uploadToStorage existentes + actualiza pdfHistorial en Firestore.",
+      "app-cotizar.js": "módulo de cotizaciones. v5.4.0: saveCurrentQuote guarda momentosArr+eventDate estructurados. v5.4.1: genPDF usa savePdfConCopiaStorage.",
+      "app-propuesta.js": "módulo de propuestas / eventos. Una sola función genPropPDF con flag isFinal=!!window.__pfMode — NO hay genPropFinalPDF separada. v5.4.1: genPropPDF usa savePdfConCopiaStorage con kind dinámico.",
+      "app-historial.js": "historial + 4 archivos (Vivas/Pedidos/Perdidas/Anuladas) + buscador. Contiene METODOS_PAGO, FOLLOW_UP_META, MOTIVOS_PERDIDA y histArchive/histFilter/histSearch. v5.4.0: openOrderModal/submitMarkAsOrder/openApproveModal con propagación de notas + producción editable. v5.4.1: botón 📎 PDFs (N) en actionBtns + openPdfHistorialModal/closePdfHistorialModal.",
+      "app-seguimiento.js": "pestaña seguimiento comercial (sin cambios desde v5.0.5)",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + Operación urgente 3d (v5.3.0) + colapsables (v5.3.0) + drill-down con chips (v5.3.0) + agenda + exports + mantenimiento. v5.4.0: exportHistoryJson con timestamp. v5.4.1: urgentItemHtml con chip 🔪 Producido inline."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/Cotizador/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password + Google) · 3 usuarios",
+    "firebase_plan": "Blaze (cuota gratis suficiente)",
+    "firebase_storage_disponible": "5 GB — Luis confirmó que NO es problema guardar todos los PDFs. A partir de v5.4.1 los PDFs se suben a pdfs/{kind}/{docId}/v{N}_{timestamp}.pdf",
+    "firebase_storage_estructura": {
+      "pagos": "pagos/{quoteNumber}-{timestamp}.jpg (v5.0+, fotos de comprobantes)",
+      "entregas": "entregas/{quoteNumber}-{timestamp}.jpg (v5.0+, fotos de entrega)",
+      "pdfs": "pdfs/{kind}/{docId}/v{N}_{YYYY-MM-DD_HHhMM}.pdf (v5.4.1+, copias versionadas de PDFs). kind ∈ {quote, proposal, propfinal}"
+    },
+    "backup_estado": "Export JSON manual (📥 Backup JSON) · v5.4.0: nombres con timestamp para no sobrescribir. Restaurar backup aún pendiente (v5.4.2) · PITR y Scheduled Backups en Firebase Console — Luis los configuró, verificar en consola"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": [
+      "enviada",
+      "pedido",
+      "en_produccion",
+      "entregado",
+      "anulada"
+    ],
+    "propuesta_status": [
+      "enviada",
+      "propfinal",
+      "aprobada",
+      "en_produccion",
+      "entregado",
+      "convertida",
+      "superseded",
+      "anulada"
+    ],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]. v5.2.3: docs sin status se tratan como 'enviada'.",
+      "valores_internos": [
+        "pendiente",
+        "contactado",
+        "activa",
+        "perdida"
+      ],
+      "expuesto_a_usuario": [
+        "viva",
+        "perdida"
+      ],
+      "regla_binaria": "pendiente/contactado/activa → VIVA. perdida → PERDIDA.",
+      "comportamiento_kpis": "perdida excluye igual que anulada."
+    },
+    "campos_nuevos_v540": {
+      "en_cotizaciones": {
+        "momentosArr": "array de strings. Contiene los checkbox activos del bloque de fecha+momento + el input 'Otro' si se llenó. Ej: ['Almuerzo', 'Regalo para María, incluir tarjeta XXX']. Usado para propagar instrucciones críticas al modal de pedido.",
+        "eventDate": "string YYYY-MM-DD. Fecha de entrega esperada. Ya existía en propuestas, ahora también en cotizaciones."
+      },
+      "retrocompat": "Cotizaciones anteriores a v5.4.0 no tienen estos campos. El código lee con fallback desde el string `deliv` cuando es necesario."
+    },
+    "campos_nuevos_v541": {
+      "en_cualquier_doc": {
+        "pdfRegenCount": "number. Cuántas veces se ha (re)generado el PDF de este doc. Arranca en 0 implícito (undefined), v1 es el primer PDF. Se incrementa cada vez que savePdfConCopiaStorage sube a Storage exitosamente.",
+        "pdfHistorial": "array de {version, url, path, fecha, generadoPor, filename}. url = download URL de Firebase Storage (permanente mientras el archivo exista). path = ruta interna en Storage (para futuro delete si se llena). generadoPor = displayName o email del usuario logueado al momento de generar."
+      },
+      "retrocompat": "Docs anteriores a v5.4.1 no tienen ninguno de los dos campos. Al regenerar un PDF, arranca pdfRegenCount=1 y pdfHistorial=[{version:1, ...}]. Los PDFs generados ANTES de v5.4.1 NO están en Storage — no hay forma de rescatarlos ahora."
+    },
+    "flujo_produccion_v540": {
+      "default_sigue_igual": "Producción = entrega - 1 día (cuando Luis no toca nada). Sigue siendo el caso 99%.",
+      "mismo_dia_permitido": "Producción puede ser igual a entrega — pide confirmación explícita.",
+      "mas_anticipacion_permitida": "Producción puede ser varios días antes de entrega — no pide confirmación.",
+      "validaciones": "No puede ser en pasado. No puede ser después de entrega.",
+      "status_resultante": "Si productionDate <= hoy → status='en_produccion'. Si productionDate > hoy → status='pedido'."
+    }
+  },
+  "historial_versiones_detallado": [
+    {
+      "version": "v5.4.2",
+      "fecha": "2026-04-22",
+      "tipo": "PATCH + 2 features menores",
+      "highlights": [
+        "FIX CSS: checkbox \"Ya está producido\" en modal Marcar-como-pedido (herencia de label uppercase/block)",
+        "FIX UX-002: loadQuote restaura f-date + f-moments al reabrir cotización",
+        "FEATURE: Botón 📤 Restaurar JSON en Mantenimiento (modo MERGE aditivo + preview + confirmación doble)",
+        "FEATURE: Botón 📎 Todos los PDFs en header de Historial (navegador global con búsqueda en vivo)"
+      ]
+    },
+    {
+      "version": "v5.0.0",
+      "fecha": "2026-04-20",
+      "tipo": "MAJOR",
+      "highlights": "Firebase Auth + Storage + audit trail"
+    },
+    {
+      "version": "v5.0.1",
+      "fecha": "2026-04-20",
+      "highlights": "Google Sign-In + toggle password + menú cuenta"
+    },
+    {
+      "version": "v5.0.1b",
+      "fecha": "2026-04-20",
+      "highlights": "Convertidas ocultas + borrado cascada + drill-down agrupado"
+    },
+    {
+      "version": "v5.0.2",
+      "fecha": "2026-04-20",
+      "highlights": "Auto-sync + fechas flexibles + fantasmas + modal backup"
+    },
+    {
+      "version": "v5.0.3",
+      "fecha": "2026-04-20",
+      "highlights": "Estado anulada + modal anular con motivo/devolución"
+    },
+    {
+      "version": "v5.0.4",
+      "fecha": "2026-04-20",
+      "highlights": "Pipeline Activo · pestaña Seguimiento · 4 estados followUp"
+    },
+    {
+      "version": "v5.0.5",
+      "fecha": "2026-04-21",
+      "highlights": "Binario VIVA/PERDIDA · reactivarPerdida · bloqueo perdida→pedido"
+    },
+    {
+      "version": "v5.1.0",
+      "fecha": "2026-04-21",
+      "tipo": "MINOR",
+      "status": "ESTABLE",
+      "highlights": "Historial 4 archivos + buscador + botones rápidos"
+    },
+    {
+      "version": "v5.2.0",
+      "fecha": "2026-04-21",
+      "tipo": "MINOR",
+      "status": "DEFECTUOSA",
+      "highlights": "Rediseño dashboard + 3 reportes. Destapó bug de histFilter"
+    },
+    {
+      "version": "v5.2.1",
+      "fecha": "2026-04-21",
+      "tipo": "PATCH",
+      "highlights": "_safe wrappers + logs diagnóstico"
+    },
+    {
+      "version": "v5.2.2",
+      "fecha": "2026-04-21",
+      "tipo": "PATCH HOTFIX",
+      "status": "ESTABLE",
+      "highlights": "Fix 1 línea: removido let histFilter huérfano"
+    },
+    {
+      "version": "v5.2.3",
+      "fecha": "2026-04-21",
+      "tipo": "PATCH FUNCIONAL",
+      "status": "ESTABLE",
+      "highlights": "Docs legacy sin status normalizados + botones Viva/Perdida en drill-down"
+    },
+    {
+      "version": "v5.3.0",
+      "fecha": "2026-04-21",
+      "tipo": "MINOR",
+      "status": "ESTABLE",
+      "highlights": "Rediseño dashboard progressive disclosure: Pipeline+KPIs+Operación urgente 3d siempre visible. Análisis comercial + Otros operativos colapsables con estado localStorage. Drill-down con chips compactos + botón Convertir a pedido/Aprobar inline."
+    },
+    {
+      "version": "v5.4.0-parcial",
+      "fecha": "2026-04-22",
+      "tipo": "MINOR (parcial)",
+      "status": "ENTREGADA — BLOQUES A+C+E",
+      "highlights": "Bloques A+C+E: notas críticas de cotización propagan al modal de pedido + producción editable (mismo día permitido con confirmación) + backups con timestamp."
+    },
+    {
+      "version": "v5.4.1",
+      "fecha": "2026-04-22",
+      "tipo": "MINOR (complemento)",
+      "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN",
+      "highlights": "Bloque D (chip 🔪 Producido inline en tarjetas de Operación Urgente 3d) + Bloque B (versionado automático de PDFs con copia en Firebase Storage + modal 📎 PDFs para ver versiones anteriores). Cierra el roadmap planeado para el loop operativo."
+    }
+  ],
+  "archivos_de_cada_version": {
+    "v5_3_0_ESTABLE": {
+      "nota": "Rollback disponible si algo explota en v5.4.x. Los 3 archivos (app-core.js, app-dashboard.js, index.html) de v5.3.0 están en el histórico de GitHub Pages."
+    },
+    "v5_4_0_PARCIAL_ESTABLE": {
+      "archivos_subidos": [
+        "app-core.js",
+        "app-cotizar.js",
+        "app-historial.js",
+        "app-dashboard.js",
+        "index.html"
+      ],
+      "sin_cambios_vs_v530": [
+        "app-seguimiento.js",
+        "app-propuesta.js",
+        "app-assets.js"
+      ]
+    },
+    "v5_4_1_ENTREGADA": {
+      "archivos_a_subir_estos_6": [
+        "app-core.js — BUILD_VERSION v5.4.1 + helper savePdfConCopiaStorage (~60 líneas nuevas)",
+        "app-cotizar.js — genPDF usa savePdfConCopiaStorage en vez de savePdf",
+        "app-propuesta.js — genPropPDF usa savePdfConCopiaStorage con kind dinámico",
+        "app-historial.js — botón 📎 PDFs (N) + openPdfHistorialModal + closePdfHistorialModal",
+        "app-dashboard.js — urgentItemHtml con chip 🔪 Producido inline",
+        "index.html — modal pdf-hist + CSS chip producido + CSS hc-btn-pdfs + cache-busting v5.4.1"
+      ],
+      "sin_cambios_vs_v540": [
+        "app-seguimiento.js",
+        "app-assets.js"
+      ],
+      "breaking_changes": "Ninguno — campos pdfRegenCount y pdfHistorial son opcionales. Docs pre-v5.4.1 no los tienen y al regenerar PDF arrancan en v1.",
+      "deltas_aprox_bytes": {
+        "app-core.js": "+4646 (helper + changelog)",
+        "app-cotizar.js": "+316",
+        "app-propuesta.js": "+413",
+        "app-historial.js": "+3382 (modal handler + botón)",
+        "app-dashboard.js": "+887 (chip + CSS implícito en layout)",
+        "index.html": "+2124 (modal + CSS)"
+      }
+    },
+    "v5_4_2_ENTREGADA": {
+      "fecha": "2026-04-22",
+      "estado": "ESTABLE",
+      "cambios_vs_anterior": "Checkbox producido fix + UX-002 cerrado + restaurar backup JSON + navegador global de PDFs",
+      "archivos_modificados": [
+        "app-core.js",
+        "app-historial.js",
+        "app-dashboard.js",
+        "index.html"
+      ],
+      "archivos_sin_cambios": [
+        "app-assets.js",
+        "app-cotizar.js",
+        "app-propuesta.js",
+        "app-seguimiento.js"
+      ]
+    }
+  },
+  "decisiones_arquitectura_importantes": {
+    "upload_best_effort": "Si Storage falla por cualquier razón (offline, cuota, permisos, timeout), el PDF local igual se entrega al usuario. El upload a Storage es mejor-esfuerzo, nunca bloquea el flujo. Log en consola para diagnóstico posterior.",
+    "no_cleanup_automatico": "Luis tiene 5GB y genera pocos PDFs al día. NO hay limpieza automática de Storage. Si en el futuro se llena, agregar función que borre entradas antiguas (por ejemplo, solo mantener las últimas 10 versiones por doc, o borrar las de docs anulados/entregados hace >1 año).",
+    "versionado_transparente_en_v1": "Primera versión de un PDF NO lleva sufijo _v01 — sale con el nombre clásico GB-XXXX_Cliente.pdf (retrocompat UX). Solo v2+ llevan _v02, _v03. Esto evita confundir al cliente con nombres raros en la primera regeneración.",
+    "chip_producido_stopPropagation": "El chip debe usar event.stopPropagation() en su onclick porque está dentro de un contenedor que tiene su propio onclick=loadQuote. Sin eso, tocar el chip abriría el doc Y además marcaría producido — comportamiento inesperado.",
+    "firebase_storage_path_pdfs": "pdfs/{kind}/{docId}/v{N}_{timestamp}.pdf — kind en singular (quote/proposal/propfinal) a propósito: alinea con el campo kind del doc y es más legible que quotes/proposals/propfinals para humanos debuggeando en la consola de Firebase."
+  },
+  "bugs_conocidos_abiertos": [],
+  "bugs_cerrados_en_versiones_anteriores": [
+    {
+      "id": "BUG-008",
+      "version_fix": "v5.4.1",
+      "severidad": "Media — molesta para Luis en operación diaria",
+      "descripcion": "PDFs locales se sobrescribían si Luis regeneraba la misma cotización. Sin historial de qué versión se envió al cliente. No podía recuperar el PDF original si Kathy editó algo después.",
+      "fix": "Versionado automático via savePdfConCopiaStorage. v1 sin sufijo (retrocompat), v2+ con _v02, _v03. Copia en Firebase Storage. Botón 📎 PDFs (N) en historial para ver versiones anteriores con link de descarga."
+    },
+    {
+      "id": "UX-003",
+      "version_fix": "v5.4.1",
+      "severidad": "Baja — pero molesta con muchos pedidos",
+      "descripcion": "Marcar un pedido como producido requería 3 taps + navegación desde dashboard (abrir doc, scroll, botón en historial). Con 10+ pedidos en la semana, fricción acumulada notable.",
+      "fix": "Chip 🔪 Producido inline en tarjetas de Operación Urgente 3d. 1 tap y listo. toggleProduced ya existía y ya refrescaba dashboard automáticamente."
+    },
+    {
+      "id": "BUG-005",
+      "version_fix": "v5.4.0",
+      "severidad": "CRÍTICA — impacto directo en producción",
+      "descripcion": "Instrucciones especiales escritas en el campo 'momento Otro' de la cotización (ej: 'sin nueces', 'regalo para X', 'alergia gluten') salían en el PDF pero se perdían al convertir a pedido — no llegaban al .ics ni a las notas de producción. Caso real reportado por Kathy: GB-2026-0110.",
+      "fix": "momentosArr campo estructurado + pre-llenado del textarea om-notas-prod al abrir el modal de pedido (+ fallback desde deliv string para cotizaciones legacy + filtro de momentos estándar para no meter ruido)."
+    },
+    {
+      "id": "BUG-006",
+      "version_fix": "v5.4.0",
+      "severidad": "Media — limitaba flexibilidad operativa",
+      "descripcion": "Fecha de producción hardcoded a entrega-1d, input readonly. Imposible producir y entregar el mismo día aunque Luis supiera que tenía tiempo.",
+      "fix": "om-prod-fecha editable con min=hoy, max=fechaEntrega. Confirm explícito si producción=entrega."
+    },
+    {
+      "id": "BUG-007",
+      "version_fix": "v5.4.0",
+      "severidad": "Baja — pero molesta",
+      "descripcion": "Backups JSON con mismo nombre si se hacen dos el mismo día (fecha sin hora).",
+      "fix": "Nombre con timestamp YYYY-MM-DD_HHhMM."
+    },
+    {
+      "id": "UX-001",
+      "version_fix": "v5.3.0",
+      "severidad": "Media — violación regla UX explícita",
+      "descripcion": "Botones Viva/Perdida/Reactivar del drill-down quedaron full-width en v5.2.3 (flex:1). Luis reportó que se veían demasiado grandes.",
+      "fix": "Chips inline compactos con border-radius 14px. Agregado botón 🤝 Pedido / ✓ Aprobar."
+    },
+    {
+      "id": "BUG-004",
+      "version_fix": "v5.2.3",
+      "descripcion": "3 docs legacy sin status invisibles al pipeline/historial/seguimiento",
+      "fix": "Normalización en 3 capas + botón bulk"
+    },
+    {
+      "id": "BUG-001/002/003",
+      "version_fix": "v5.2.2",
+      "descripcion": "Dashboard vacío + navegación rota + Historial vacío",
+      "fix": "Removida línea huérfana `let histFilter` en app-core.js"
+    },
+    {
+      "id": "BUG-FIXED-001",
+      "version_fix": "v5.1.0",
+      "descripcion": "Propuestas sin botones Viva/Perdida"
+    },
+    {
+      "id": "BUG-FIXED-002",
+      "version_fix": "v5.1.0",
+      "descripcion": "capture=environment bloqueaba galería móvil"
+    },
+    {
+      "id": "BUG-FIXED-003",
+      "version_fix": "v5.1.0",
+      "descripcion": "Pagos sin foto no adjuntaban después"
+    },
+    {
+      "id": "BUG-FIXED-004",
+      "version_fix": "v5.0.5",
+      "descripcion": "Perdidas convertibles a pedido"
+    },
+    {
+      "id": "BUG-FIXED-005",
+      "version_fix": "v5.0.4",
+      "descripcion": "Mona en_produccion no en filtro Pedidos"
+    },
+    {
+      "id": "UX-002",
+      "descripcion": "loadQuote en app-core.js no restaura el campo f-date ni los checkboxes f-moments al editar una cotización existente. Efecto: si abres una cotización con instrucciones especiales, los campos de fecha/momento aparecen vacíos en el formulario (aunque sí están guardados en el doc y salen en PDF). Ahora que momentosArr y eventDate son estructurados (v5.4.0), el fix es trivial.",
+      "severidad": "Baja — UX de edición, no afecta datos",
+      "archivos_a_tocar": [
+        "app-core.js (loadQuote)"
+      ],
+      "estimado": "15 min",
+      "candidato_version": "v5.4.2",
+      "cerrado_en": "v5.4.2",
+      "fecha_cierre": "2026-04-22",
+      "notas_cierre": "Bloque agregado en loadQuote después de setear currentQuoteNumber. Usa try/catch para no romper en docs legacy. togMom() refresca estilos visuales de los checkboxes. Fallback \"Otro\" para momentos custom que no coincidan con la lista fija."
+    }
+  ],
+  "ROADMAP_PENDIENTE": {
+    "v5_4_3_posibles_mejoras_urgent_3d": {
+      "items": [
+        "Swipe para marcar producido/entregado en móvil",
+        "Ventana configurable (3d, 5d, 7d) desde settings",
+        "Sonido/notificación si algo cae para HOY y no está producido",
+        "Mostrar hora de entrega prominente (alarm clock style)"
+      ]
+    },
+    "v5_5_candidato_MINOR": {
+      "items": [
+        "Plantillas de cotización reutilizables",
+        "Plantillas de mensaje WhatsApp seguimiento",
+        "Recordatorios WhatsApp automáticos",
+        "Notificaciones push FCM reales"
+      ]
+    },
+    "v5_6_integraciones": [
+      "Google Calendar API OAuth",
+      "WhatsApp Business API",
+      "Portal cliente"
+    ],
+    "v6_0_rediseno_mayor": [
+      "Multi-negocio",
+      "Reportes contables",
+      "Módulo inventario"
+    ],
+    "v5_4_3_candidato": {
+      "tipo": "MINOR",
+      "prioridad": "Media",
+      "items": [
+        "Swipe para marcar producido/entregado en móvil (v5.4.3 original)",
+        "Ventana configurable (3d, 5d, 7d) desde settings",
+        "Sonido/notificación si algo cae para HOY y no está producido",
+        "Mostrar hora de entrega prominente (alarm clock style)",
+        "Posible: badge con count de PDFs en el botón Todos los PDFs (como ya tiene el botón per-tarjeta)"
+      ],
+      "estimado_total": "~2-3 horas"
+    }
+  },
+  "pendientes_operativos_no_de_codigo": {
+    "items": [
+      "Luis configuró PITR y/o Scheduled Backups en Firebase Console. Verificar en: Google Cloud Console → Firestore → Databases → (default) → 'Point-in-time recovery: Enabled'",
+      "Scheduled Backups en pestaña separada Backups del Firestore",
+      "Ejecutar migrarFotosStorage() una vez (pendiente desde v5.0)",
+      "v5.4.2: probar botón 📎 Todos los PDFs — debería listar todos los docs con pdfHistorial. Si está vacío, significa que desde v5.4.1 no se ha regenerado ningún PDF todavía.",
+      "v5.4.2: probar botón 📤 Restaurar JSON con un backup real. Validar que NO sobrescribe docs existentes (modo merge)."
+    ]
+  },
+  "conversaciones_importantes_con_luis": [
+    {
+      "tema": "v5.4.1 cierre: chip producido inline + PDF versionado Storage",
+      "fecha": "2026-04-22",
+      "disparador": "Luis pidió continuar con los bloques B y D pendientes de v5.4.0. Opción A aceptada: hacer ambos en la misma versión v5.4.1.",
+      "decisiones": [
+        "Hacer Bloque D primero (victoria rápida ~20min) y luego Bloque B (el grueso ~1h).",
+        "Primer PDF sin sufijo _v01 (retrocompat UX), v2+ con sufijo.",
+        "Upload best-effort: si falla Storage, PDF local igual se entrega.",
+        "Botón 📎 PDFs (N) aparece siempre que pdfHistorial.length > 0 (no limitado a ciertos estados).",
+        "Corrección de hallazgos del JSON anterior: genPropFinalPDF no existe (es genPropPDF con flag isFinal); uploadToStorage ya existía; currentQuoteNumber ES el docId.",
+        "Bug window.currentUser detectado en validación final y corregido antes de entregar."
+      ]
+    },
+    {
+      "tema": "v5.4.0 parcial: notas críticas, producción flexible, backups",
+      "fecha": "2026-04-22",
+      "disparador": "Luis mostró PDF real (GB-2026-0110) donde Kathy escribió 'Regalo para Margarita Quijano, incluir nota que diga Feliz cumpleaños con mucho cariño Carlitos y Adriana' — salió en PDF pero se perdió al pedido. Menos mal Kathy se acordó. Caso crítico porque si fuera 'sin nueces' sería peligro real.",
+      "decisiones": [
+        "No crear campo nuevo — usar el que ya existe (momentos/Otro) y propagarlo estructurado.",
+        "PDFs guardarse TODOS en Storage (5GB disponibles, no es problema).",
+        "Producción mismo día: permitir con confirmación (no bloquear).",
+        "Opción A aceptada: Bloques A+C+E ahora, B+D en chat nuevo cuando se restablezca uso."
+      ]
+    },
+    {
+      "tema": "Rediseño dashboard v5.3.0 progressive disclosure",
+      "fecha": "2026-04-21",
+      "decisiones": [
+        "Enfoque C (Híbrido) del wireframe interactivo",
+        "Por producir / por entregar LADO A LADO",
+        "2 bloques urgentes SIEMPRE visibles",
+        "2 toggles grupales (Análisis / Otros operativos) + Opciones avanzadas",
+        "Estado expandido persistido entre sesiones",
+        "Chips compactos para drill-down, botón convertir/aprobar inline"
+      ]
+    },
+    {
+      "tema": "Principios UX establecidos",
+      "principios": [
+        "Progressive disclosure",
+        "Top-left = hot zone (Pipeline arriba)",
+        "Bento-style grids",
+        "Tap targets ≥44px",
+        "JAMÁS botones de toda la columna ancho",
+        "Agrupación con white space, no líneas",
+        "Lo urgente SIEMPRE visible",
+        "Lo analítico y secundario en toggles",
+        "Cuando un campo pre-llenado viene de otro lado, resaltarlo visualmente (v5.4.0)",
+        "Acciones frecuentes inline (no requieren abrir el doc) — v5.4.1"
+      ]
+    }
+  ],
+  "tips_para_nuevo_chat_de_claude": {
+    "al_empezar": [
+      "Leer TODO este JSON primero",
+      "Preguntar a Luis cómo va la app antes de asumir bugs",
+      "Si reporta un bug: pedir F12 → Console → screenshot ANTES de proponer fix",
+      "Respetar decisiones arquitectónicas ya tomadas",
+      "Respetar UX: jamás full-width buttons, bento grid, progressive disclosure, lo urgente visible, acciones frecuentes inline",
+      "Si es el primer chat después de v5.4.1: lo que sigue es v5.4.2 con UX-002 + Restaurar backup JSON.",
+      "IMPORTANTE: verificar el código antes de confiar en el JSON — hubo correcciones en v5.4.1 (genPropFinalPDF no existía, currentQuoteNumber ES el docId, etc). El JSON puede quedar desactualizado si alguien cambia algo sin actualizarlo.",
+      "ENTREGA COMPLETA SIEMPRE: al final de cualquier versión, entregar los 9 archivos del proyecto (7 .js + index.html + JSON), no solo los modificados. Luis guarda snapshots completos. Ver 'instrucciones_mantenimiento_json.REGLA_ENTREGA_ARCHIVOS' para el detalle.",
+      "ZIP VERSIONADO SIEMPRE: empaquetar los 9 archivos en gourmet-bites-vX_Y_Z.zip (guiones bajos, no puntos). Ver 'instrucciones_mantenimiento_json.REGLA_ENTREGA_ZIP'. Luis tiene problemas con múltiples versiones sueltas — el ZIP resuelve esto."
+    ],
+    "al_hacer_cambios_de_codigo": [
+      "SIEMPRE subir BUILD_VERSION en app-core.js",
+      "SIEMPRE actualizar BUILD_DATE en app-core.js",
+      "SIEMPRE actualizar cache-busting ?v=X.X.X en TODOS los script tags de index.html",
+      "SIEMPRE actualizar comentario VERSION línea 10 de index.html",
+      "SIEMPRE actualizar este JSON de contexto",
+      "SIEMPRE validar con node -c y lxml y cruce HTML-JS",
+      "SIEMPRE hacer grep de identificadores nuevos en los 7 archivos antes de entregar (lección v5.2.2)",
+      "SIEMPRE _safe() wrapping en secciones nuevas del dashboard",
+      "SIEMPRE localStorage read/write con try-catch y fallback",
+      "Al reestructurar HTML: NUNCA eliminar IDs existentes, solo meterlos dentro de nuevos wrappers (lección v5.3.0)",
+      "Al agregar campo estructurado nuevo: SIEMPRE fallback al campo viejo si existe (lección v5.4.0)",
+      "Al usar scope del módulo vs window: verificar si es `let foo` o `window.foo` (lección v5.4.1 — bug menor detectado en validación final)",
+      "Preferir cambios pequeños y enfocados",
+      "Si el límite de uso está cerca (>80%) y el task es grande: dividir en entregas parciales como v5.4.0"
+    ],
+    "sobre_el_stack": [
+      "Firebase Blaze activo",
+      "GitHub Pages deploy manual drag-and-drop",
+      "quotesCache = variable global con todos los docs",
+      "$() = document.getElementById",
+      "fm() = pesos colombianos",
+      "Las 3 vars del historial (histArchive/histFilter/histSearch) viven SOLO en app-historial.js",
+      "currentUser está en scope del módulo de app-core.js (let, no window)",
+      "currentQuoteNumber y currentPropNumber SON los docIds en Firestore",
+      "Colecciones Firestore: quotes, proposals, propfinals (plural)",
+      "Paths Storage: pagos/, entregas/, pdfs/{kind}/{docId}/ (kind singular)",
+      "isFollowable/getPipelineActivo/setFollowUp tratan docs sin status como 'enviada'",
+      "localStorage key para estado de colapsables dashboard: gb_dash_coll_v530",
+      "Firebase Storage disponible: 5GB",
+      "momentosArr (v5.4.0+): array de strings con checkbox activos + 'Otro' del bloque de fecha",
+      "pdfHistorial (v5.4.1+): array de {version, url, path, fecha, generadoPor, filename} — opcional, puede no existir",
+      "savePdf: helper original en app-core.js:73 — solo local (share/descarga)",
+      "savePdfConCopiaStorage: helper v5.4.1 en app-core.js:116 — wrappea savePdf + sube a Storage + actualiza Firestore",
+      "uploadToStorage: helper desde v5.0 en app-core.js:452 — upload a Storage sin más"
+    ],
+    "sobre_luis": [
+      "Técnico intermedio-avanzado, en español",
+      "Respuestas concisas pero completas",
+      "Valora honestidad técnica (incluso sobre límites de uso de Claude)",
+      "Pide 'recomendación' = UNA con razón clara",
+      "Prioriza urgente sobre perfecto",
+      "Prefiere cambios pequeños sobre paquetes grandes",
+      "Le gustan los wireframes interactivos para decidir UX",
+      "Cuando se acerca al límite de uso, acepta entregas parciales seguras en vez de arriesgar a cortarse",
+      "Valora que le digas lo que NO funcionó o lo que quedó a medias antes de entregar — cero sorpresas"
+    ]
+  },
+  "instrucciones_mantenimiento_json": {
+    "REGLA_CRITICA": "Este JSON DEBE actualizarse CADA VEZ que se entrega una nueva versión.",
+    "REGLA_ENTREGA_ARCHIVOS": "SIEMPRE entregar la TOTALIDAD de los archivos del proyecto (los 7 .js + index.html + JSON de contexto = 9 archivos), incluso si solo algunos cambiaron. Luis los guarda todos juntos para tener snapshots consistentes y poder hacer rollback completo. Distinguir claramente cuáles tienen cambios vs. cuáles vienen idénticos a la versión anterior (para que sepa cuáles subir a GitHub Pages y cuáles solo archivar). Esta instrucción la dio Luis en v5.4.1 y es permanente — debe replicarse en cada entrega futura.",
+    "REGLA_ENTREGA_ZIP": "SIEMPRE entregar los 9 archivos empaquetados en un ZIP cuyo nombre incluya la versión: gourmet-bites-vX_Y_Z.zip (ej: gourmet-bites-v5_4_1.zip). Luis tiene problemas con múltiples versiones sueltas y nombres colisionando — el ZIP versionado evita confusión al descargar. Esta regla la dio Luis en v5.4.1 tras v5.4.1 inicial y es permanente. Ejecutar create_file + bash (zip) + present_files en cada entrega.",
+    "ADVERTENCIA_DOWNLOADER": "IMPORTANTE: present_files puede renombrar el ZIP a 'files.zip' al descargarlo (limitación del UI de Claude). Luis detectó esto en v5.4.1 cuando le llegó como files.zip. Al entregar: AVISAR A LUIS que si el archivo descargado se llama 'files.zip', debe renombrarlo manualmente a gourmet-bites-vX_Y_Z.zip. El archivo en sí está bien, solo cambia el nombre en descarga. Mencionar esto explícitamente al final del mensaje de entrega.",
+    "cuando_actualizar": [
+      "nueva versión",
+      "bug abierto/cerrado",
+      "decisión arquitectónica",
+      "mover item roadmap",
+      "hallazgo correctivo al revisar código",
+      "nueva instrucción permanente de Luis"
+    ],
+    "campos_SIEMPRE_actualizar": [
+      "_meta.generado_el",
+      "proyecto.version_actual",
+      "estado_actual_*",
+      "historial_versiones_detallado",
+      "archivos_de_cada_version",
+      "bugs_conocidos_abiertos",
+      "bugs_cerrados_en_versiones_anteriores",
+      "ROADMAP_PENDIENTE"
+    ],
+    "formato_entrega_estandar": [
+      "Crear ZIP versionado con los 9 archivos: gourmet-bites-vX_Y_Z.zip (ej: gourmet-bites-v5_4_1.zip). Guiones bajos en la versión, no puntos — evita confusiones con extensiones.",
+      "Llamar present_files con el ZIP primero, luego los 9 archivos sueltos en este orden: JSON, core, cotizar, propuesta, historial, dashboard, seguimiento, assets, index.html",
+      "Nombre JSON con versión: context_vX_Y_Z.json (ej: context_v5_4_1.json)",
+      "En el mensaje de entrega: indicar cuáles archivos cambiaron (para subir a GitHub Pages) vs cuáles vienen sin cambios (para archivar junto)",
+      "Recordar a Luis guardar el ZIP completo + el JSON para futuros chats"
+    ],
+    "NO_poner": [
+      "credenciales",
+      "datos reales clientes",
+      "código completo",
+      "transcripciones literales"
+    ]
+  },
+  "estado_actual_v541_archivado": {
+    "resumen_en_una_frase": "v5.4.1 COMPLETA cierra los dos bloques que quedaron pendientes de v5.4.0: chip 🔪 Producido inline en dashboard (Bloque D) + versionado automático de PDFs con copia en Firebase Storage y dropdown para ver versiones anteriores (Bloque B). El loop operativo cotización→pedido→producción→entrega está cerrado end-to-end. Pendiente menor: UX-002 (loadQuote no restaura f-date/f-moments) candidato v5.4.2.",
+    "bloques_entregados_en_v541": {
+      "D_chip_producido_inline_dashboard": {
+        "problema": "Botón 🔪 Producido solo existía en Historial. Para marcar un pedido producido desde el dashboard había que tocar la tarjeta → se abría el doc → scroll hasta el botón. 3 taps + navegación innecesarios. Sobre todo molesto con 10+ pedidos en la semana.",
+        "solucion": [
+          "urgentItemHtml en app-dashboard.js reestructurado con layout urgent-item-top (flex) + urgent-item-txt (contenido) + urgent-item-act (chip).",
+          "Chip 🔪 Producido solo aparece si !q.produced. stopPropagation en onclick para que NO dispare el loadQuote del contenedor.",
+          "Si q.produced === true, se muestra en su lugar un badge verde '🔪 Producido' con tooltip de la fecha.",
+          "toggleProduced ya existía en app-historial.js:989 y ya llamaba renderDashboard() — 0 cambios lógicos, solo UI.",
+          "CSS nuevo: .urgent-prod-chip (interactivo naranja, feedback táctil) + .urgent-prod-done (badge verde estático)."
+        ],
+        "archivos_tocados": [
+          "app-dashboard.js (urgentItemHtml)",
+          "index.html (CSS chip)"
+        ],
+        "complejidad_real": "Baja — 20 min, como estaba estimado"
+      },
+      "B_versionado_pdf_copia_storage": {
+        "problema": "PDFs locales se sobrescribían si Luis regeneraba la misma cotización (ambos con nombre GB-XXXX-XXXX_Cliente.pdf). Sin historial de qué PDF se envió al cliente la primera vez vs. segunda. Luis pidió guardar todos (tiene 5GB libres en Storage, no es problema).",
+        "solucion": [
+          "Helper nuevo savePdfConCopiaStorage(doc, baseName, kind, docId) en app-core.js. Reutiliza uploadToStorage existente (line 452) y savePdf clásico (line 73) — no duplica código.",
+          "Cálculo de versión: lee pdfRegenCount del q en cache → incrementa → v1 sin sufijo, v2+ con _v02, _v03 (ordenan alfabéticamente bien).",
+          "Upload a Firebase Storage en ruta pdfs/{kind}/{docId}/v{N}_{YYYY-MM-DD_HHhMM}.pdf.",
+          "Actualiza Firestore: pdfRegenCount incrementado + array pdfHistorial con entrada {version, url, path, fecha, generadoPor, filename}.",
+          "Botón 📎 PDFs (N) aparece en actionBtns de cada tarjeta de historial cuando q.pdfHistorial.length > 0.",
+          "Modal #pdf-hist-modal con lista ordenada descendente (más reciente primero), versión ACTUAL marcada con badge verde, link de descarga directo desde Storage.",
+          "Upload best-effort: si falla (offline, cuota, permisos), el PDF local igual se entrega al usuario — NO bloquea el flujo. Logs en consola para diagnóstico."
+        ],
+        "retrocompatibilidad": "Total. Docs pre-v5.4.1 no tienen pdfRegenCount (undefined → arranca en 0, siguiente PDF será v1) ni pdfHistorial (undefined → array vacío, botón 📎 no aparece). Cuando se regenere un PDF, empieza a versionarse desde v1.",
+        "archivos_tocados": [
+          "app-core.js (savePdfConCopiaStorage nuevo + BUILD_VERSION + changelog)",
+          "app-cotizar.js (genPDF usa helper)",
+          "app-propuesta.js (genPropPDF usa helper, kind dinámico según prefijo GB-PF-)",
+          "app-historial.js (botón 📎 PDFs + openPdfHistorialModal + closePdfHistorialModal)",
+          "index.html (modal pdf-hist + CSS hc-btn-pdfs + cache-busting)"
+        ],
+        "complejidad_real": "Media — ~1h real, como estaba estimado"
+      }
+    },
+    "hallazgos_correctivos_al_json_anterior": {
+      "descripcion": "Cosas que el JSON v5.4.0 decía pero que al revisar el código real resultaron ser diferentes o inexactas. Documentadas aquí para que futuras sesiones no asuman mal.",
+      "correcciones": [
+        {
+          "campo": "app-propuesta.js — función genPropFinalPDF",
+          "decia_json_v540": "Función separada genPropFinalPDF que habría que tocar para el Bloque B",
+          "realidad": "NO existe como función separada. Es una sola función genPropPDF (line 653) que usa flag isFinal = !!window.__pfMode (line 656) para cambiar el título y la lógica interna. Para el Bloque B se tocó solo genPropPDF una vez — cubre ambos casos (propuesta normal y propuesta final)."
+        },
+        {
+          "campo": "helper de upload a Storage",
+          "decia_json_v540": "Crear helper nuevo savePdfConCopiaStorage",
+          "realidad": "uploadToStorage(blob, path) YA EXISTÍA en app-core.js:452 desde v5.0 (se usa para fotos de pagos y entregas). En v5.4.1 se reutilizó — el helper nuevo savePdfConCopiaStorage lo llama internamente. No se duplicó código de upload."
+        },
+        {
+          "campo": "currentQuoteId vs currentQuoteNumber",
+          "decia_json_v540": "Usar currentQuoteId para identificar el doc",
+          "realidad": "currentQuoteId NO existe como variable. currentQuoteNumber (definido en app-core.js:305) ES el docId en Firestore — así se usa en los getDoc(doc(db,'quotes',currentQuoteNumber)) de saveCurrentQuote. Lo mismo aplica a currentPropNumber en propuestas."
+        },
+        {
+          "campo": "colección propfinal",
+          "decia_json_v540": "propfinals (implícito)",
+          "realidad": "Confirmado: Firestore tiene 3 colecciones separadas: quotes, proposals, propfinals. En app-historial.js:998 la lógica es: kind==='quote' ? 'quotes' : (docId.startsWith('GB-PF-') ? 'propfinals' : 'proposals'). Misma convención usa savePdfConCopiaStorage."
+        },
+        {
+          "campo": "currentUser scope",
+          "decia_json_v540": "No mencionaba",
+          "realidad": "currentUser está declarada como `let currentUser = null` (app-core.js:66) en el scope del módulo. NO es window.currentUser. Un borrador de savePdfConCopiaStorage usaba window.currentUser (undefined) y se corrigió antes de entregar."
+        }
+      ]
+    },
+    "archivos_modificados_en_v541": {
+      "total": 6,
+      "app-core.js": [
+        "BUILD_VERSION subido a v5.4.1 + changelog en comentario de encabezado",
+        "Helper nuevo savePdfConCopiaStorage(doc, baseName, kind, docId) — ~60 líneas entre savePdf (line 73) y el catálogo de productos (line 175)",
+        "Usa currentUser del scope del módulo (no window.currentUser) para campo generadoPor"
+      ],
+      "app-cotizar.js": [
+        "genPDF (line 287-292): reemplaza savePdf(...) por savePdfConCopiaStorage(doc, baseName, 'quote', currentQuoteNumber)",
+        "baseName sin extensión ni versión — el helper arma el nombre final"
+      ],
+      "app-propuesta.js": [
+        "genPropPDF (line 880-887): idem con kind dinámico",
+        "kind = currentPropNumber.startsWith('GB-PF-') ? 'propfinal' : 'proposal'"
+      ],
+      "app-historial.js": [
+        "actionBtns: nuevo botón 📎 PDFs (N) si Array.isArray(q.pdfHistorial) && q.pdfHistorial.length > 0 (línea 330)",
+        "Al final del archivo: openPdfHistorialModal(docId, kind, ev) + closePdfHistorialModal() — ~50 líneas"
+      ],
+      "app-dashboard.js": [
+        "urgentItemHtml (line 1294) reestructurado: layout urgent-item-top con urgent-item-txt (izq) y urgent-item-act (der)",
+        "Chip 🔪 Producido interactivo si !q.produced, badge verde si ya producido",
+        "stopPropagation en onclick del chip para no disparar loadQuote del contenedor"
+      ],
+      "index.html": [
+        "Comentario VERSION línea 10: v5.4.1 con descripción",
+        "CSS nuevo: .urgent-item-top, .urgent-item-txt, .urgent-item-act, .urgent-prod-chip, .urgent-prod-done (~5 líneas tras urgent-d-tomorrow)",
+        "CSS nuevo: .hc-btn-pdfs (1 línea tras hc-btn-coment)",
+        "Modal #pdf-hist-modal insertado después de #reactivar-modal — con ph-doc-id, ph-doc-cli, ph-doc-meta, ph-list",
+        "Cache-busting: 7 script tags ?v=5.4.0 → ?v=5.4.1"
+      ],
+      "sin_cambios_en_v541": [
+        "app-seguimiento.js",
+        "app-assets.js"
+      ]
+    },
+    "validaciones_pre_entrega_v541": [
+      "node -c OK en los 7 archivos .js (incluyendo los no modificados)",
+      "lxml parse OK en index.html",
+      "IDs nuevos únicos (pdf-hist-modal, ph-doc-id, ph-doc-cli, ph-doc-meta, ph-list) — cada uno exactamente 1 vez en HTML",
+      "Cache-busting: 7 tags con ?v=5.4.1, 0 referencias residuales a ?v=5.4.0",
+      "BUILD_VERSION='v5.4.1' en app-core.js línea 50",
+      "Cross-check HTML↔JS: openPdfHistorialModal definida 1x en JS, referenciada correctamente desde tarjetas; closePdfHistorialModal definida 1x, referenciada 3x en HTML (overlay, X, botón cerrar)",
+      "Chip urgent-prod-chip: CSS en HTML, uso en app-dashboard.js — cruza OK",
+      "savePdf (original): definida 1x, usada solo internamente por savePdfConCopiaStorage — no hay llamadas sueltas desde cotizar/propuesta",
+      "savePdfConCopiaStorage: definida 1x en app-core.js:116, usada 2x (cotizar + propuesta)",
+      "Bug window.currentUser detectado en validación final y corregido antes de entrega"
+    ],
+    "instrucciones_deploy_para_luis_v541": [
+      "Subir a GitHub Pages 6 archivos: app-core.js + app-cotizar.js + app-propuesta.js + app-historial.js + app-dashboard.js + index.html",
+      "Guardar context_v5_4_1.json para el próximo chat (NO subir al sitio)",
+      "Ctrl+F5 en el navegador (o abrir en incógnito)",
+      "Header debe decir v5.4.1 · 2026-04-22",
+      "PRUEBA 1 (Bloque D): Dashboard → Operación Urgente 3d. En las tarjetas de Por producir / Por entregar, cada item debe mostrar un chip naranja 🔪 Producido a la derecha. Al tocarlo: toast ✅ Producido + el chip se transforma en badge verde 🔪 Producido (con fecha en tooltip). Tocar la tarjeta afuera del chip debe seguir abriendo el doc (comportamiento viejo intacto).",
+      "PRUEBA 2 (Bloque B): Abrir una cotización existente → generar PDF → el PDF se genera y comparte normalmente (nombre igual que antes, sin sufijo en v1). Volver a entrar a la misma cotización → generar PDF de nuevo → el archivo debe llamarse GB-XXXX_Cliente_v02.pdf. En Historial → esa tarjeta debe mostrar un nuevo botón 📎 PDFs (2) → al tocar abre modal con las 2 versiones listadas (la v2 marcada ACTUAL en verde), link de descarga directo en ambas.",
+      "PRUEBA 3 (Bloque B offline/degradado): Apagar wifi → generar PDF → el PDF local se entrega igual (share/descarga), pero en consola aparece '[savePdfConCopiaStorage] offline — PDF solo local, sin copia Storage'. Firestore NO se actualiza, botón 📎 PDFs tampoco aparece (correcto). Al volver online y regenerar, se versiona desde donde quedó."
+    ]
+  },
+  "estado_actual_2026_04_22_v542": {
+    "resumen_en_una_frase": "v5.4.2 cierra 4 items: (1) FIX CSS del checkbox \"Ya está producido\" en modal Marcar-como-pedido que se renderizaba mal por herencia de estilo uppercase/block. (2) FIX UX-002: loadQuote restaura f-date + f-moments al reabrir cotización (antes aparecían vacíos aunque estuvieran guardados). (3) FEATURE: Botón 📤 Restaurar JSON en Mantenimiento con modo MERGE aditivo (NO sobrescribe, solo agrega docs con IDs que no existen) + preview con conteos + confirmación doble. (4) FEATURE: Botón 📎 Todos los PDFs en header del Historial → navegador global de todos los PDFs en Storage con búsqueda en vivo y descarga directa. Cero breaking changes.",
+    "items_entregados_en_v542": {
+      "1_fix_checkbox_producido": {
+        "problema": "El checkbox \"Ya está producido\" en el modal Marcar-como-pedido (index.html:1432) usaba `<label>` directo dentro de `.mf-field`, que heredaba el CSS genérico `.mform .mf-field label { display:block; text-transform:uppercase; font-weight:700; margin-bottom:5px }`. Resultado visual: el cuadrito del checkbox quedaba huérfano a la derecha del input de fecha, y el texto \"YA ESTÁ PRODUCIDO\" aparecía debajo como label de un campo vacío fantasma. La lógica JS funcionaba (om-produced se leía bien en submitMarkAsOrder) — era puramente cosmético.",
+        "solucion": [
+          "Nueva clase `.mf-field.mf-check` con `display:flex;align-items:center` + caja (bg + border + padding)",
+          "Nueva clase `.mf-check-lbl` que resetea text-transform:none, letter-spacing:0, margin:0, font-weight:600, font-size:13px — rompe la herencia del label genérico",
+          "Checkbox estilizado: 18x18, accent-color verde, flex-shrink:0",
+          "Sin cambios a JS — openOrderModal y submitMarkAsOrder intactos"
+        ],
+        "archivos_tocados": [
+          "index.html (CSS + markup del checkbox)"
+        ],
+        "complejidad_real": "Muy baja — 5 min"
+      },
+      "2_fix_UX_002_loadQuote_restaura_momentos": {
+        "problema": "Al abrir una cotización desde el historial (loadQuote en app-core.js), los campos `#f-date` y los checkboxes de `#f-moments` aparecían vacíos aunque los datos sí estuvieran guardados en Firestore (q.eventDate + q.momentosArr, estructurados desde v5.4.0). El PDF salía bien pero la UX de edición era frustrante: había que re-marcar todo.",
+        "solucion": [
+          "Bloque nuevo en loadQuote (después de setear currentQuoteNumber) envuelto en try/catch",
+          "Setea $(\"f-date\").value = q.eventDate || \"\"",
+          "Resetea todos los checkboxes de #f-moments",
+          "Recorre q.momentosArr: si el valor está en la lista fija (Desayuno/Almuerzo/etc.) marca el checkbox correspondiente. Si no, lo mete en \"Otro\" + #f-time-other",
+          "Llama togMom() en cada checkbox para refrescar estilos visuales (selected state)"
+        ],
+        "archivos_tocados": [
+          "app-core.js (loadQuote)"
+        ],
+        "complejidad_real": "Baja — 15 min como estimado"
+      },
+      "3_restaurar_backup_json": {
+        "problema": "Luis tenía el botón 📥 Backup JSON (exportar) desde v5.4.0 pero no había forma de re-importar. Si borraba un doc por error o quería consolidar un backup antiguo, tenía que editar Firestore a mano.",
+        "solucion": [
+          "Nuevo botón `.mant-btn-restore` (naranja) en el grid de Mantenimiento, al lado de 📥 Backup",
+          "Flujo: triggerRestoreBackup() crea input[type=file] oculto → onRestoreBackupFile() parsea + valida estructura (debe tener array `quotes`) → calcula preview (IDs nuevos vs existentes) → openRestorePreviewModal() muestra conteos en modal naranja",
+          "Modal nuevo #restore-backup-modal con preview: ✅ N docs se agregarán · ⏭️ N se saltarán (ya existen) · 👥 N clientes nuevos",
+          "confirmRestoreBackup() pide confirmación doble (window.confirm) antes de escribir",
+          "Escritura: setDoc por cada quote en su colección correcta (quotes/proposals/propfinals según kind + prefijo GB-PF-). Marca restoredAt + restoredBy para trazabilidad. Clientes van a colección \"clients\" con key=id||name",
+          "Modo MERGE: NO sobrescribe docs existentes. Solo escribe IDs que NO están en quotesCache. Tu dato más fresco gana siempre.",
+          "Al final: reload de loadAllHistory + toast con resumen de éxitos/errores"
+        ],
+        "archivos_tocados": [
+          "app-dashboard.js (~175 líneas nuevas: triggerRestoreBackup, onRestoreBackupFile, openRestorePreviewModal, closeRestoreBackupModal, confirmRestoreBackup, clientsArr_len)",
+          "index.html (botón en mant-grid + CSS .mant-btn-restore + modal #restore-backup-modal)"
+        ],
+        "complejidad_real": "Media — ~40 min (preview dinámico + validaciones)"
+      },
+      "4_navegador_global_pdfs": {
+        "problema": "Luis preguntó \"¿dónde están quedando guardados los PDFs?\" — la feature del Bloque B de v5.4.1 existía (subida a Storage + botón 📎 PDFs por tarjeta) pero no había forma de ver un listado global sin abrir cada cotización una por una. Para auditar o buscar un PDF específico era engorroso.",
+        "solucion": [
+          "Botón 📎 Todos los PDFs en el header de la pestaña Historial (al lado del título \"📁 Historial de Cotizaciones\")",
+          "Abre modal #all-pdfs-modal (max-width 640px — un poco más ancho que modales normales)",
+          "openAllPdfsModal() fuerza loadAllHistory si cache vacío, luego renderAllPdfsList()",
+          "renderAllPdfsList() filtra quotesCache a los que tienen pdfHistorial no-vacío, mapea por doc con metadata, ordena por latestDate desc",
+          "Búsqueda en vivo con oninput (debounce no necesario — filtro es cheap)",
+          "Stats arriba: \"📊 N docs · M PDFs en la nube\" (actualiza con filtro aplicado)",
+          "Cada doc-card muestra: número + cliente + tipo + total + fecha creación · botón 👁️ Abrir (carga la cotización y cierra modal) · sub-lista de versiones con link directo a Storage URL + tag ACTUAL en la más reciente",
+          "Estado vacío diferenciado: si no hay PDFs en toda la nube → mensaje explicativo. Si búsqueda no matchea → mensaje de \"no coincide\""
+        ],
+        "archivos_tocados": [
+          "app-historial.js (~80 líneas nuevas: openAllPdfsModal, closeAllPdfsModal, onAllPdfsSearchInput, renderAllPdfsList + variable _pdfGlobalFilter)",
+          "index.html (botón en header mode-hist + modal #all-pdfs-modal)"
+        ],
+        "complejidad_real": "Media — ~30 min"
+      }
+    },
+    "archivos_modificados_en_v542": {
+      "total": 4,
+      "cambiaron": [
+        "app-core.js",
+        "app-historial.js",
+        "app-dashboard.js",
+        "index.html"
+      ],
+      "sin_cambios_vs_v541": [
+        "app-assets.js",
+        "app-cotizar.js",
+        "app-propuesta.js",
+        "app-seguimiento.js"
+      ]
+    },
+    "breaking_changes": "Ninguno. CSS del checkbox solo afecta a ese elemento (clase nueva). loadQuote restaura campos — si no hay momentosArr/eventDate (docs pre-v5.4.0), bloque try/catch falla silenciosamente y campos quedan vacíos como antes. Restaurar backup es modo merge aditivo, jamás sobrescribe. Navegador PDFs es lectura pura.",
+    "diagnostico_pdfs_en_storage": "Pregunta de Luis 2026-04-22: \"no encuentro donde están quedando guardadas los pdf\". Confirmado que el código del Bloque B (v5.4.1) SÍ está guardando correctamente. Ubicación real: Firebase Console → Storage (NO Firestore) → carpeta pdfs/{kind}/{docId}/v{N}_{YYYY-MM-DD_HHhMM}.pdf. Para verificar desde app: pestaña Historial → botón 📎 Todos los PDFs (nuevo en v5.4.2). Si aún no aparece nada: (a) asegurarse de estar autenticado, (b) regenerar al menos 1 PDF después de v5.4.1 (los PDFs generados antes no están en Storage), (c) revisar consola F12 por logs [savePdfConCopiaStorage]."
+  },
+  "archivos_en_esta_entrega_v5_4_2": {
+    "nota_importante": "Luis pidió en v5.4.1 (permanente) que SIEMPRE se entregue la totalidad de archivos (los 9), distinguiendo cuáles cambiaron y cuáles no, y que todo venga empaquetado en un ZIP versionado (gourmet-bites-vX_Y_Z.zip con guiones bajos). Aplica a todas las versiones futuras.",
+    "zip_versionado_entregado": "gourmet-bites-v5_4_2.zip",
+    "archivos_totales_entregados": 9,
+    "subir_estos_4_a_github_pages_porque_cambiaron": [
+      "app-core.js",
+      "app-historial.js",
+      "app-dashboard.js",
+      "index.html"
+    ],
+    "archivar_estos_4_sin_subir_porque_no_cambiaron": [
+      "app-assets.js",
+      "app-cotizar.js",
+      "app-propuesta.js",
+      "app-seguimiento.js"
+    ],
+    "guardar_este_1_para_proximo_chat": "context_v5_4_2.json",
+    "sin_cambios_vs_v5_4_1": [
+      "app-assets.js",
+      "app-cotizar.js",
+      "app-propuesta.js",
+      "app-seguimiento.js"
+    ],
+    "breaking_changes": "Ninguno. Modo merge en restaurar, loadQuote con try/catch, navegador de PDFs es solo lectura.",
+    "resumen_cambios": "Fix visual del checkbox producido + UX-002 cerrado + restaurar backup con modo merge + navegador global de todos los PDFs en la nube (responde a la pregunta de Luis de dónde están guardados)."
+  }
+}
