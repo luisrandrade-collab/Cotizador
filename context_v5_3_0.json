@@ -1,0 +1,354 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Todo lo necesario para que un nuevo chat de Claude (o Luis mismo) retome el proyecto Gourmet Bites sin perder contexto.",
+    "generado_el": "2026-04-21",
+    "generado_por": "Claude Opus 4.7 — asistente técnico del proyecto",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final"
+  },
+
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual": "v5.3.0 — rediseño dashboard con progressive disclosure + Operación urgente 3 días",
+    "version_anterior_estable_probada": "v5.2.3 (fix docs sin status + etiquetado drill-down)",
+    "fecha_ultima_actualizacion": "2026-04-21",
+    "url_produccion": "https://luisrandrade-collab.github.io/Cotizador/"
+  },
+
+  "estado_actual_2026_04_21_v530": {
+    "resumen_en_una_frase": "v5.3.0 rediseña el dashboard con progressive disclosure pedido por Luis. Mantiene siempre visibles las partes esenciales (Pipeline + KPIs) + las 2 nuevas tarjetas lado a lado 🔥 Por producir / 📦 Por entregar de los próximos 3 días. El resto se agrupa en 2 toggles colapsables (Análisis comercial / Otros operativos). Además corrige los botones del drill-down (v5.2.3 los dejó full-width contra la regla UX; ahora son chips compactos) y agrega botón 🤝 Pedido / ✓ Aprobar inline para convertir sin salir.",
+
+    "wireframe_aprobado_por_luis": {
+      "enfoque_elegido": "C · Híbrido",
+      "estructura": [
+        "SIEMPRE VISIBLE: Header + Pipeline Activo (3 cards) + 5 KPI cards bento",
+        "SIEMPRE VISIBLE: ⏰ Operación urgente · próximos 3 días — 2 tarjetas LADO A LADO partiendo la pantalla por la mitad",
+        "  └ 🔥 Por producir (status pedido/aprobada con fechaEntrega en ≤3 días)",
+        "  └ 📦 Por entregar (status en_produccion con fechaEntrega en ≤3 días)",
+        "COLAPSABLE: 📈 Análisis comercial (Conversión / Pérdidas / Vista cliente)",
+        "COLAPSABLE: 💵 Otros operativos (Recaudo / Próximas 14 días / Por cobrar / Comentarios)",
+        "COLAPSABLE: ⚙️ Opciones avanzadas (Mantenimiento — ya existía así)"
+      ],
+      "defaults": {
+        "todo_colapsado_por_default": true,
+        "estado_persistido_en_localStorage": true,
+        "key_localStorage": "gb_dash_coll_v530",
+        "fallback_si_localStorage_falla": "todo colapsado (defensivo)"
+      }
+    },
+
+    "cambios_bloque_a_fix_drill_down": {
+      "problema_v523": "Los botones 🟢 Viva / ❌ Perdida / ♻️ Reactivar que agregué en v5.2.3 al drill-down del dashboard quedaron FULL-WIDTH (flex:1), violando la regla UX explícita de Luis 'jamás botones de toda la columna'. Además faltaba el botón 🤝 Convertir a pedido.",
+      "fix_v530": {
+        "chips_compactos": "Nuevos botones inline estilo chip (border-radius 14px, min-width 34px, padding 4px 10px). No full-width. Flex-wrap para que se acomoden si no caben.",
+        "boton_convertir_agregado": "Según tipo+status del doc: cotización enviada → 🤝 Pedido (openOrderModal). Propuesta enviada/propfinal → ✓ Aprobar (openApproveModal). No se expone PropFinalFlow (ir al Historial para eso).",
+        "perdidas": "Si el doc está perdida, solo muestra ♻️ (chip naranja) sin los otros."
+      }
+    },
+
+    "cambios_bloque_b_progressive_disclosure": {
+      "html_reestructurado": "Toda la zona mode-dash del index.html se reordenó. Lo que antes estaba plano ahora vive dentro de 2 nuevos wrappers .dash-collapsible con toggle.",
+      "estado_localStorage": {
+        "clave": "gb_dash_coll_v530",
+        "formato": "JSON objeto {analisis: true|false, operativos: true|false}",
+        "lectura_defensiva": "getDashCollState() captura cualquier error de parse y retorna {} (todo colapsado)",
+        "escritura_defensiva": "saveDashCollState() captura errores silenciosamente"
+      },
+      "funciones_nuevas_en_app_dashboard_js": [
+        "toggleDashSection(key) — alterna una sección y persiste",
+        "applyDashCollapsedState() — se llama desde renderDashboard para aplicar estado al primer render",
+        "getDashCollState() / saveDashCollState(st) — helpers"
+      ]
+    },
+
+    "cambios_bloque_c_operacion_urgente_3d": {
+      "ubicacion": "Entre KPIs y el primer colapsable. SIEMPRE visible.",
+      "filtros_de_datos": {
+        "por_producir": "status ∈ [pedido, aprobada] + fechaEntrega/eventDate entre hoy y hoy+3 días",
+        "por_entregar": "status=en_produccion + fechaEntrega/eventDate entre hoy y hoy+3 días",
+        "excluye": ["_wrongCollection", "anulada", "superseded", "convertida", "entregado"]
+      },
+      "formato_item": "cliente (bold) · número+fecha (pequeño) · monto (verde bold). Fecha HOY resaltada en rojo, MAÑANA en naranja, PASADO normal.",
+      "ordenacion": "Por fecha ascendente (más cercano primero)",
+      "empty_state": "Mensaje centrado: 'Sin pedidos... en los próximos 3 días'",
+      "item_tappable": "onclick loadQuote abre el doc completo",
+      "funciones_nuevas_en_app_dashboard_js": [
+        "renderUrgent3d() — lee quotesCache, filtra y puebla los 2 bloques",
+        "urgentItemHtml(q) — helper HTML de un item"
+      ]
+    },
+
+    "archivos_modificados_en_v530": {
+      "total": 3,
+      "app-core.js": "BUILD_VERSION v5.3.0 + comentario changelog en header (sin cambios de lógica)",
+      "app-dashboard.js": "docRow reemplaza botones full-width por chips compactos + agrega convertir a pedido/aprobar. +renderUrgent3d +urgentItemHtml +toggleDashSection +applyDashCollapsedState +getDashCollState +saveDashCollState. Integración en renderDashboard con _safe() wrapping.",
+      "index.html": "Reestructuración del div#mode-dash: Pipeline y KPIs intactos, se agregan 2 tarjetas urgent lado a lado, se meten las 7 secciones viejas en 2 wrappers .dash-collapsible (analisis/operativos). +CSS .dash-urgent-title, .dash-urgent-split, .urgent-card, .urgent-hdr, .urgent-item, .urgent-empty, .dash-collapsible, .dash-coll-toggle, .dash-coll-body, .dd-chip, .dd-chip-viva/perdida/react/convert. Cache-busting ?v=5.3.0 + comentario VERSION.",
+      "sin_cambios": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"]
+    },
+
+    "validaciones_pre_entrega_v530": [
+      "node -c OK en los 7 .js",
+      "lxml 0 errores en index.html",
+      "0 funciones HTML onclick huérfanas (todas están definidas)",
+      "20+ IDs críticos verificados presentes en HTML",
+      "Ningún identificador nuevo colisiona con otro archivo (lección v5.2.2)",
+      "7 script tags con ?v=5.3.0, 0 referencias a ?v=5.2.3",
+      "Chips NO son flex:1 (confirmado que no son full-width)",
+      "_safe() wrapping en renderUrgent3d y applyDashCollapsedState (defensivo)",
+      "localStorage read/write con try-catch y fallback a {}"
+    ],
+
+    "instrucciones_deploy_para_luis": [
+      "Subir a GitHub Pages 3 archivos: app-core.js + app-dashboard.js + index.html",
+      "Guardar context_v5_3_0.json para el próximo chat (NO subir al sitio)",
+      "Ctrl+F5 en el navegador",
+      "Header debe decir v5.3.0 · 2026-04-21",
+      "Al abrir el dashboard debes ver: Pipeline + 5 KPI cards + Operación urgente (2 tarjetas lado a lado, probablemente vacías hoy) + 3 toggles cerrados debajo",
+      "Tocar un toggle expande su sección. Vuelves a tocar y se cierra. El estado se recuerda entre sesiones.",
+      "Ir al drill-down (tocar Cotizado/Vendido/etc) y verificar que los chips de Viva/Perdida son pequeños, y aparece 🤝 Pedido para cotizaciones enviadas",
+      "Si los botones todavía se ven grandes, Ctrl+F5 más agresivo o abrir en incógnito (caché del navegador)"
+    ]
+  },
+
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION. isFollowable/getPipelineActivo/setFollowUp normalizan docs sin status (v5.2.3).",
+      "app-cotizar.js": "módulo de cotizaciones",
+      "app-propuesta.js": "módulo de propuestas / eventos",
+      "app-historial.js": "historial + 4 archivos (Vivas/Pedidos/Perdidas/Anuladas) + buscador. Contiene METODOS_PAGO, FOLLOW_UP_META, MOTIVOS_PERDIDA y histArchive/histFilter/histSearch",
+      "app-seguimiento.js": "pestaña seguimiento comercial",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + Operación urgente 3d (v5.3.0) + colapsables (v5.3.0) + drill-down con chips (v5.3.0) + agenda + exports + mantenimiento"
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/Cotizador/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password + Google) · 3 usuarios",
+    "firebase_plan": "Blaze (cuota gratis suficiente)",
+    "backup_estado": "Export JSON manual (📥 Backup JSON) · Restaurar backup aún pendiente (v5.3.x o v5.4.0) · PITR y Scheduled Backups en Firebase Console — Luis los configuró, verificar en consola"
+  },
+
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]. v5.2.3: docs sin status se tratan como 'enviada'.",
+      "valores_internos": ["pendiente", "contactado", "activa", "perdida"],
+      "expuesto_a_usuario": ["viva", "perdida"],
+      "regla_binaria": "pendiente/contactado/activa → VIVA. perdida → PERDIDA.",
+      "comportamiento_kpis": "perdida excluye igual que anulada."
+    }
+  },
+
+  "historial_versiones_detallado": [
+    {"version": "v5.0.0", "fecha": "2026-04-20", "tipo": "MAJOR", "highlights": "Firebase Auth + Storage + audit trail"},
+    {"version": "v5.0.1", "fecha": "2026-04-20", "highlights": "Google Sign-In + toggle password + menú cuenta"},
+    {"version": "v5.0.1b", "fecha": "2026-04-20", "highlights": "Convertidas ocultas + borrado cascada + drill-down agrupado"},
+    {"version": "v5.0.2", "fecha": "2026-04-20", "highlights": "Auto-sync + fechas flexibles + fantasmas + modal backup"},
+    {"version": "v5.0.3", "fecha": "2026-04-20", "highlights": "Estado anulada + modal anular con motivo/devolución"},
+    {"version": "v5.0.4", "fecha": "2026-04-20", "highlights": "Pipeline Activo · pestaña Seguimiento · 4 estados followUp"},
+    {"version": "v5.0.5", "fecha": "2026-04-21", "highlights": "Binario VIVA/PERDIDA · reactivarPerdida · bloqueo perdida→pedido"},
+    {"version": "v5.1.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ESTABLE", "highlights": "Historial 4 archivos + buscador + botones rápidos"},
+    {"version": "v5.2.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "DEFECTUOSA", "highlights": "Rediseño dashboard + 3 reportes. Destapó bug de histFilter"},
+    {"version": "v5.2.1", "fecha": "2026-04-21", "tipo": "PATCH", "highlights": "_safe wrappers + logs diagnóstico"},
+    {"version": "v5.2.2", "fecha": "2026-04-21", "tipo": "PATCH HOTFIX", "status": "ESTABLE", "highlights": "Fix 1 línea: removido let histFilter huérfano"},
+    {"version": "v5.2.3", "fecha": "2026-04-21", "tipo": "PATCH FUNCIONAL", "status": "ESTABLE", "highlights": "Docs legacy sin status normalizados + botones Viva/Perdida en drill-down"},
+    {"version": "v5.3.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN", "highlights": "Rediseño dashboard progressive disclosure: Pipeline+KPIs+Operación urgente 3d siempre visible. Análisis comercial + Otros operativos colapsables con estado localStorage. Drill-down con chips compactos + botón Convertir a pedido/Aprobar inline."}
+  ],
+
+  "archivos_de_cada_version": {
+    "v5_2_3_ESTABLE_PREVIA": {
+      "nota": "Rollback disponible. Los 3 archivos (app-core.js, app-dashboard.js, index.html) de v5.2.3 están en el histórico de GitHub Pages si necesitan revertir."
+    },
+    "v5_3_0_ENTREGADA": {
+      "archivos_a_subir_estos_3": [
+        "app-core.js — solo cambió BUILD_VERSION + comentario changelog",
+        "app-dashboard.js — nuevas funciones renderUrgent3d/toggleDashSection/applyDashCollapsedState + docRow con chips",
+        "index.html — mode-dash reestructurado + CSS nuevo + cache-busting"
+      ],
+      "sin_cambios_vs_v523": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"],
+      "breaking_changes": "Ninguno — la reestructuración HTML es puramente visual, todos los IDs viejos se preservaron dentro de los nuevos wrappers colapsables"
+    }
+  },
+
+  "decisiones_arquitectura_importantes": {
+    "por_que_progressive_disclosure": "Luis explícitamente pidió 'el dashboard debe ser sencillo y visible y la info adicional se despliega'. Las secciones analíticas (Conversión, Pérdidas, Cliente) se consultan semanal/mensual. Las operativas (Recaudo, Próximas 14d, Por cobrar, Comentarios) también se consultan ocasionalmente. Las URGENTES (Por producir/Por entregar 3d) son las únicas que se deben ver cada mañana — por eso quedan fijas.",
+    "por_que_2_toggles_grupales_no_7_individuales": "Luis vio wireframes A/B/C y eligió C (híbrido). El argumento: 7 toggles individuales cerrados se ven repetitivos y requieren decidir qué abrir primero. 2 toggles grupales reducen la carga cognitiva.",
+    "por_que_localStorage_para_estado": "Entre sesiones, Luis debería recuperar lo que estaba mirando. Si siempre se cierra, es fricción. Defensivo: si el parse falla, fallback a todo colapsado (no explota la app).",
+    "por_que_chips_en_drill_down": "Luis detectó que los botones v5.2.3 violaban su regla UX 'jamás botones de toda la columna'. Los chips inline respetan esa regla + dejan espacio para el botón convertir.",
+    "por_que_ventana_3_dias_corridos": "Operación de catering tiene ciclos cortos. 3 días cubre 'hoy, mañana, pasado'. Días corridos (no laborales) porque los eventos pueden ser sábado/domingo. Si Luis quiere cambiar a 3 días laborales en el futuro, ajustar renderUrgent3d.",
+    "leccion_v522_evitar_colisiones_globales": "Antes de declarar identificador nuevo (DASH_COLL_KEY, renderUrgent3d, etc), grep en los 7 archivos. v5.3.0 pasó esta validación.",
+    "leccion_v523_defaults_consistentes": "Los docs legacy sin status ya están normalizados. Nuevos campos opcionales deben siempre tener fallback consistente en TODOS los puntos de lectura.",
+    "leccion_v530_rediseno_grande_sin_romper": "Mantener TODOS los IDs viejos. La reestructuración HTML mete divs viejos dentro de wrappers nuevos, nunca los elimina ni renombra. Así el JS viejo sigue encontrando sus targets."
+  },
+
+  "ROADMAP_PENDIENTE": {
+    "v5_3_1_candidato_restaurar_backup": {
+      "tipo": "PATCH feature",
+      "prioridad": "Media-alta — pedida hace rato",
+      "descripcion": "Botón 📤 Restaurar backup JSON en Mantenimiento. UX a decidir: merge o replace? Confirmación doble? Preview antes de escribir?"
+    },
+    "v5_3_2_posibles_mejoras_urgent_3d": {
+      "items": [
+        "Botón inline 🔪 Marcar en producción / 🎉 Marcar entregado dentro de las tarjetas urgent (avanzar status sin abrir el doc)",
+        "Swipe para marcar producido/entregado en móvil",
+        "Ventana configurable (3d, 5d, 7d) desde settings",
+        "Sonido/notificación si algo cae para HOY y no está producido",
+        "Mostrar hora de entrega prominente (alarm clock style)"
+      ]
+    },
+    "v5_4_candidato_MINOR": {
+      "items": [
+        "Plantillas de cotización reutilizables",
+        "Plantillas de mensaje WhatsApp seguimiento",
+        "Recordatorios WhatsApp automáticos",
+        "Notificaciones push FCM reales"
+      ]
+    },
+    "v5_5_integraciones": ["Google Calendar API OAuth", "WhatsApp Business API", "Portal cliente"],
+    "v6_0_rediseno_mayor": ["Multi-negocio", "Reportes contables", "Módulo inventario"]
+  },
+
+  "pendientes_operativos_no_de_codigo": {
+    "items": [
+      "Luis configuró PITR y/o Scheduled Backups en Firebase Console. Verificar en: Google Cloud Console → Firestore → Databases → (default) → 'Point-in-time recovery: Enabled'",
+      "Scheduled Backups en pestaña separada Backups del Firestore",
+      "Ejecutar migrarFotosStorage() una vez (pendiente desde v5.0)"
+    ]
+  },
+
+  "bugs_conocidos_abiertos": [],
+
+  "bugs_cerrados_en_versiones_anteriores": [
+    {
+      "id": "UX-001",
+      "version_fix": "v5.3.0",
+      "severidad": "Media — violación regla UX explícita",
+      "descripcion": "Botones Viva/Perdida/Reactivar del drill-down quedaron full-width en v5.2.3 (flex:1). Luis reportó que se veían demasiado grandes.",
+      "fix": "Chips inline compactos con border-radius 14px. Agregado botón 🤝 Pedido / ✓ Aprobar."
+    },
+    {
+      "id": "BUG-004",
+      "version_fix": "v5.2.3",
+      "descripcion": "3 docs legacy sin status invisibles al pipeline/historial/seguimiento",
+      "fix": "Normalización en 3 capas + botón bulk"
+    },
+    {
+      "id": "BUG-001/002/003",
+      "version_fix": "v5.2.2",
+      "descripcion": "Dashboard vacío + navegación rota + Historial vacío",
+      "fix": "Removida línea huérfana `let histFilter` en app-core.js"
+    },
+    {"id": "BUG-FIXED-001", "version_fix": "v5.1.0", "descripcion": "Propuestas sin botones Viva/Perdida"},
+    {"id": "BUG-FIXED-002", "version_fix": "v5.1.0", "descripcion": "capture=environment bloqueaba galería móvil"},
+    {"id": "BUG-FIXED-003", "version_fix": "v5.1.0", "descripcion": "Pagos sin foto no adjuntaban después"},
+    {"id": "BUG-FIXED-004", "version_fix": "v5.0.5", "descripcion": "Perdidas convertibles a pedido"},
+    {"id": "BUG-FIXED-005", "version_fix": "v5.0.4", "descripcion": "Mona en_produccion no en filtro Pedidos"}
+  ],
+
+  "conversaciones_importantes_con_luis": [
+    {
+      "tema": "Rediseño dashboard v5.3.0 progressive disclosure",
+      "fecha": "2026-04-21",
+      "decisiones": [
+        "Luis eligió enfoque C (Híbrido) del wireframe interactivo",
+        "Pidió que por producir / por entregar queden LADO A LADO partiendo por la mitad",
+        "Los 2 bloques urgentes SIEMPRE visibles (no dentro de un toggle)",
+        "2 toggles grupales (Análisis / Otros operativos) + Opciones avanzadas",
+        "Estado expandido persistido entre sesiones",
+        "Fix colateral: chips compactos para los botones del drill-down (v5.2.3 los dejó full-width)",
+        "Botón convertir a pedido/aprobar inline agregado"
+      ]
+    },
+    {
+      "tema": "Diagnóstico v5.2.3 — docs en limbo",
+      "fecha": "2026-04-21",
+      "decisiones": ["Fix en 3 capas: isFollowable + setFollowUp auto-normaliza + botón bulk"]
+    },
+    {
+      "tema": "Diagnóstico v5.2.2 — histFilter",
+      "fecha": "2026-04-21",
+      "decisiones": ["Screenshot consola reveló SyntaxError. Fix de 1 línea removiendo declaración huérfana"]
+    },
+    {
+      "tema": "Principios UX establecidos",
+      "principios": [
+        "Progressive disclosure",
+        "Top-left = hot zone (Pipeline arriba)",
+        "Bento-style grids",
+        "Tap targets ≥44px",
+        "JAMÁS botones de toda la columna ancho",
+        "Agrupación con white space, no líneas",
+        "Lo urgente SIEMPRE visible",
+        "Lo analítico y secundario en toggles"
+      ]
+    }
+  ],
+
+  "tips_para_nuevo_chat_de_claude": {
+    "al_empezar": [
+      "Leer TODO este JSON primero",
+      "Preguntar a Luis cómo va la app antes de asumir bugs",
+      "Si reporta un bug: pedir F12 → Console → screenshot ANTES de proponer fix",
+      "Respetar decisiones arquitectónicas ya tomadas",
+      "Respetar UX: jamás full-width buttons, bento grid, progressive disclosure, lo urgente visible"
+    ],
+    "al_hacer_cambios_de_codigo": [
+      "SIEMPRE subir BUILD_VERSION en app-core.js",
+      "SIEMPRE actualizar cache-busting ?v=X.X.X en TODOS los script tags de index.html",
+      "SIEMPRE actualizar comentario VERSION línea 10 de index.html",
+      "SIEMPRE actualizar este JSON de contexto",
+      "SIEMPRE validar con node -c y lxml y cruce HTML-JS",
+      "SIEMPRE hacer grep de identificadores nuevos en los 7 archivos antes de entregar (lección v5.2.2)",
+      "SIEMPRE _safe() wrapping en secciones nuevas del dashboard",
+      "SIEMPRE localStorage read/write con try-catch y fallback",
+      "Al reestructurar HTML: NUNCA eliminar IDs existentes, solo meterlos dentro de nuevos wrappers (lección v5.3.0)",
+      "Preferir cambios pequeños y enfocados"
+    ],
+    "sobre_el_stack": [
+      "Firebase Blaze activo",
+      "GitHub Pages deploy manual drag-and-drop",
+      "quotesCache = variable global con todos los docs",
+      "$() = document.getElementById",
+      "fm() = pesos colombianos",
+      "Las 3 vars del historial (histArchive/histFilter/histSearch) viven SOLO en app-historial.js",
+      "isFollowable/getPipelineActivo/setFollowUp tratan docs sin status como 'enviada'",
+      "localStorage key para estado de colapsables dashboard: gb_dash_coll_v530"
+    ],
+    "sobre_luis": [
+      "Técnico intermedio-avanzado, en español",
+      "Respuestas concisas pero completas",
+      "Valora honestidad técnica",
+      "Pide 'recomendación' = UNA con razón clara",
+      "Prioriza urgente sobre perfecto",
+      "Prefiere cambios pequeños sobre paquetes grandes",
+      "Le gustan los wireframes interactivos para decidir UX"
+    ]
+  },
+
+  "instrucciones_mantenimiento_json": {
+    "REGLA_CRITICA": "Este JSON DEBE actualizarse CADA VEZ que se entrega una nueva versión.",
+    "cuando_actualizar": ["nueva versión", "bug abierto/cerrado", "decisión arquitectónica", "mover item roadmap"],
+    "campos_SIEMPRE_actualizar": ["_meta.generado_el", "proyecto.version_actual", "estado_actual_*", "historial_versiones_detallado", "archivos_de_cada_version", "bugs_conocidos", "ROADMAP_PENDIENTE"],
+    "formato_entrega": ["Nombre JSON con versión: context_v5_3_0.json", "Recordar guardar para futuros chats"],
+    "NO_poner": ["credenciales", "datos reales clientes", "código completo", "transcripciones literales"]
+  },
+
+  "archivos_en_esta_entrega_v5_3_0": {
+    "subir_estos_3_a_github_pages": ["app-core.js", "app-dashboard.js", "index.html"],
+    "guardar_para_proximo_chat": "context_v5_3_0.json",
+    "sin_cambios_vs_v5_2_3": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"],
+    "breaking_changes": "Ninguno",
+    "resumen_cambios": "Rediseño dashboard progressive disclosure + operación urgente 3 días + chips compactos drill-down + botón convertir inline"
+  }
+}
