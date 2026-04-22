@@ -1,0 +1,368 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Todo lo necesario para que un nuevo chat de Claude (o Luis mismo) retome el proyecto Gourmet Bites sin perder contexto. NO omitir detalles.",
+    "generado_el": "2026-04-21",
+    "generado_por": "Claude Opus 4.7 — asistente técnico del proyecto",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final"
+  },
+
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual": "v5.2.3 — fix de docs legacy sin status + etiquetado desde drill-down",
+    "version_anterior_estable_probada": "v5.2.2 (verificada en producción — resolvió bugs de v5.2.0/5.2.1)",
+    "fecha_ultima_actualizacion": "2026-04-21",
+    "url_produccion": "https://luisrandrade-collab.github.io/Cotizador/"
+  },
+
+  "estado_actual_2026_04_21_v523": {
+    "resumen_en_una_frase": "v5.2.3 resuelve la discrepancia entre Pipeline Activo ($5.5M · 4 vivas) y Cotizado del período ($8.3M · 9 docs) que Luis detectó tras estabilizar v5.2.2. Causa: 3 docs legacy (GB-2026-0101 Maria Gracia, 0102 Realup, 0103 Ximena) creados antes de v5.0.3 sin campo `status` quedaban invisibles al Pipeline/Historial-Vivas/Seguimiento pero sí aparecían en Cotizado. Fix en 3 capas: (1) isFollowable y getPipelineActivo tratan docs sin status como enviada, (2) setFollowUp auto-normaliza status al etiquetar, (3) botón 🔧 Normalizar docs en Mantenimiento para bulk fix. Además: botones 🟢/❌/♻️ inline en drill-down del dashboard.",
+
+    "problema_reportado_por_luis_y_diagnostico": {
+      "sintoma_visual": "Pipeline Activo 'En cotización' muestra $5.553.300 · 4 vivas. Dashboard 'Cotizado del mes' muestra $8.318.800 · 9 docs. La diferencia ($2.765.500) parece indicar docs perdidos, pero Luis confirmó que no son perdidos sino 'sin etiqueta'.",
+      "diagnostico_con_matematicas": {
+        "9_docs_del_mes_abril_2026": [
+          "GB-PF-2026-0101 Tarkus Pharma Lab $5.135.600 (status=propfinal) → en Pipeline ✅",
+          "GB-2026-0111 Tarkus Pharma Lab $153.700 (status=enviada) → en Pipeline ✅",
+          "GB-2026-0103 Ximena Cabezas $1.096.000 (status=vacío) → LIMBO ❌",
+          "GB-2026-0102 Realup Media $776.000 (status=vacío) → LIMBO ❌",
+          "GB-2026-0101 Maria Gracia Diaz $755.000 (status=vacío) → LIMBO ❌",
+          "GB-2026-0109 Jaime Castañeda $188.000 (status=enviada) → en Pipeline ✅",
+          "GB-2026-0110 Adriana Pulido Melo $76.000 (status=enviada) → en Pipeline ✅",
+          "GB-2026-0106 Carolina Valero $70.000 (status=entregado) → no aplica pipeline cotización",
+          "GB-2026-0108 Mona Acevedo $68.500 (status=entregado) → no aplica pipeline cotización"
+        ],
+        "cuadratura": "Pipeline 4 vivas = Tarkus PF + Tarkus + Jaime + Adriana = $5.553.300 ✓. Cotizado 9 docs = todos incluidos porque dashboard usa `status || 'enviada'` como default mientras que Pipeline/isFollowable comparaban estricto `status === 'enviada'`.",
+        "causa_raiz": "Los 3 docs legacy (GB-2026-0101/0102/0103) fueron creados ANTES de v5.0.3, cuando el campo `status` aún no existía. Nunca se normalizaron."
+      },
+      "por_que_luis_no_los_podia_etiquetar_antes": "Los 3 docs en limbo NO aparecían en ninguna pantalla donde hay botones de etiquetado Viva/Perdida: (a) archivo Vivas del Historial los excluye porque isFollowable retornaba false, (b) pestaña Seguimiento usa la misma isFollowable, (c) Pipeline Activo del dashboard los excluye por comparación estricta. Solo aparecían en el drill-down de 'Cotizado' — pero el drill-down antes era SOLO visualización, sin botones de acción."
+    },
+
+    "fix_aplicado_en_v523": {
+      "archivos_modificados": 3,
+      "archivos_sin_tocar": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"],
+
+      "cambio_1_isFollowable": {
+        "archivo": "app-core.js ~líneas 703-713",
+        "descripcion": "Tratar docs sin status como 'enviada'. Afecta también archivo Vivas del Historial y pestaña Seguimiento (ambas usan isFollowable)",
+        "impacto_usuario": "Los 3 docs limbo ahora aparecen en Pipeline, Historial Vivas y Seguimiento como VIVA pendiente"
+      },
+      "cambio_2_getPipelineActivo": {
+        "archivo": "app-core.js ~líneas 747-788",
+        "descripcion": "Misma normalización: docs sin status entran al bucket 'en_cotizacion'. getPipelineActivo hace su propia lógica sin usar isFollowable.",
+        "impacto_usuario": "Pipeline Activo 'En cotización' ahora incluye los 3 docs legacy. 4 vivas → 7 vivas, $5.553.300 → $8.180.300"
+      },
+      "cambio_3_setFollowUp_auto_normaliza": {
+        "archivo": "app-core.js ~líneas 805-815",
+        "descripcion": "Al etiquetar followUp, si el doc no tiene status, se le escribe 'enviada' (o 'propfinal' para PFs) en el mismo updateDoc. Los datos se auto-reparan con el uso normal.",
+        "impacto_usuario": "El primer clic en 🟢 Viva sobre un doc legacy lo deja permanentemente normalizado en Firebase"
+      },
+      "cambio_4_botones_drilldown": {
+        "archivo": "app-dashboard.js docRow() + CSS en index.html",
+        "descripcion": "Cada fila del modal drill-down ahora muestra botones inline: 🟢 Viva + ❌ Perdida para followables, ♻️ Reactivar para perdidas. Reusa quickMarkViva y openPerdidaModal sin modificarlas. Wrapper ddQuickViva refresca el modal automáticamente tras etiquetar.",
+        "impacto_usuario": "Puede etiquetar desde el drill-down sin salir. UX: tocar 'Cotizado' del dashboard → ver lista → tocar 🟢/❌ por doc"
+      },
+      "cambio_5_normalizador_bulk": {
+        "archivo": "app-dashboard.js función normalizarDocsSinStatus + botón HTML + CSS",
+        "descripcion": "Botón '🔧 Normalizar docs' en Mantenimiento. Muestra preview de docs legacy, pide confirmación, escribe status='enviada' (o 'propfinal' para PFs) en batch secuencial con audit trail. Idempotente: si no hay docs sin status, informa y sale.",
+        "impacto_usuario": "Luis puede limpiar los 3 docs legacy de un tirón (3 clics) sin etiquetarlos individualmente. Recomendado ejecutar una vez."
+      },
+
+      "validacion_pre_entrega": [
+        "node -c en los 7 .js → todos compilan",
+        "lxml parser en index.html → 0 errores",
+        "Cruce HTML handlers ↔ funciones JS → 0 huérfanos",
+        "7 referencias a ?v=5.2.3, 0 a ?v=5.2.2",
+        "BUILD_VERSION = v5.2.3 confirmado"
+      ]
+    },
+
+    "instrucciones_deploy_para_luis": [
+      "Subir a GitHub Pages 3 archivos: app-core.js + app-dashboard.js + index.html",
+      "Guardar context_v5_2_3.json para el próximo chat (NO subir al sitio)",
+      "Ctrl+F5 en el navegador",
+      "Verificar header: v5.2.3 · 2026-04-21",
+      "Ir a Mantenimiento (Opciones avanzadas) → click '🔧 Normalizar docs' → preview con 3 docs (Maria Gracia, Realup, Ximena) → confirmar",
+      "Después: Pipeline debe mostrar 7 vivas por ~$8.180.300 (antes 4 vivas / $5.553.300)",
+      "Alternativa al botón: ir al Dashboard, tocar 'Cotizado', y dar 🟢 Viva uno por uno a los 3 docs. Hace lo mismo pero uno a uno."
+    ]
+  },
+
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION. isFollowable, getPipelineActivo, setFollowUp tratan docs sin status como 'enviada' (v5.2.3).",
+      "app-cotizar.js": "módulo de cotizaciones (sin cambios desde v5.0.x)",
+      "app-propuesta.js": "módulo de propuestas / eventos (sin cambios desde v5.0.x)",
+      "app-historial.js": "historial + ciclo de vida + pagos + 4 archivos/sub-pestañas + buscador + botones rápidos Viva/Perdida. Contiene METODOS_PAGO, FOLLOW_UP_META, MOTIVOS_PERDIDA y las 3 variables histArchive/histFilter/histSearch",
+      "app-seguimiento.js": "pestaña seguimiento comercial (desde v5.0.4)",
+      "app-dashboard.js": "dashboard + pipeline activo + reportes + drill-down con etiquetado inline (v5.2.3) + agenda + exports + normalizarDocsSinStatus (v5.2.3)"
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/Cotizador/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password) · 3 usuarios · + Google Sign-In",
+    "firebase_plan": "Blaze (cuota gratuita perpetua suficiente para el volumen actual)",
+    "backup_estado": "Export JSON manual disponible (botón 📥 Backup JSON) · Restaurar backup PENDIENTE (v5.3.x) · PITR y Scheduled Backups PENDIENTES de activar en Firebase Console"
+  },
+
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]. v5.2.3: docs sin campo status se tratan como 'enviada' para este propósito.",
+      "valores_internos": ["pendiente", "contactado", "activa", "perdida"],
+      "expuesto_a_usuario": ["viva", "perdida"],
+      "regla_binaria": "pendiente/contactado/activa → VIVA. perdida → PERDIDA.",
+      "comportamiento_kpis": "perdida excluye de todos los KPIs igual que anulada. Las otras 3 suman normal."
+    }
+  },
+
+  "historial_versiones_detallado": [
+    {"version": "v5.0.0", "fecha": "2026-04-20", "tipo": "MAJOR", "highlights": "Firebase Auth + Storage + audit trail"},
+    {"version": "v5.0.1", "fecha": "2026-04-20", "highlights": "Google Sign-In + toggle password + menú cuenta"},
+    {"version": "v5.0.1b", "fecha": "2026-04-20", "highlights": "Convertidas ocultas + borrado cascada + drill-down agrupado + banner HOY + sync agenda"},
+    {"version": "v5.0.2", "fecha": "2026-04-20", "highlights": "Auto-sync + sync incremental + fechas flexibles + fantasmas + modal backup"},
+    {"version": "v5.0.3", "fecha": "2026-04-20", "highlights": "Estado anulada + modal anular con motivo/devolución"},
+    {"version": "v5.0.4", "fecha": "2026-04-20", "highlights": "Pipeline Activo · pestaña Seguimiento · 4 estados followUp · WhatsApp/tel/correo · notas · modal perdida"},
+    {"version": "v5.0.5", "fecha": "2026-04-21", "highlights": "Binario VIVA/PERDIDA · reactivarPerdida · bloqueo perdida→pedido · botón ♻️ Reactivar"},
+    {"version": "v5.1.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ESTABLE", "highlights": "Historial en 4 archivos · buscador · botones rápidos · adjuntar comprobante después · fix capture móvil. BUG LATENTE sembrado aquí (histFilter huérfano)."},
+    {"version": "v5.2.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "DEFECTUOSA — no usar", "highlights": "Rediseño dashboard + 3 reportes + badge novedades + mantenimiento colapsable. Destapó bug latente de v5.1.0."},
+    {"version": "v5.2.1", "fecha": "2026-04-21", "tipo": "PATCH", "status": "INTERMEDIA", "highlights": "_safe wrappers + logs [Dashboard]. Los logs revelaron SyntaxError de histFilter."},
+    {"version": "v5.2.2", "fecha": "2026-04-21", "tipo": "PATCH HOTFIX", "status": "ESTABLE — en producción", "highlights": "Fix de 1 línea: removido `let histFilter` huérfano de app-core.js. Resuelve BUG-001/002/003."},
+    {"version": "v5.2.3", "fecha": "2026-04-21", "tipo": "PATCH FUNCIONAL", "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN", "highlights": "Fix operativo de docs legacy sin status. isFollowable/getPipelineActivo normalizan. setFollowUp auto-repara datos. Botones inline Viva/Perdida/Reactivar en drill-down del dashboard. Botón bulk 🔧 Normalizar docs en Mantenimiento."}
+  ],
+
+  "archivos_de_cada_version": {
+    "v5_2_2_ESTABLE": {
+      "nota": "Versión previa estable. Rollback a esta es trivial si v5.2.3 falla.",
+      "archivos_modificados_vs_v521": ["app-core.js (removió let histFilter)", "index.html (cache-busting)"]
+    },
+    "v5_2_3_ENTREGADA": {
+      "nota": "Esta es la versión viva. Fix + 2 features aditivas.",
+      "archivos_a_subir_estos_3": [
+        "app-core.js — isFollowable + getPipelineActivo + setFollowUp ajustados. BUILD_VERSION v5.2.3. Changelog.",
+        "app-dashboard.js — docRow con botones inline + wrapper ddQuickViva + función normalizarDocsSinStatus",
+        "index.html — cache-busting ?v=5.2.3 + CSS de dd-qbtn-viva/perdida/react + CSS mant-btn-normalizar + botón Normalizar + comentario VERSION"
+      ],
+      "archivos_sin_cambios_vs_v522": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"],
+      "breaking_changes": "Ninguno — todo aditivo o compatible"
+    }
+  },
+
+  "decisiones_arquitectura_importantes": {
+    "por_que_followUp_y_no_status_nuevo": "Un doc 'enviada' con followUp='perdida' sigue siendo una cotización enviada en su ciclo de vida — solo que comercialmente cerró sin venta. followUp es una capa ORTOGONAL al status.",
+    "por_que_archivos_historial_y_no_tags": "Con 50+ docs los tags planos se vuelven ruido. Archivos mutuamente exclusivos escalan mejor.",
+    "por_que_vivas_default_del_historial": "Es la vista operativa más usada.",
+    "por_que_r5_simple_y_no_fcm": "FCM real requiere Cloud Functions + SW + tokens. R5 simple con localStorage resuelve 80% del valor.",
+    "por_que_no_full_width_buttons": "Regla explícita de Luis. CTAs ancho-completo solo para acción primaria.",
+    "por_que_try_catch_por_seccion": "Dashboard es composición de widgets. Error Boundary replicado con try-catch.",
+    "por_que_normalizacion_en_3_capas_v523": "(1) isFollowable ajustado = fix inmediato de visibilidad sin migrar datos. (2) setFollowUp auto-normaliza = datos se reparan con uso natural. (3) Botón bulk = opción manual para limpiar de una vez. Redundante a propósito: cada capa cubre un escenario distinto.",
+    "leccion_v522": "Cuando se mueve estado de un archivo a otro, SIEMPRE grep del identificador en TODO el código antes de entregar.",
+    "leccion_v523": "Campos legacy (null/undefined) requieren política de default consistente en TODA la lógica. Si una función usa `X || 'default'` y otra usa `X === 'value'`, aparecerán inconsistencias operativas invisibles."
+  },
+
+  "ROADMAP_PENDIENTE": {
+    "v5_3_0_rediseno_dashboard_progressive_disclosure": {
+      "tipo": "MINOR — refactor visual con CUIDADO",
+      "prioridad": "Alta — pedido directo por Luis tras v5.2.3",
+      "descripcion": "Dashboard más simple y limpio usando progressive disclosure. Info esencial siempre visible (Pipeline + 5 KPI cards), secciones secundarias colapsables por toggle.",
+      "items_a_discutir_con_luis_antes_de_codear": [
+        "¿Qué queda fijo arriba? (propuesta: Pipeline Activo + 5 KPI cards del período + selector Mes/Año/etc)",
+        "¿Qué va colapsable? (candidatos: Conversión del período, Pérdidas por motivo, Vista por cliente, Recaudo por método, Próximas entregas, Pendientes por cobrar, Últimos comentarios)",
+        "¿Un solo toggle '▼ Ver más' o varios toggles por sección?",
+        "¿Recordar qué secciones quedan expandidas entre sesiones? (localStorage)",
+        "¿Mantenimiento se queda como está (ya colapsable) o se mueve a un settings aparte?"
+      ],
+      "advertencia": "v5.2.0 rompió la app por un rediseño visual grande. Hacer esta versión con mockup TEXTUAL antes de codear, cambios incrementales, y prueba local antes de deploy."
+    },
+
+    "v5_3_1_restaurar_backup": {
+      "tipo": "PATCH feature aditiva",
+      "prioridad": "Media — pedida desde antes",
+      "descripcion": "Botón 📤 Restaurar backup JSON en Mantenimiento. Decisiones UX pendientes: ¿merge o replace? ¿confirmación doble? ¿preview antes de escribir? ¿política cuando el doc existe tanto en el backup como en Firebase con datos distintos?"
+    },
+
+    "v5_3_2_otros": {
+      "items_prioridad_media": [
+        "Plantillas de cotización reutilizables",
+        "Plantillas de mensaje WhatsApp seguimiento (con variables)",
+        "Recordatorios WhatsApp automáticos cuando saldo pendiente >N días",
+        "Notificaciones push FCM reales (si R5 simple no alcanza tras 2-3 semanas)"
+      ],
+      "items_prioridad_baja": [
+        "Dashboard comparativo (período actual vs anterior)",
+        "Exportar Excel (SheetJS ya en CDN)",
+        "Fotos múltiples por comentario",
+        "Reactivar anuladas (hoy terminal)",
+        "Motivos/días configurables desde settings",
+        "followUpUpdatedAt específico (vs updatedAt general)",
+        "Buscador expandido incluyendo notas y comentarios",
+        "Archivado de convertidas viejas",
+        "Reporte cancelación post-entrega"
+      ]
+    },
+
+    "v5_5_integraciones": {
+      "items": ["Google Calendar API OAuth", "WhatsApp Business API real", "Portal cliente (link único sin login)"]
+    },
+
+    "v6_0_rediseno_mayor": {
+      "items": ["Multi-negocio (tenant/workspace)", "Reportes contables (Siesa/World Office/DIAN)", "Módulo inventario"]
+    }
+  },
+
+  "pendientes_operativos_no_de_codigo": {
+    "items": [
+      "Tras v5.2.3 deploy: ejecutar '🔧 Normalizar docs' desde Mantenimiento una vez (3 docs legacy: GB-2026-0101, 0102, 0103)",
+      "Verificar tras normalizar: Pipeline Activo debe pasar de 4 vivas/$5.5M a 7 vivas/$8.18M",
+      "Activar PITR (Point In Time Recovery) en Firebase Console — 5 min",
+      "Activar Scheduled Backups en Firebase",
+      "Ejecutar migrarFotosStorage() una vez"
+    ]
+  },
+
+  "bugs_conocidos_abiertos": [],
+
+  "bugs_cerrados_en_versiones_anteriores": [
+    {
+      "id": "BUG-004",
+      "version_fix": "v5.2.3",
+      "severidad_original": "ALTA — operativa invisible",
+      "descripcion": "3 docs legacy sin campo status quedaban invisibles a Pipeline/Historial Vivas/Seguimiento pero aparecían en Cotizado. Luis no los podía etiquetar Viva/Perdida desde ninguna parte.",
+      "causa_real": "isFollowable y getPipelineActivo hacían comparación estricta `status === 'enviada'` mientras que el dashboard usaba default `status || 'enviada'`.",
+      "fix": "3 capas: normalizar en isFollowable + getPipelineActivo, auto-reparar en setFollowUp, botón bulk en Mantenimiento"
+    },
+    {
+      "id": "BUG-001 / 002 / 003",
+      "version_fix": "v5.2.2",
+      "severidad_original": "BLOQUEANTE",
+      "descripcion": "Dashboard KPIs vacíos + navegación rota + Historial vacío tras v5.2.0.",
+      "causa_real": "`let histFilter` en app-core.js chocaba con `var histFilter` en app-historial.js → SyntaxError en parseo → abortaba archivo entero → renderHist y METODOS_PAGO no cargaban.",
+      "fix": "Remover 1 línea huérfana de app-core.js"
+    },
+    {"id": "BUG-FIXED-001", "version_fix": "v5.1.0", "descripcion": "Propuestas vivas sin botones Viva/Perdida en Historial"},
+    {"id": "BUG-FIXED-002", "version_fix": "v5.1.0", "descripcion": "capture=environment bloqueaba galería en móvil"},
+    {"id": "BUG-FIXED-003", "version_fix": "v5.1.0", "descripcion": "Pagos sin foto no permitían adjuntar comprobante después"},
+    {"id": "BUG-FIXED-004", "version_fix": "v5.0.5", "descripcion": "Cotizaciones perdidas se podían convertir a pedido"},
+    {"id": "BUG-FIXED-005", "version_fix": "v5.0.4", "descripcion": "Mona en_produccion no aparecía en filtro Pedidos"}
+  ],
+
+  "conversaciones_importantes_con_luis": [
+    {
+      "tema": "Diagnóstico v5.2.3 — docs en limbo",
+      "fecha": "2026-04-21 (sesión v5.2.3)",
+      "decisiones": [
+        "Luis detectó discrepancia Pipeline ($5.5M/4 vivas) vs Cotizado ($8.3M/9 docs)",
+        "Análisis reveló que 3 docs legacy sin status quedaban operativamente invisibles",
+        "Acordado: fix en 3 capas (isFollowable + setFollowUp auto-normaliza + botón bulk)",
+        "Acordado: agregar botones Viva/Perdida al drill-down del dashboard",
+        "Acordado: rediseño visual progressive disclosure del dashboard queda para v5.3.0 — se discute antes de codear para no repetir el error de v5.2.0"
+      ]
+    },
+    {
+      "tema": "Diagnóstico v5.2.2",
+      "fecha": "2026-04-21 (sesión v5.2.2)",
+      "decisiones": [
+        "Luis compartió screenshot de consola con SyntaxError de histFilter",
+        "Identificado: let histFilter en app-core.js chocaba con var histFilter en app-historial.js",
+        "Fix: remover 1 línea. Versiones más elegantes se rechazaron por riesgo"
+      ]
+    },
+    {
+      "tema": "Reorganización Historial v5.1.0",
+      "decisiones": ["4 archivos: Vivas/Pedidos/Perdidas/Anuladas", "Buscador en cliente+número+productos", "Botones rápidos 🟢/❌ en tarjetas"]
+    },
+    {
+      "tema": "Rediseño dashboard v5.2.0 (falló)",
+      "principios_UX_establecidos": [
+        "Top-left = hot zone (Pipeline arriba)",
+        "Bento-style grids",
+        "Tap targets ≥44px",
+        "Progressive disclosure",
+        "JAMÁS botones de toda la columna ancho",
+        "Agrupación con white space, no líneas"
+      ]
+    }
+  ],
+
+  "tips_para_nuevo_chat_de_claude": {
+    "al_empezar": [
+      "Leer TODO este JSON primero",
+      "Preguntar a Luis cómo va la app antes de asumir bugs",
+      "Si reporta un bug: pedir F12 → Console → screenshot ANTES de proponer fix",
+      "Respetar decisiones arquitectónicas ya tomadas",
+      "Respetar UX: jamás full-width buttons, bento grid, progressive disclosure"
+    ],
+    "al_hacer_cambios_de_codigo": [
+      "SIEMPRE subir BUILD_VERSION en app-core.js",
+      "SIEMPRE actualizar cache-busting ?v=X.X.X en TODOS los script tags de index.html",
+      "SIEMPRE actualizar comentario VERSION línea 10 de index.html",
+      "SIEMPRE actualizar este JSON de contexto",
+      "SIEMPRE validar con node -c y lxml",
+      "SIEMPRE hacer grep de identificadores antes de redeclararlos (lección v5.2.2)",
+      "SIEMPRE pensar en defaults consistentes para campos legacy (lección v5.2.3)",
+      "Preferir cambios pequeños y enfocados. Las versiones que rompieron la app fueron las grandes (v5.2.0)."
+    ],
+    "sobre_el_stack": [
+      "Firebase Blaze activo — cuota gratis sobra",
+      "GitHub Pages deploy manual drag-and-drop (no CI/CD)",
+      "quotesCache es variable global con todos los docs",
+      "$() = document.getElementById",
+      "fm() = formato pesos colombianos",
+      "Las 3 vars del historial (histArchive/histFilter/histSearch) viven SOLO en app-historial.js con patrón `if(typeof X==='undefined')var X`",
+      "isFollowable, getPipelineActivo, setFollowUp tratan docs sin status como 'enviada' (v5.2.3)"
+    ],
+    "sobre_luis": [
+      "Técnico intermedio-avanzado, en español",
+      "Prefiere respuestas concisas pero completas",
+      "Valora honestidad técnica sobre comercialismo",
+      "Pide 'recomendación' = UNA con razón clara",
+      "Prioriza urgente sobre perfecto",
+      "Prefiere cambios pequeños sobre paquetes grandes"
+    ]
+  },
+
+  "instrucciones_mantenimiento_json": {
+    "REGLA_CRITICA": "Este JSON DEBE actualizarse CADA VEZ que se entrega una nueva versión.",
+    "cuando_actualizar": [
+      "Al entregar archivos de cualquier versión nueva",
+      "Al descubrir o cerrar un bug",
+      "Al tomar decisión arquitectónica importante",
+      "Al mover item del roadmap"
+    ],
+    "campos_que_SIEMPRE_actualizar": [
+      "_meta.generado_el",
+      "proyecto.version_actual",
+      "proyecto.fecha_ultima_actualizacion",
+      "estado_actual_* (renombrar con versión)",
+      "historial_versiones_detallado (append)",
+      "archivos_de_cada_version",
+      "bugs_conocidos_abiertos / bugs_cerrados",
+      "ROADMAP_PENDIENTE"
+    ],
+    "formato_entrega": [
+      "Nombre JSON con versión: context_v5_2_3.json",
+      "Recordar a Luis: guardar para futuros chats"
+    ],
+    "NO_poner": ["credenciales", "datos reales clientes", "código completo", "transcripciones literales"]
+  },
+
+  "archivos_en_esta_entrega_v5_2_3": {
+    "subir_estos_3_a_github_pages": ["app-core.js", "app-dashboard.js", "index.html"],
+    "guardar_para_proximo_chat": "context_v5_2_3.json",
+    "sin_cambios_vs_v5_2_2": ["app-historial.js", "app-seguimiento.js", "app-cotizar.js", "app-propuesta.js", "app-assets.js"],
+    "breaking_changes": "Ninguno",
+    "resumen_cambios": "Fix operativo de docs sin status en 3 capas + botones inline drill-down + normalizador bulk"
+  }
+}
