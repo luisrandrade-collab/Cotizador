@@ -1078,8 +1078,13 @@ async function exportHistoryJson(){
       }
     };
     const json=JSON.stringify(payload,null,2);
-    const today=new Date().toISOString().slice(0,10);
-    const filename="gourmet-bites-backup-"+today+".json";
+    // v5.4.0 (Bloque E): nombre con fecha Y hora para que múltiples backups del mismo
+    // día no se sobrescriban. Formato YYYY-MM-DD_HHhMM (ej: 2026-04-22_14h32).
+    // Ordena bien alfabéticamente y es legible → fácil identificar cuál es el más reciente.
+    const _now=new Date();
+    const _p=n=>String(n).padStart(2,"0");
+    const stamp=_now.getFullYear()+"-"+_p(_now.getMonth()+1)+"-"+_p(_now.getDate())+"_"+_p(_now.getHours())+"h"+_p(_now.getMinutes());
+    const filename="gourmet-bites-backup-"+stamp+".json";
     const blob=new Blob([json],{type:"application/json;charset=utf-8"});
     // Web Share API en móviles, download clásico en desktop
     try{

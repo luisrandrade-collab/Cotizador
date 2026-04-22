@@ -1,0 +1,472 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Todo lo necesario para que un nuevo chat de Claude (o Luis mismo) retome el proyecto Gourmet Bites sin perder contexto.",
+    "generado_el": "2026-04-22",
+    "generado_por": "Claude Opus 4.7 — asistente técnico del proyecto",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final"
+  },
+
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual": "v5.4.0 PARCIAL (Bloques A+C+E) — notas críticas propagan + producción flexible + backups con timestamp",
+    "version_anterior_estable_probada": "v5.3.0 (dashboard progressive disclosure + urgente 3d + chips)",
+    "fecha_ultima_actualizacion": "2026-04-22",
+    "url_produccion": "https://luisrandrade-collab.github.io/Cotizador/"
+  },
+
+  "estado_actual_2026_04_22_v540_parcial": {
+    "resumen_en_una_frase": "v5.4.0 PARCIAL entrega 3 de los 5 bloques planeados para cerrar el loop operativo cotización→pedido→producción→entrega. Bloques B (versionado PDF + copia Storage) y D (botón 🔪 Producido inline en dashboard urgente) quedan pendientes para v5.4.1 en chat nuevo por límite de uso.",
+
+    "disparador_cambios": {
+      "problema_reportado_por_luis": "Kathy escribió en una cotización real del 20-abril (GB-2026-0110 para Adriana Pulido Melo) la instrucción crítica 'Regalo para Margarita Quijano, incluir nota que diga Feliz cumpleaños con mucho cariño Carlitos y Adriana'. Esa instrucción SÍ salió en el PDF (pegada a la fecha de entrega) pero SE PERDIÓ al convertir a pedido: no llegó al .ics, no llegó a Kathy/JP el día de producción. Por suerte Kathy se acordó. Luis pidió que nunca vuelva a pasar — una instrucción tipo 'sin nueces' podría causar daño.",
+      "otros_problemas_reportados": [
+        "PDFs se sobrescriben si se regenera la misma cotización (ambos con nombre GB-XXXX-XXXX_Cliente.pdf)",
+        "No se puede producir y entregar el mismo día — producción hardcoded a entrega-1d con input readonly",
+        "Botón 🔪 Producido solo existe en Historial, no en dashboard ni en tarjetas Operación Urgente 3d",
+        "Backups JSON se sobrescriben si haces dos el mismo día (nombre solo fecha, sin hora)"
+      ]
+    },
+
+    "bloques_entregados_en_v540_parcial": {
+      "A_notas_criticas_propagan": {
+        "problema": "Las 'instrucciones especiales' que el cliente escribe en la cotización se perdían al convertir a pedido.",
+        "donde_estaban": "En el campo 'momento Otro' (input #f-time-other cuando chk-otro está activo). Se concatenaban con fecha de entrega en getDelivStr() → string `deliv` → salían en PDF pero no se guardaban estructuradas.",
+        "solucion": [
+          "saveCurrentQuote en app-cotizar.js ahora guarda también `momentosArr` (array estructurado) y `eventDate` explícitos, ADEMÁS del string `deliv` legacy (retrocompat).",
+          "openOrderModal en app-historial.js pre-llena `om-notas-prod` con los momentos NO estándar (filtra Desayuno/Almuerzo/Cena/etc.) cuando no hay notas previas.",
+          "Fallback defensivo: si la cotización es pre-v5.4.0 y no tiene momentosArr pero sí tiene deliv con ` — ` separator, extrae la parte después del separador y la usa (también filtra ruido de momentos estándar).",
+          "Mismo tratamiento para propuestas en openApproveModal: si p.momento tiene texto y no hay notas previas, se pre-llena am-notas-prod.",
+          "El textarea pre-llenado se resalta visualmente (fondo amarillo claro, borde naranja) para que Luis vea claro que viene de la cotización y pueda editar si quiere."
+        ],
+        "propagacion_final": "Las notas llegan a orderData.notasProduccion → el .ics de producción YA las lee desde antes (exportPedidoIcs en app-dashboard.js:567) → Kathy/JP las ven en Outlook.",
+        "archivos_tocados": ["app-cotizar.js (saveCurrentQuote)", "app-historial.js (openOrderModal + openApproveModal)"],
+        "retrocompatibilidad": "Cotizaciones pre-v5.4.0 sin momentosArr siguen funcionando: el fallback desde deliv string las rescata. Cotizaciones ya convertidas a pedido (con orderData.notasProduccion previo) preservan lo que Luis ya editó a mano."
+      },
+
+      "C_produccion_flexible": {
+        "problema": "Input om-prod-fecha era readonly; lógica hardcodeada a entrega-1d en submitMarkAsOrder. No se podía producir y entregar el mismo día.",
+        "solucion": [
+          "om-prod-fecha en index.html ya no tiene atributo readonly ni estilo gris; tiene label '(editable)'.",
+          "openOrderModal quita readonly vía JS (defensivo) y establece min=hoy, max=fechaEntrega.",
+          "oninput en om-prod-fecha marca dataset.userEdited='1' para que el oninput de om-entrega-fecha NO sobrescriba si el usuario ya la tocó.",
+          "submitMarkAsOrder ahora lee productionDate del input (no recalcula); valida no-en-pasado, no-después-de-entrega; si producción = entrega pide confirm('¿seguro que tienes el tiempo?').",
+          "Mensaje de ayuda actualizado: 'Producción se auto-llena 1 día antes. Puedes editarla si produces el mismo día o con más anticipación.'"
+        ],
+        "archivos_tocados": ["app-historial.js (openOrderModal + submitMarkAsOrder)", "index.html (modal pedido)"],
+        "NO_toca_propuestas": "openApproveModal y submitApproveProposal no tienen campo de producción editable (propuestas heredan lógica distinta). Queda para revisar en v5.4.1 si aplica."
+      },
+
+      "E_backups_con_timestamp": {
+        "problema": "filename era 'gourmet-bites-backup-YYYY-MM-DD.json' → dos backups el mismo día se sobrescribían.",
+        "solucion": "filename ahora es 'gourmet-bites-backup-YYYY-MM-DD_HHhMM.json' (ej: gourmet-bites-backup-2026-04-22_14h32.json). Ordena bien alfabéticamente y es legible.",
+        "archivos_tocados": ["app-dashboard.js (exportHistoryJson)"]
+      }
+    },
+
+    "bloques_PENDIENTES_para_v541": {
+      "B_versionado_pdf_copia_storage": {
+        "prioridad": "Alta — Luis confirmó que quiere guardar todos los PDFs (tiene 5GB en Storage, no es problema de espacio)",
+        "descripcion": [
+          "Nombre de archivo local incrementa con -02, -03 etc. al regenerar (basado en q.pdfRegenCount).",
+          "Copia en Firebase Storage en ruta pdfs/{kind}/{docId}/v{N}_{timestamp}.pdf",
+          "Array q.pdfHistorial = [{version, url, fecha, generadoPor}]",
+          "Botón 📎 'Ver PDFs anteriores' en detalle del doc → dropdown con links",
+          "NO cleanup automático por ahora (Luis tiene espacio). Si en el futuro se llena: borrar más antiguos que N días."
+        ],
+        "archivos_a_tocar": ["app-cotizar.js (genPDF)", "app-propuesta.js (genPropPDF + genPropFinalPDF)", "app-core.js (helper savePdfConCopiaStorage)", "app-historial.js (mostrar pdfHistorial)", "index.html (dropdown UI)"],
+        "complejidad_estimada": "Media — requiere uploadBytes a Storage + manejo de URL de descarga + UI de dropdown"
+      },
+
+      "D_boton_producido_inline_dashboard": {
+        "prioridad": "Media-alta — ya estaba en roadmap v5.3.2",
+        "descripcion": [
+          "Agregar chip 🔪 'Producido' en tarjetas 'Por producir' (status=pedido|aprobada con fechaEntrega≤3d) y 'Por entregar' (status=en_produccion sin produced=true) de Operación Urgente 3d.",
+          "Al tocar: llama toggleProduced() existente en app-historial.js:952 (ya probado, sin cambios lógicos).",
+          "Toast '✅ Producido' + refresh del dashboard."
+        ],
+        "archivos_a_tocar": ["app-dashboard.js (urgentItemHtml + CSS chip)"],
+        "complejidad_estimada": "Baja — toggleProduced ya existe y está probado, solo es cuestión de agregar el chip + refresh"
+      }
+    },
+
+    "archivos_modificados_en_v540_parcial": {
+      "total": 5,
+      "app-core.js": "BUILD_VERSION v5.4.0 + BUILD_DATE 2026-04-22 + comentario changelog v5.4.0. Sin cambios de lógica.",
+      "app-cotizar.js": "saveCurrentQuote guarda momentosArr (array) y eventDate (string) como campos estructurados en el qObj. Retrocompat: sigue guardando deliv string.",
+      "app-historial.js": [
+        "openOrderModal: pre-llena om-notas-prod con momentos/instrucciones de la cotización (prioridad: orderData.notasProduccion > momentosArr > deliv fallback); filtra momentos estándar para evitar ruido; resalta visualmente el textarea si viene de cotización; quita readonly de om-prod-fecha y configura min/max + oninput tracker userEdited.",
+        "submitMarkAsOrder: lee productionDate del input (ya no recalcula); valida no-en-pasado y no-posterior-a-entrega; pide confirm si producción=entrega.",
+        "openApproveModal: pre-llena am-notas-prod con p.momento si no hay notas previas; resalta visualmente."
+      ],
+      "app-dashboard.js": "exportHistoryJson: nombre con formato YYYY-MM-DD_HHhMM para no sobrescribir backups del mismo día.",
+      "index.html": "Comentario VERSION v5.4.0 + 7 cache-busting ?v=5.4.0 + modal pedido: om-prod-fecha sin readonly + label '(editable)' + textos de ayuda actualizados + etiquetas notas-prod con aviso 'se pre-llenan con las notas de la cotización'.",
+      "sin_cambios_en_v540_parcial": ["app-seguimiento.js", "app-propuesta.js", "app-assets.js"]
+    },
+
+    "validaciones_pre_entrega_v540_parcial": [
+      "node -c OK en los 7 .js",
+      "lxml parse OK en index.html",
+      "18 IDs críticos verificados (om-*, am-*, input/textarea de ambos modales)",
+      "Identificadores nuevos únicos (momentosArr, userEdited) — grep limpio en los 7 archivos",
+      "7 script tags con ?v=5.4.0, 0 referencias residuales de cache-busting ?v=5.3.0",
+      "Test simulación de propagación de notas: 8 casos (reales + edge cases) → todos correctos",
+      "Retrocompat probada: cotización real de Kathy (GB-2026-0110 con 'Regalo para Margarita Quijano') extraería la instrucción correctamente desde el string deliv legacy",
+      "Edge case resuelto: cotizaciones con solo momentos estándar (ej 'Almuerzo') no meten ruido en notas-prod"
+    ],
+
+    "instrucciones_deploy_para_luis_v540_parcial": [
+      "Subir a GitHub Pages 5 archivos: app-core.js + app-cotizar.js + app-historial.js + app-dashboard.js + index.html",
+      "Guardar context_v5_4_0.json para el próximo chat (NO subir al sitio)",
+      "Ctrl+F5 en el navegador (o abrir en incógnito)",
+      "Header debe decir v5.4.0 · 2026-04-22",
+      "PRUEBA 1 (bloque A crítico): abrir una cotización existente que tenga instrucción especial (ej GB-2026-0110 de Kathy), tocar 'Marcar como pedido' → en el modal, el textarea 'Notas de producción' debería aparecer PRE-LLENADO con la instrucción y con fondo amarillo claro.",
+      "PRUEBA 2 (bloque C): en el mismo modal de pedido, intentar poner fecha de producción = fecha de entrega → debe pedir confirmación explícita. Poner fecha anterior → debe aceptar sin problema.",
+      "PRUEBA 3 (bloque E): Dashboard → Opciones avanzadas → 📥 Backup JSON. Hacerlo dos veces seguidas → los archivos deberían tener nombres distintos (con hora y minuto)."
+    ]
+  },
+
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION. isFollowable/getPipelineActivo/setFollowUp normalizan docs sin status (v5.2.3).",
+      "app-cotizar.js": "módulo de cotizaciones. v5.4.0: saveCurrentQuote guarda momentosArr+eventDate estructurados.",
+      "app-propuesta.js": "módulo de propuestas / eventos. Ya guardaba momento+eventDate desde antes.",
+      "app-historial.js": "historial + 4 archivos (Vivas/Pedidos/Perdidas/Anuladas) + buscador. Contiene METODOS_PAGO, FOLLOW_UP_META, MOTIVOS_PERDIDA y histArchive/histFilter/histSearch. v5.4.0: openOrderModal/submitMarkAsOrder/openApproveModal con propagación de notas + producción editable.",
+      "app-seguimiento.js": "pestaña seguimiento comercial",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + Operación urgente 3d (v5.3.0) + colapsables (v5.3.0) + drill-down con chips (v5.3.0) + agenda + exports + mantenimiento. v5.4.0: exportHistoryJson con timestamp."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/Cotizador/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password + Google) · 3 usuarios",
+    "firebase_plan": "Blaze (cuota gratis suficiente)",
+    "firebase_storage_disponible": "5 GB — Luis confirmó que NO es problema guardar todos los PDFs (pendiente v5.4.1 Bloque B)",
+    "backup_estado": "Export JSON manual (📥 Backup JSON) · v5.4.0: nombres con timestamp para no sobrescribir. Restaurar backup aún pendiente (v5.3.x o v5.4.x) · PITR y Scheduled Backups en Firebase Console — Luis los configuró, verificar en consola"
+  },
+
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]. v5.2.3: docs sin status se tratan como 'enviada'.",
+      "valores_internos": ["pendiente", "contactado", "activa", "perdida"],
+      "expuesto_a_usuario": ["viva", "perdida"],
+      "regla_binaria": "pendiente/contactado/activa → VIVA. perdida → PERDIDA.",
+      "comportamiento_kpis": "perdida excluye igual que anulada."
+    },
+    "campos_nuevos_v540": {
+      "en_cotizaciones": {
+        "momentosArr": "array de strings. Contiene los checkbox activos del bloque de fecha+momento + el input 'Otro' si se llenó. Ej: ['Almuerzo', 'Regalo para María, incluir tarjeta XXX']. Usado para propagar instrucciones críticas al modal de pedido.",
+        "eventDate": "string YYYY-MM-DD. Fecha de entrega esperada. Ya existía en propuestas, ahora también en cotizaciones."
+      },
+      "retrocompat": "Cotizaciones anteriores a v5.4.0 no tienen estos campos. El código lee con fallback desde el string `deliv` cuando es necesario."
+    },
+    "flujo_produccion_v540": {
+      "default_sigue_igual": "Producción = entrega - 1 día (cuando Luis no toca nada). Sigue siendo el caso 99%.",
+      "mismo_dia_permitido": "Producción puede ser igual a entrega — pide confirmación explícita.",
+      "mas_anticipacion_permitida": "Producción puede ser varios días antes de entrega — no pide confirmación.",
+      "validaciones": "No puede ser en pasado. No puede ser después de entrega.",
+      "status_resultante": "Si productionDate <= hoy → status='en_produccion'. Si productionDate > hoy → status='pedido'."
+    }
+  },
+
+  "historial_versiones_detallado": [
+    {"version": "v5.0.0", "fecha": "2026-04-20", "tipo": "MAJOR", "highlights": "Firebase Auth + Storage + audit trail"},
+    {"version": "v5.0.1", "fecha": "2026-04-20", "highlights": "Google Sign-In + toggle password + menú cuenta"},
+    {"version": "v5.0.1b", "fecha": "2026-04-20", "highlights": "Convertidas ocultas + borrado cascada + drill-down agrupado"},
+    {"version": "v5.0.2", "fecha": "2026-04-20", "highlights": "Auto-sync + fechas flexibles + fantasmas + modal backup"},
+    {"version": "v5.0.3", "fecha": "2026-04-20", "highlights": "Estado anulada + modal anular con motivo/devolución"},
+    {"version": "v5.0.4", "fecha": "2026-04-20", "highlights": "Pipeline Activo · pestaña Seguimiento · 4 estados followUp"},
+    {"version": "v5.0.5", "fecha": "2026-04-21", "highlights": "Binario VIVA/PERDIDA · reactivarPerdida · bloqueo perdida→pedido"},
+    {"version": "v5.1.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ESTABLE", "highlights": "Historial 4 archivos + buscador + botones rápidos"},
+    {"version": "v5.2.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "DEFECTUOSA", "highlights": "Rediseño dashboard + 3 reportes. Destapó bug de histFilter"},
+    {"version": "v5.2.1", "fecha": "2026-04-21", "tipo": "PATCH", "highlights": "_safe wrappers + logs diagnóstico"},
+    {"version": "v5.2.2", "fecha": "2026-04-21", "tipo": "PATCH HOTFIX", "status": "ESTABLE", "highlights": "Fix 1 línea: removido let histFilter huérfano"},
+    {"version": "v5.2.3", "fecha": "2026-04-21", "tipo": "PATCH FUNCIONAL", "status": "ESTABLE", "highlights": "Docs legacy sin status normalizados + botones Viva/Perdida en drill-down"},
+    {"version": "v5.3.0", "fecha": "2026-04-21", "tipo": "MINOR", "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN", "highlights": "Rediseño dashboard progressive disclosure: Pipeline+KPIs+Operación urgente 3d siempre visible. Análisis comercial + Otros operativos colapsables con estado localStorage. Drill-down con chips compactos + botón Convertir a pedido/Aprobar inline."},
+    {"version": "v5.4.0-parcial", "fecha": "2026-04-22", "tipo": "MINOR (parcial)", "status": "ENTREGADA — PENDIENTE DEPLOY Y VERIFICACIÓN. Bloques B+D pendientes para v5.4.1", "highlights": "Bloques A+C+E: notas críticas de cotización propagan al modal de pedido (pre-llena om-notas-prod con momentos/instrucciones) + producción editable (mismo día permitido con confirmación) + backups con timestamp (YYYY-MM-DD_HHhMM) para no sobrescribir."}
+  ],
+
+  "archivos_de_cada_version": {
+    "v5_3_0_ESTABLE_PREVIA": {
+      "nota": "Rollback disponible. Los 3 archivos (app-core.js, app-dashboard.js, index.html) de v5.3.0 están en el histórico de GitHub Pages si necesitan revertir."
+    },
+    "v5_4_0_PARCIAL_ENTREGADA": {
+      "archivos_a_subir_estos_5": [
+        "app-core.js — BUILD_VERSION + BUILD_DATE + comentario changelog (sin lógica nueva)",
+        "app-cotizar.js — saveCurrentQuote guarda momentosArr + eventDate estructurados",
+        "app-historial.js — openOrderModal pre-llena notas desde cotización + producción editable; submitMarkAsOrder lee productionDate del input + valida + confirm si mismo día; openApproveModal pre-llena notas desde momento",
+        "app-dashboard.js — exportHistoryJson con timestamp",
+        "index.html — cache-busting v5.4.0 + VERSION comment + modal pedido (om-prod-fecha editable + textos actualizados)"
+      ],
+      "sin_cambios_vs_v530": ["app-seguimiento.js", "app-propuesta.js", "app-assets.js"],
+      "breaking_changes": "Ninguno — todos los campos nuevos son opcionales con fallback. Cotizaciones viejas siguen funcionando.",
+      "deltas_aprox_bytes": {
+        "app-core.js": "+873 (solo changelog)",
+        "app-cotizar.js": "+434",
+        "app-historial.js": "+4683",
+        "app-dashboard.js": "+419",
+        "index.html": "+236"
+      }
+    }
+  },
+
+  "decisiones_arquitectura_importantes": {
+    "por_que_progressive_disclosure": "Luis explícitamente pidió 'el dashboard debe ser sencillo y visible y la info adicional se despliega'. Las secciones analíticas (Conversión, Pérdidas, Cliente) se consultan semanal/mensual. Las operativas (Recaudo, Próximas 14d, Por cobrar, Comentarios) también se consultan ocasionalmente. Las URGENTES (Por producir/Por entregar 3d) son las únicas que se deben ver cada mañana — por eso quedan fijas.",
+    "por_que_2_toggles_grupales_no_7_individuales": "Luis vio wireframes A/B/C y eligió C (híbrido). El argumento: 7 toggles individuales cerrados se ven repetitivos y requieren decidir qué abrir primero. 2 toggles grupales reducen la carga cognitiva.",
+    "por_que_localStorage_para_estado": "Entre sesiones, Luis debería recuperar lo que estaba mirando. Si siempre se cierra, es fricción. Defensivo: si el parse falla, fallback a todo colapsado (no explota la app).",
+    "por_que_chips_en_drill_down": "Luis detectó que los botones v5.2.3 violaban su regla UX 'jamás botones de toda la columna'. Los chips inline respetan esa regla + dejan espacio para el botón convertir.",
+    "por_que_ventana_3_dias_corridos": "Operación de catering tiene ciclos cortos. 3 días cubre 'hoy, mañana, pasado'. Días corridos (no laborales) porque los eventos pueden ser sábado/domingo. Si Luis quiere cambiar a 3 días laborales en el futuro, ajustar renderUrgent3d.",
+    "por_que_momentosArr_y_no_solo_string": "El string `deliv` es para el PDF (visual). Pero para LÓGICA (filtrar estándares, propagar al pedido, mostrar en .ics) se necesita el array estructurado. Además, el fallback desde `deliv` es frágil ante cambios de formato. Tener ambos es la decisión correcta.",
+    "por_que_pre_llenado_y_no_obligar_campo_nuevo": "Luis dijo 'en la cotización ya hay un campo de notas' — no quería agregar otro campo a llenar, sino que el existente se preserve. La solución es propagar el que ya existe, no crear uno nuevo.",
+    "por_que_resaltar_visualmente_textarea_prellenado": "Si Luis convierte a pedido y el textarea ya tiene texto, debe saber que viene de la cotización (no de un error) y que puede editarlo. Fondo amarillo + borde naranja = 'esto viene de otro lado, revisa'.",
+    "por_que_confirm_si_produccion_igual_entrega": "Luis pidió explícitamente: 'pida confirmación pero que se pueda hacer'. El default sigue siendo entrega-1d (sin fricción para el 99% de casos). Solo el caso edge pide confirmar. No se bloquea.",
+    "por_que_NO_confirm_si_produccion_varios_dias_antes": "No hay riesgo. Producir con más anticipación es operativamente válido y común.",
+    "leccion_v522_evitar_colisiones_globales": "Antes de declarar identificador nuevo (DASH_COLL_KEY, renderUrgent3d, momentosArr, etc), grep en los 7 archivos. v5.3.0 y v5.4.0 pasaron esta validación.",
+    "leccion_v523_defaults_consistentes": "Los docs legacy sin status ya están normalizados. Nuevos campos opcionales deben siempre tener fallback consistente en TODOS los puntos de lectura.",
+    "leccion_v530_rediseno_grande_sin_romper": "Mantener TODOS los IDs viejos. La reestructuración HTML mete divs viejos dentro de wrappers nuevos, nunca los elimina ni renombra. Así el JS viejo sigue encontrando sus targets.",
+    "leccion_v540_propagacion_silenciosa": "Cuando se agrega un campo estructurado nuevo (momentosArr), dejar SIEMPRE el fallback al campo viejo (deliv string) → cotizaciones viejas se benefician del fix sin migración. El fallback debe filtrar ruido (momentos estándar) para no degradar el UX."
+  },
+
+  "ROADMAP_PENDIENTE": {
+    "v5_4_1_SIGUIENTE_CHAT_prioridad_alta": {
+      "disparador": "Límite de uso Claude alcanzado en chat de v5.4.0 parcial. Luis retoma en chat nuevo con context_v5_4_0.json.",
+      "bloque_B_versionado_pdf_storage": {
+        "items": [
+          "Incrementar pdfRegenCount en el doc cada vez que se genera PDF",
+          "Nombre local: GB-XXXX-XXXX_Cliente.pdf (1ra vez), GB-XXXX-XXXX-02_Cliente.pdf (2da), etc.",
+          "Upload a Firebase Storage en pdfs/{kind}/{docId}/v{N}_{YYYY-MM-DD_HHhMM}.pdf",
+          "Array q.pdfHistorial = [{version, url, fecha, generadoPor}]",
+          "Botón 📎 Ver PDFs anteriores en detalle del doc (Historial) → dropdown con links de descarga",
+          "Decisión tomada por Luis: NO cleanup automático (5GB disponibles, suficiente)"
+        ],
+        "helper_nuevo_sugerido": "savePdfConCopiaStorage(doc, filename, kind, docId) en app-core.js que wrappee savePdf existente + sube a Storage + actualiza pdfHistorial del doc."
+      },
+      "bloque_D_boton_producido_inline": {
+        "items": [
+          "Chip 🔪 Producido en tarjetas de Operación Urgente 3d (ambas: Por producir y Por entregar)",
+          "Solo mostrar en docs con !produced (ya producidos no lo ven)",
+          "onclick llama toggleProduced() existente",
+          "Toast + refresh dashboard"
+        ],
+        "complejidad": "Baja — toggleProduced ya existe en app-historial.js:952 sin cambios"
+      }
+    },
+    "v5_4_2_candidato_restaurar_backup": {
+      "tipo": "PATCH feature",
+      "prioridad": "Media — pedida hace rato",
+      "descripcion": "Botón 📤 Restaurar backup JSON en Mantenimiento. UX a decidir: merge o replace? Confirmación doble? Preview antes de escribir?"
+    },
+    "v5_4_3_posibles_mejoras_urgent_3d": {
+      "items": [
+        "Swipe para marcar producido/entregado en móvil",
+        "Ventana configurable (3d, 5d, 7d) desde settings",
+        "Sonido/notificación si algo cae para HOY y no está producido",
+        "Mostrar hora de entrega prominente (alarm clock style)"
+      ]
+    },
+    "v5_5_candidato_MINOR": {
+      "items": [
+        "Plantillas de cotización reutilizables",
+        "Plantillas de mensaje WhatsApp seguimiento",
+        "Recordatorios WhatsApp automáticos",
+        "Notificaciones push FCM reales"
+      ]
+    },
+    "v5_6_integraciones": ["Google Calendar API OAuth", "WhatsApp Business API", "Portal cliente"],
+    "v6_0_rediseno_mayor": ["Multi-negocio", "Reportes contables", "Módulo inventario"]
+  },
+
+  "pendientes_operativos_no_de_codigo": {
+    "items": [
+      "Luis configuró PITR y/o Scheduled Backups en Firebase Console. Verificar en: Google Cloud Console → Firestore → Databases → (default) → 'Point-in-time recovery: Enabled'",
+      "Scheduled Backups en pestaña separada Backups del Firestore",
+      "Ejecutar migrarFotosStorage() una vez (pendiente desde v5.0)"
+    ]
+  },
+
+  "bugs_conocidos_abiertos": [
+    {
+      "id": "UX-002",
+      "descripcion": "loadQuote en app-core.js no restaura el campo f-date ni los checkboxes f-moments al editar una cotización existente. Efecto: si abres una cotización con instrucciones especiales, los campos de fecha/momento aparecen vacíos en el formulario (aunque sí están guardados en el doc y salen en PDF). Scope fuera de v5.4.0 parcial — no bloquea el fix principal. Candidato v5.4.2.",
+      "severidad": "Baja — UX de edición, no afecta datos",
+      "archivos_a_tocar": ["app-core.js (loadQuote)"],
+      "estimado": "15 min"
+    }
+  ],
+
+  "bugs_cerrados_en_versiones_anteriores": [
+    {
+      "id": "BUG-005",
+      "version_fix": "v5.4.0",
+      "severidad": "CRÍTICA — impacto directo en producción",
+      "descripcion": "Instrucciones especiales escritas en el campo 'momento Otro' de la cotización (ej: 'sin nueces', 'regalo para X', 'alergia gluten') salían en el PDF pero se perdían al convertir a pedido — no llegaban al .ics ni a las notas de producción. Caso real reportado por Kathy: GB-2026-0110.",
+      "fix": "momentosArr campo estructurado + pre-llenado del textarea om-notas-prod al abrir el modal de pedido (+ fallback desde deliv string para cotizaciones legacy + filtro de momentos estándar para no meter ruido)."
+    },
+    {
+      "id": "BUG-006",
+      "version_fix": "v5.4.0",
+      "severidad": "Media — limitaba flexibilidad operativa",
+      "descripcion": "Fecha de producción hardcoded a entrega-1d, input readonly. Imposible producir y entregar el mismo día aunque Luis supiera que tenía tiempo.",
+      "fix": "om-prod-fecha editable con min=hoy, max=fechaEntrega. Confirm explícito si producción=entrega."
+    },
+    {
+      "id": "BUG-007",
+      "version_fix": "v5.4.0",
+      "severidad": "Baja — pero molesta",
+      "descripcion": "Backups JSON con mismo nombre si se hacen dos el mismo día (fecha sin hora).",
+      "fix": "Nombre con timestamp YYYY-MM-DD_HHhMM."
+    },
+    {
+      "id": "UX-001",
+      "version_fix": "v5.3.0",
+      "severidad": "Media — violación regla UX explícita",
+      "descripcion": "Botones Viva/Perdida/Reactivar del drill-down quedaron full-width en v5.2.3 (flex:1). Luis reportó que se veían demasiado grandes.",
+      "fix": "Chips inline compactos con border-radius 14px. Agregado botón 🤝 Pedido / ✓ Aprobar."
+    },
+    {
+      "id": "BUG-004",
+      "version_fix": "v5.2.3",
+      "descripcion": "3 docs legacy sin status invisibles al pipeline/historial/seguimiento",
+      "fix": "Normalización en 3 capas + botón bulk"
+    },
+    {
+      "id": "BUG-001/002/003",
+      "version_fix": "v5.2.2",
+      "descripcion": "Dashboard vacío + navegación rota + Historial vacío",
+      "fix": "Removida línea huérfana `let histFilter` en app-core.js"
+    },
+    {"id": "BUG-FIXED-001", "version_fix": "v5.1.0", "descripcion": "Propuestas sin botones Viva/Perdida"},
+    {"id": "BUG-FIXED-002", "version_fix": "v5.1.0", "descripcion": "capture=environment bloqueaba galería móvil"},
+    {"id": "BUG-FIXED-003", "version_fix": "v5.1.0", "descripcion": "Pagos sin foto no adjuntaban después"},
+    {"id": "BUG-FIXED-004", "version_fix": "v5.0.5", "descripcion": "Perdidas convertibles a pedido"},
+    {"id": "BUG-FIXED-005", "version_fix": "v5.0.4", "descripcion": "Mona en_produccion no en filtro Pedidos"}
+  ],
+
+  "conversaciones_importantes_con_luis": [
+    {
+      "tema": "v5.4.0 parcial: notas críticas, producción flexible, backups",
+      "fecha": "2026-04-22",
+      "disparador": "Luis mostró PDF real (GB-2026-0110) donde Kathy escribió 'Regalo para Margarita Quijano, incluir nota que diga Feliz cumpleaños con mucho cariño Carlitos y Adriana' — salió en PDF pero se perdió al pedido. Menos mal Kathy se acordó. Caso crítico porque si fuera 'sin nueces' sería peligro real.",
+      "decisiones": [
+        "No crear campo nuevo — usar el que ya existe (momentos/Otro) y propagarlo estructurado.",
+        "PDFs guardarse TODOS en Storage (5GB disponibles, no es problema).",
+        "Producción mismo día: permitir con confirmación (no bloquear).",
+        "Opción A aceptada: Bloques A+C+E ahora, B+D en chat nuevo cuando se restablezca uso.",
+        "Luis preguntó por límite de uso (86% sesión, 63% semanal) — se eligió estrategia conservadora para no romper a la mitad."
+      ]
+    },
+    {
+      "tema": "Rediseño dashboard v5.3.0 progressive disclosure",
+      "fecha": "2026-04-21",
+      "decisiones": [
+        "Luis eligió enfoque C (Híbrido) del wireframe interactivo",
+        "Pidió que por producir / por entregar queden LADO A LADO partiendo por la mitad",
+        "Los 2 bloques urgentes SIEMPRE visibles (no dentro de un toggle)",
+        "2 toggles grupales (Análisis / Otros operativos) + Opciones avanzadas",
+        "Estado expandido persistido entre sesiones",
+        "Fix colateral: chips compactos para los botones del drill-down (v5.2.3 los dejó full-width)",
+        "Botón convertir a pedido/aprobar inline agregado"
+      ]
+    },
+    {
+      "tema": "Diagnóstico v5.2.3 — docs en limbo",
+      "fecha": "2026-04-21",
+      "decisiones": ["Fix en 3 capas: isFollowable + setFollowUp auto-normaliza + botón bulk"]
+    },
+    {
+      "tema": "Diagnóstico v5.2.2 — histFilter",
+      "fecha": "2026-04-21",
+      "decisiones": ["Screenshot consola reveló SyntaxError. Fix de 1 línea removiendo declaración huérfana"]
+    },
+    {
+      "tema": "Principios UX establecidos",
+      "principios": [
+        "Progressive disclosure",
+        "Top-left = hot zone (Pipeline arriba)",
+        "Bento-style grids",
+        "Tap targets ≥44px",
+        "JAMÁS botones de toda la columna ancho",
+        "Agrupación con white space, no líneas",
+        "Lo urgente SIEMPRE visible",
+        "Lo analítico y secundario en toggles",
+        "Cuando un campo pre-llenado viene de otro lado, resaltarlo visualmente (v5.4.0)"
+      ]
+    }
+  ],
+
+  "tips_para_nuevo_chat_de_claude": {
+    "al_empezar": [
+      "Leer TODO este JSON primero",
+      "Preguntar a Luis cómo va la app antes de asumir bugs",
+      "Si reporta un bug: pedir F12 → Console → screenshot ANTES de proponer fix",
+      "Respetar decisiones arquitectónicas ya tomadas",
+      "Respetar UX: jamás full-width buttons, bento grid, progressive disclosure, lo urgente visible",
+      "Si es el primer chat después de v5.4.0 parcial: lo que sigue es v5.4.1 con Bloques B (PDFs en Storage) y D (botón producido inline)."
+    ],
+    "al_hacer_cambios_de_codigo": [
+      "SIEMPRE subir BUILD_VERSION en app-core.js",
+      "SIEMPRE actualizar BUILD_DATE en app-core.js",
+      "SIEMPRE actualizar cache-busting ?v=X.X.X en TODOS los script tags de index.html",
+      "SIEMPRE actualizar comentario VERSION línea 10 de index.html",
+      "SIEMPRE actualizar este JSON de contexto",
+      "SIEMPRE validar con node -c y lxml y cruce HTML-JS",
+      "SIEMPRE hacer grep de identificadores nuevos en los 7 archivos antes de entregar (lección v5.2.2)",
+      "SIEMPRE _safe() wrapping en secciones nuevas del dashboard",
+      "SIEMPRE localStorage read/write con try-catch y fallback",
+      "Al reestructurar HTML: NUNCA eliminar IDs existentes, solo meterlos dentro de nuevos wrappers (lección v5.3.0)",
+      "Al agregar campo estructurado nuevo: SIEMPRE fallback al campo viejo si existe (lección v5.4.0)",
+      "Preferir cambios pequeños y enfocados",
+      "Si el límite de uso está cerca (>80%) y el task es grande: dividir en entregas parciales como v5.4.0"
+    ],
+    "sobre_el_stack": [
+      "Firebase Blaze activo",
+      "GitHub Pages deploy manual drag-and-drop",
+      "quotesCache = variable global con todos los docs",
+      "$() = document.getElementById",
+      "fm() = pesos colombianos",
+      "Las 3 vars del historial (histArchive/histFilter/histSearch) viven SOLO en app-historial.js",
+      "isFollowable/getPipelineActivo/setFollowUp tratan docs sin status como 'enviada'",
+      "localStorage key para estado de colapsables dashboard: gb_dash_coll_v530",
+      "Firebase Storage disponible: 5GB (confirmado por Luis abril 2026)",
+      "momentosArr (v5.4.0+): array de strings con checkbox activos + 'Otro' del bloque de fecha. Usado para propagar instrucciones críticas al modal de pedido."
+    ],
+    "sobre_luis": [
+      "Técnico intermedio-avanzado, en español",
+      "Respuestas concisas pero completas",
+      "Valora honestidad técnica (incluso sobre límites de uso de Claude)",
+      "Pide 'recomendación' = UNA con razón clara",
+      "Prioriza urgente sobre perfecto",
+      "Prefiere cambios pequeños sobre paquetes grandes",
+      "Le gustan los wireframes interactivos para decidir UX",
+      "Cuando se acerca al límite de uso, acepta entregas parciales seguras en vez de arriesgar a cortarse"
+    ]
+  },
+
+  "instrucciones_mantenimiento_json": {
+    "REGLA_CRITICA": "Este JSON DEBE actualizarse CADA VEZ que se entrega una nueva versión.",
+    "cuando_actualizar": ["nueva versión", "bug abierto/cerrado", "decisión arquitectónica", "mover item roadmap"],
+    "campos_SIEMPRE_actualizar": ["_meta.generado_el", "proyecto.version_actual", "estado_actual_*", "historial_versiones_detallado", "archivos_de_cada_version", "bugs_conocidos", "ROADMAP_PENDIENTE"],
+    "formato_entrega": ["Nombre JSON con versión: context_v5_4_0.json", "Recordar guardar para futuros chats"],
+    "NO_poner": ["credenciales", "datos reales clientes", "código completo", "transcripciones literales"]
+  },
+
+  "archivos_en_esta_entrega_v5_4_0_parcial": {
+    "subir_estos_5_a_github_pages": ["app-core.js", "app-cotizar.js", "app-historial.js", "app-dashboard.js", "index.html"],
+    "guardar_para_proximo_chat": "context_v5_4_0.json",
+    "sin_cambios_vs_v5_3_0": ["app-seguimiento.js", "app-propuesta.js", "app-assets.js"],
+    "breaking_changes": "Ninguno — retrocompat total",
+    "resumen_cambios": "Notas críticas de cotización propagan al modal de pedido (pre-llenado inteligente con fallback) + producción editable (mismo día permitido con confirmación) + backups con timestamp. Bloques B (PDFs en Storage) y D (botón producido inline) pendientes para v5.4.1."
+  }
+}
