@@ -325,6 +325,10 @@ async function renderHist(){
     if(status==="entregado"||q.comentarioCliente){
       actionBtns.push('<button class="btn hc-btn-coment" onclick="openComentModal(\''+q.id+'\',\''+q.kind+'\',event)">💬 '+(q.comentarioCliente?'Editar':'Registrar')+' comentario</button>');
     }
+    // v5.4.1 (Bloque B): botón para ver PDFs anteriores si hay historial de regeneraciones
+    if(Array.isArray(q.pdfHistorial)&&q.pdfHistorial.length>0){
+      actionBtns.push('<button class="btn hc-btn-pdfs" onclick="openPdfHistorialModal(\''+q.id+'\',\''+q.kind+'\',event)">📎 PDFs ('+q.pdfHistorial.length+')</button>');
+    }
     const actions=actionBtns.length?'<div class="hc-actions">'+actionBtns.join("")+'</div>':"";
     const summary=isProp
       ?'<div class="hc-items">'+(q.sections||[]).length+' secciones · '+(q.pers||"?")+' personas</div>'
@@ -1392,4 +1396,49 @@ async function submitAnular(){
     alert("Error al anular: "+(e.message||e));
     console.error(e);
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.4.1 (Bloque B): MODAL "VER PDFs ANTERIORES"
+// ═══════════════════════════════════════════════════════════
+// Muestra todas las versiones de PDF generadas para un doc, con link de
+// descarga directa desde Firebase Storage. La versión más reciente se
+// marca "actual" visualmente. Si un upload a Storage falló en su momento,
+// esa entrada no estará en el historial (porque el helper hace best-effort).
+function openPdfHistorialModal(docId,kind,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault()}
+  const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
+  if(!q){alert("No se encontró el documento");return}
+  const hist=Array.isArray(q.pdfHistorial)?q.pdfHistorial:[];
+  if(!hist.length){alert("Este documento no tiene historial de PDFs guardado en Storage.");return}
+  $("ph-doc-id").textContent=q.quoteNumber||q.id;
+  $("ph-doc-cli").textContent=q.client||"—";
+  $("ph-doc-meta").textContent=(kind==="quote"?"Cotización":(kind==="propfinal"?"Propuesta Final":"Propuesta"))+" · "+hist.length+" versión"+(hist.length!==1?"es":"");
+  // Ordenar: más reciente primero (mayor version)
+  const sorted=[...hist].sort((a,b)=>(b.version||0)-(a.version||0));
+  const maxV=sorted[0]?.version||0;
+  const listHtml=sorted.map(e=>{
+    const isLatest=(e.version===maxV);
+    const fecha=(e.fecha||"").slice(0,10);
+    const hora=(e.fecha||"").slice(11,16);
+    const fn=e.filename||("v"+e.version+".pdf");
+    const tag=isLatest?'<span style="background:#E8F5E9;color:#1B5E20;padding:2px 7px;border-radius:10px;font-size:9.5px;font-weight:700;margin-left:6px">ACTUAL</span>':'';
+    return '<div style="padding:10px 12px;border:1px solid #E0E0E0;border-radius:8px;margin-bottom:8px;background:'+(isLatest?'#F1F8E9':'#FAFAFA')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div style="font-size:12px;font-weight:700;color:#1A1A1A">Versión '+e.version+tag+'</div>'+
+        '<a href="'+(e.url||"#")+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:600;color:#0D47A1;text-decoration:none;padding:5px 10px;background:#E3F2FD;border-radius:12px">📥 Descargar</a>'+
+      '</div>'+
+      '<div style="font-size:10px;color:#666;line-height:1.4">'+
+        '<div>📆 '+fecha+(hora?' · '+hora:'')+'</div>'+
+        '<div>👤 '+((e.generadoPor||"?").replace(/[<>]/g,""))+'</div>'+
+        '<div style="font-family:monospace;font-size:9.5px;color:#999;margin-top:2px;word-break:break-all">'+(fn||"").replace(/[<>]/g,"")+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+  $("ph-list").innerHTML=listHtml;
+  $("pdf-hist-modal").classList.remove("hidden");
+}
+
+function closePdfHistorialModal(){
+  $("pdf-hist-modal").classList.add("hidden");
 }

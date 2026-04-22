@@ -1291,6 +1291,10 @@ function renderUrgent3d(){
 }
 
 // Helper: HTML de un item dentro de las tarjetas urgentes
+// v5.4.1 (Bloque D): agrega chip 🔪 Producido inline para no tener que
+// abrir el doc solo para marcarlo. Solo se muestra si !q.produced.
+// toggleProduced ya existe en app-historial.js:989 y llama a
+// renderDashboard() al terminar, así que el refresh es automático.
 function urgentItemHtml(q){
   const fecha=q.eventDate||q.fechaEntrega;
   const today=new Date().toISOString().slice(0,10);
@@ -1306,10 +1310,20 @@ function urgentItemHtml(q){
   const hora=q.horaEntrega?' · ⏰ '+q.horaEntrega:'';
   const cli=(q.client||"—").replace(/[<>]/g,"");
   const total=fm(getDocTotal(q));
+  // Chip "Producido" solo si aún no está producido. stopPropagation en el
+  // onclick del chip para que NO dispare el loadQuote del contenedor.
+  const prodChip=q.produced?
+    '<span class="urgent-prod-done" title="Producido '+(q.producedAt||"").slice(0,10)+'">🔪 Producido</span>':
+    '<button class="urgent-prod-chip" onclick="event.stopPropagation();toggleProduced(\''+q.id+'\',\''+q.kind+'\',event)">🔪 Producido</button>';
   return '<div class="urgent-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-    '<div class="urgent-cli">'+cli+'</div>'+
-    '<div class="urgent-meta"><span class="'+fechaCls+'">'+fechaLabel+'</span>'+hora+'</div>'+
-    '<div class="urgent-val">'+total+'</div>'+
+    '<div class="urgent-item-top">'+
+      '<div class="urgent-item-txt">'+
+        '<div class="urgent-cli">'+cli+'</div>'+
+        '<div class="urgent-meta"><span class="'+fechaCls+'">'+fechaLabel+'</span>'+hora+'</div>'+
+        '<div class="urgent-val">'+total+'</div>'+
+      '</div>'+
+      '<div class="urgent-item-act">'+prodChip+'</div>'+
+    '</div>'+
   '</div>';
 }
 
