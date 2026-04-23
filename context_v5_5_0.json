@@ -1,0 +1,240 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Cierre de sesión 2026-04-23 con v5.5.0 ENTREGADA — Edición de Pedidos completa (matriz permisiva + versionado hijo + audit trail).",
+    "generado_el": "2026-04-23",
+    "generado_por": "Claude Opus 4.7 — sesión de implementación de v5.5",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final",
+    "supersedes": "context_v5_4_4.json (2026-04-23 tarde) — este reemplaza el anterior"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual_entregada": "v5.5.0 — ZIP entregado 2026-04-23",
+    "version_siguiente_planeada": "v5.6-v5.9 reserva para hotfixes · v6.0 rediseño ERP",
+    "version_en_produccion_hasta_deploy": "v5.4.4 (hasta que Luis suba v5.5.0 a GitHub Pages)",
+    "fecha_ultima_actualizacion": "2026-04-23",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers. v5.5.0: 14 helpers nuevos de edición + BUILD_VERSION v5.5.0. Bloqueos v4.13.0 de loadQuote removidos.",
+      "app-cotizar.js": "módulo cotizaciones. v5.5.0: saveCurrentQuote reescrito con matriz + versionado hijo + audit trail. renderR con letrero/botón 🕒/regenerar destacado/cancelar. cancelEdicion nuevo.",
+      "app-propuesta.js": "módulo propuestas. v5.5.0: savePropQuote con misma lógica. renderPropEditBanners enganchado a loadPropQuote. cancelEdicionProp nuevo.",
+      "app-historial.js": "historial + buscador + modal PDFs. v5.5.0: botón ✏️ Editar según canEdit, botón 🕒 timeline en cards, banner '⚠️ Doc editado después de este PDF'.",
+      "app-seguimiento.js": "seguimiento comercial (sin cambios desde v5.4.4)",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda (sin cambios desde v5.4.4)"
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/GB-Ciclo-de-ventas/)",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze",
+    "firebase_storage_rules": "rules_version 2 · allPaths auth != null · verificado desde 2026-04-23"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada", "superseded"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]",
+      "expuesto_a_usuario": ["viva", "perdida"]
+    },
+    "nota_v550": "Status 'superseded' ahora aplica también a cotizaciones (padres versionados con hijos -1, -2)."
+  },
+  "version_550_ENTREGADA": {
+    "fecha_entrega": "2026-04-23",
+    "tipo": "MINOR — feature grande (Edición de Pedidos)",
+    "estado": "ZIP gourmet-bites-v5_5_0.zip entregado — pendiente deploy por Luis",
+    "revision_profunda_post_entrega": {
+      "contexto": "Tras primera entrega, revisión crítica identificó 7 issues. Se fixearon los 4 críticos/altos antes del deploy. Los 3 medios quedan documentados para v5.5.1 si molestan.",
+      "fixes_aplicados": {
+        "FIX_1_modal_antes_de_editar": "Click en ✏️ Editar en Historial ahora dispara modal de advertencia ANTES de cargar el doc, si status es en_produccion/aprobada. Nueva función requestEdit() en app-historial.js.",
+        "FIX_2_orden_transaccion_recotizacion": "Al recotizar se crea el hijo PRIMERO y se marca padre superseded DESPUÉS. Si falla la segunda operación, el hijo ya existe (recuperable) en lugar de dejar padre huérfano.",
+        "FIX_3_sync_quotesCache_post_save": "Tras cualquier saveCurrentQuote/savePropQuote exitoso, se actualiza quotesCache en memoria para que el botón 🕒 aparezca INSTANTÁNEAMENTE tras la primera edición (antes solo aparecía al recargar historial).",
+        "FIX_4_loadQuote_limpia_lastSavedQuote": "loadQuote para cotizaciones ahora limpia window._lastSavedQuote al inicio, previniendo banners stale entre docs distintos."
+      },
+      "issues_conocidos_v551": [
+        "Razón del cambio usa prompt() nativo (feo en mobile) — idealmente modal estilizado",
+        "Comparación JSON.stringify de sections de propuesta puede dar falsos positivos por orden de keys",
+        "Botón Regenerar PDF destacado no se desdestacan tras regenerar (cosmético)"
+      ]
+    },
+    "matriz_edicion_implementada": {
+      "cotizaciones": {
+        "enviada": "editable sin fricción · genera versión -1, -2 (recotización) · padre queda superseded",
+        "pedido": "editable sin fricción · mismo número · audit trail",
+        "en_produccion": "editable · modal advertencia · letrero naranja post-guardado · mismo número",
+        "entregado": "editable solo notas internas (confirm previo)",
+        "anulada": "NO editable"
+      },
+      "propuestas": {
+        "enviada": "editable sin fricción · genera -1, -2",
+        "propfinal": "editable sin fricción · genera -1, -2",
+        "aprobada": "editable · modal advertencia suave · mismo número",
+        "en_produccion": "editable · modal advertencia fuerte · letrero · mismo número",
+        "entregado": "editable solo notas internas (confirm previo)",
+        "convertida / superseded / anulada": "NO editable"
+      }
+    },
+    "helpers_v550_en_app_core": [
+      "canEdit(q) — true si status no está en [anulada, convertida, superseded]",
+      "requiresWarning(q) — true si status en [en_produccion, aprobada]",
+      "warningSeverity(q) — 'fuerte' | 'suave' | null",
+      "editOnlyNotes(q) — true si status = entregado",
+      "shouldVersionWithSuffix(q, kind) — true si pre-confirmación",
+      "buildChildNumber(baseId) — GB-2026-0120 → GB-2026-0120-1 → GB-2026-0120-2",
+      "diffDocs(oldQ, newQ) — [{campo, antes, despues}]",
+      "cambiosAfectanCliente(cambios) — bool para destacar Regenerar PDF",
+      "buildEditHistoryEntry(cambios, razon) — entrada completa para editHistory",
+      "pdfDesactualizado(q) — true si editHistory posterior a último PDF",
+      "openEditHistoryModal(docId, kind) — modal timeline",
+      "closeEditHistoryModal",
+      "openEditWarningModal(q, onProceed) — modal advertencia",
+      "closeEditWarningModal"
+    ],
+    "features_ui": [
+      "Letrero naranja '⚠️ Pedido en producción con cambios — tener en cuenta' post-guardado",
+      "Botón 🕒 timeline solo visible si editHistory.length > 0 (en vista cotización y en cards historial)",
+      "Botón Regenerar PDF destacado (gradient naranja + animación pulse) si cambios afectan cliente",
+      "Botón 'Cancelar edición' recarga desde Firestore (descarta cambios)",
+      "Banner diferencia-anticipo informativo (sin automatización) si total cambia y hay pagos",
+      "Badge '⚠️ Doc editado después de este PDF' en modal individual de PDFs",
+      "Prompt opcional de razón del cambio (máx 200 chars)"
+    ],
+    "versionado_con_sufijo": {
+      "regla": "Solo pre-confirmación: cotizaciones enviada · propuestas enviada/propfinal",
+      "comportamiento": "Al guardar cotización 'enviada' se pregunta si crear versión nueva. Si ok → GB-XXXX-1 · padre marcado superseded+supersededBy=hijo",
+      "heuristica_detección": "buildChildNumber: consecutivo con grupo final de 4 dígitos (GB-YYYY-NNNN) → agrega -1. Con sufijo ≤3 dígitos → incrementa",
+      "no_aplica_a": "pedido/en_produccion/entregado → mismo número, audit trail + PDF versión interna"
+    },
+    "archivos_modificados": ["app-core.js", "app-cotizar.js", "app-propuesta.js", "app-historial.js", "index.html"],
+    "archivos_sin_cambios": ["app-assets.js", "app-seguimiento.js", "app-dashboard.js"],
+    "breaking_changes": "Ninguno. editHistory campo opcional · docs viejos sin él no muestran botón 🕒 · política de guardado más permisiva (docs que antes bloqueaban ahora permiten con fricción apropiada)",
+    "validacion_global": "Los 7 archivos JS pasan node -c. HTML estructuralmente balanceado.",
+    "pendiente_luis": [
+      "Subir los 5 archivos modificados a GitHub Pages (app-core.js, app-cotizar.js, app-propuesta.js, app-historial.js, index.html)",
+      "Hard refresh (Ctrl+F5) para invalidar cache",
+      "Probar: abrir cotización 'enviada' → Editar → Guardar → confirmar versión -1 creada",
+      "Probar: abrir pedido 'en_produccion' → Editar cantidad → modal advertencia → letrero naranja al guardar",
+      "Probar: botón 🕒 aparece tras primera edición · modal timeline muestra cambios",
+      "Probar: Regenerar PDF destacado tras cambio en productos/total · badge desactualizado en modal PDFs",
+      "Probar en móvil real con Kathy/JP"
+    ]
+  },
+  "bugs_conocidos_abiertos": [],
+  "bugs_resueltos_en_sesiones_previas": [
+    {"id": "BUG-009", "titulo": "Reglas Firebase Storage", "resuelto_en": "v5.4.4 infra"},
+    {"id": "BUG-010", "titulo": "_now scope en catch", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-011", "titulo": "WhatsApp en Seguimiento (campos q.tel/q.mail)", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-012", "titulo": "Descarga PDF por versión", "resuelto_en": "v5.4.4"}
+  ],
+  "roadmap_v6_0_arquitectura_erp": {
+    "contexto": "Rediseño mayor tipo ERP: 5 módulos + Despachos nuevo + Finanzas expandido. NO en fases pequeñas.",
+    "orden_de_versiones": {
+      "v5.5.0": "Edición de Pedidos — ENTREGADA 2026-04-23",
+      "v5.6_a_v5.9": "Reserva para hotfixes o quick wins que emerjan",
+      "v6.0": "Rediseño ERP completo — cuando haya 2-3 semanas estables post v5.5"
+    },
+    "propuesta_menu_5_modulos": [
+      {"id": "dashboard", "label": "Dashboard", "contenido": "Pipeline · KPIs · Operación urgente · Agenda"},
+      {"id": "ventas", "label": "Ventas", "contenido": "A. Cotizaciones · B. Seguimiento · C. Propuestas"},
+      {"id": "operaciones", "label": "Operaciones", "contenido": "Pedidos · Producción · Despachos (NUEVO) · Entregas · Historial operativo"},
+      {"id": "finanzas", "label": "Finanzas", "contenido": "Cartera · Pagos · Comprobantes · Reportes · Exportables"},
+      {"id": "herramientas", "label": "Herramientas", "contenido": "Buscar global · PDFs nube · Backup/Restaurar · Mantenimiento · Config plantillas"}
+    ]
+  },
+  "pendientes_v6_0_por_aterrizar": {
+    "despachos_modulo_nuevo": {
+      "estado": "Luis NO tiene claro el alcance — sesión dedicada antes de v6.0",
+      "preguntas_abiertas": [
+        "¿Objeto separado (colección 'despachos') o estado del pedido?",
+        "¿Quién despacha: interno o terceros?",
+        "¿Programación anticipada o reactivos?",
+        "¿Firma/foto receptor obligatoria?",
+        "¿Despacho parcial?",
+        "¿Direcciones recurrentes guardadas?",
+        "¿Costos en total al cliente o internos?"
+      ]
+    },
+    "finanzas_expandido": {
+      "preguntas_abiertas": [
+        "¿Granularidad reportes: cliente/línea/fuente?",
+        "¿Formato DIAN? ¿Facturación electrónica?",
+        "¿Conciliación bancaria manual?",
+        "¿Gastos operativos o solo ingresos?"
+      ]
+    }
+  },
+  "historial_versiones_detallado": [
+    {"version": "v5.5.0", "fecha": "2026-04-23", "tipo": "MINOR", "estado": "ENTREGADA (ZIP) — pendiente deploy", "highlights": ["Edición de Pedidos con matriz permisiva", "Versionado hijo -1/-2 pre-confirmación", "Audit trail editHistory con botón 🕒", "Banner diferencia-anticipo informativo", "14 helpers v5.5 en app-core.js"]},
+    {"version": "v5.4.4", "fecha": "2026-04-23", "tipo": "HOTFIX", "estado": "EN PRODUCCIÓN", "highlights": ["BUG-010 _now scope", "BUG-011 WhatsApp Seguimiento", "BUG-012 Ver/Descargar PDF por versión", "Reintentar todos PDFs"]},
+    {"version": "v5.4.3", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED por v5.4.4"},
+    {"version": "v5.4.2", "fecha": "2026-04-22", "tipo": "PATCH + features", "estado": "SUPERSEDED"},
+    {"version": "v5.4.1", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.4.0", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.3.0", "fecha": "2026-04-21", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.0.x-v5.2.x", "fecha": "2026-04-20/21", "tipo": "MAJOR + iteraciones", "estado": "SUPERSEDED"}
+  ],
+  "pendientes_operativos_no_de_codigo": {
+    "urgente_post_v550": [
+      "Subir los 5 archivos modificados a GitHub Pages",
+      "Hard refresh + verificar flujos de edición según matriz",
+      "Pilotar con Kathy/JP en casos reales de cambios de último minuto"
+    ],
+    "media_prioridad": [
+      "Configurar PITR y/o Scheduled Backups en Firebase Console",
+      "Ejecutar migrarFotosStorage() (pendiente desde v5.0)"
+    ],
+    "post_estabilizacion_v550": [
+      "Recopilar feedback real de 2-3 semanas de uso",
+      "Aterrizar preguntas abiertas de Despachos y Finanzas para v6.0"
+    ]
+  },
+  "memoria_para_proximo_chat": {
+    "arranque_sugerido": "v5.5.0 ENTREGADA 2026-04-23. Próximo chat: esperar 2-3 semanas de uso estable + recopilar feedback. Luego aterrizar alcance de Despachos y Finanzas antes de arrancar v6.0.",
+    "contexto_critico_no_perder": [
+      "v5.5.0 ZIP entregado 2026-04-23 — Luis debe hacer deploy",
+      "Política de edición cambió: antes bloqueaba docs en producción/entregados, ahora permite con fricción apropiada",
+      "Versionado -1, -2 solo pre-confirmación del cliente (enviada para cotización · enviada/propfinal para propuesta)",
+      "editHistory es campo opcional nuevo — docs viejos siguen funcionando sin él",
+      "URL producción: GB-Ciclo-de-ventas/",
+      "v6.0 rediseño grande decidido — 5 módulos · Despachos + Finanzas aún sin alcance"
+    ],
+    "decisiones_aprobadas_no_discutir_de_nuevo": [
+      "v5.5 matriz permisiva en producción con modal de advertencia",
+      "v5.5 versionado con sufijo SOLO pre-confirmación (regla cerrada)",
+      "v5.5 regeneración PDF manual con botón destacado condicional",
+      "v5.5 audit trail completo oculto con razón opcional",
+      "v5.5 aviso a Kathy/JP mediante letrero visible en app (NO WhatsApp automático)",
+      "v5.5 banner diferencia-anticipo solo informativo (cero automatización de pagos)",
+      "v6.0 rediseño grande, no en fases",
+      "Entrega: ZIP versionado con 9 archivos (8 + JSON) cuando hay código"
+    ],
+    "descubrimientos_sesion_v550": [
+      "El código v4.13.0 bloqueaba explícitamente la edición en docs en producción/entregados/convertidos/reemplazados con alerts. v5.5 tuvo que desmontar esos bloqueos y reemplazar política por matriz.",
+      "El campo editHistory se guarda como array en Firestore; docs antiguos sin él simplemente no disparan botón 🕒 (backwards compatible).",
+      "La heurística de buildChildNumber distingue consecutivo original (4 dígitos al final) de sufijo de versión (1-3 dígitos). GB-2026-0120 → -1 · GB-2026-0120-1 → -2.",
+      "Versionar pedidos confirmados con sufijo sería confuso para producción — Luis confirmó que -1, -2 aplica solo a docs aún en manos del cliente (recotización)."
+    ]
+  },
+  "instrucciones_mantenimiento_json": {
+    "regla_entrega_archivos": "SIEMPRE entregar los 9 archivos empaquetados en ZIP versionado gourmet-bites-vX_Y_Z.zip. present_files recibe SOLO el ZIP (1 filepath). En el mensaje: qué archivos cambiaron vs cuáles no. Warning: present_files puede renombrar a files.zip.",
+    "excepcion_sesiones_sin_codigo": "Si sesión es puramente planeación/diagnóstico, solo se entrega el JSON actualizado. NO ZIP.",
+    "mantener_al_dia": [
+      "Actualizar version_actual_entregada cada release",
+      "Mover bugs entre abiertos/resueltos según progreso",
+      "Actualizar historial_versiones_detallado cada release",
+      "Limpiar decisiones_aprobadas_no_discutir_de_nuevo cuando se implementen"
+    ]
+  }
+}
