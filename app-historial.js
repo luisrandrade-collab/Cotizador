@@ -1425,10 +1425,15 @@ function openPdfHistorialModal(docId,kind,ev){
     const hora=(e.fecha||"").slice(11,16);
     const fn=e.filename||("v"+e.version+".pdf");
     const tag=isLatest?'<span style="background:#E8F5E9;color:#1B5E20;padding:2px 7px;border-radius:10px;font-size:9.5px;font-weight:700;margin-left:6px">ACTUAL</span>':'';
+    const url=e.url||"#";
+    // v5.4.4 BUG-012 fix: agregado botón "Ver" (preview) además de "Descargar" para flujo móvil → WhatsApp.
     return '<div style="padding:10px 12px;border:1px solid #E0E0E0;border-radius:8px;margin-bottom:8px;background:'+(isLatest?'#F1F8E9':'#FAFAFA')+'">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;flex-wrap:wrap">'+
         '<div style="font-size:12px;font-weight:700;color:#1A1A1A">Versión '+e.version+tag+'</div>'+
-        '<a href="'+(e.url||"#")+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:600;color:#0D47A1;text-decoration:none;padding:5px 10px;background:#E3F2FD;border-radius:12px">📥 Descargar</a>'+
+        '<div style="display:flex;gap:6px">'+
+          '<a href="'+url+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:600;color:#0D47A1;text-decoration:none;padding:5px 10px;background:#E3F2FD;border:1px solid #90CAF9;border-radius:12px">👁️ Ver</a>'+
+          '<a href="'+url+'" download style="font-size:11px;font-weight:600;color:#1B5E20;text-decoration:none;padding:5px 10px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:12px">📥 Descargar</a>'+
+        '</div>'+
       '</div>'+
       '<div style="font-size:10px;color:#666;line-height:1.4">'+
         '<div>📆 '+fecha+(hora?' · '+hora:'')+'</div>'+
@@ -1544,8 +1549,12 @@ function renderAllPdfsList(){
   // Render sección de fallidos arriba si hay
   let fallidosHtml="";
   if(fallidos.length){
+    // v5.4.4: botón "Reintentar todos" para regenerar PDFs huérfanos en bulk
     fallidosHtml='<div style="margin-bottom:12px;padding:10px;border:1.5px dashed #FB8C00;border-radius:8px;background:#FFFBF5">'+
-      '<div style="font-size:11.5px;font-weight:700;color:#BF360C;margin-bottom:6px">⚠️ PDFs pendientes de subir ('+fallidos.length+')</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">'+
+        '<div style="font-size:11.5px;font-weight:700;color:#BF360C">⚠️ PDFs pendientes de subir ('+fallidos.length+')</div>'+
+        '<button onclick="retryAllFailedPdfs()" id="btn-retry-all-pdfs" style="font-size:10.5px;padding:5px 11px;background:#FB8C00;color:#fff;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Reintentar todos</button>'+
+      '</div>'+
       fallidos.map(q=>{
         const qNum=q.quoteNumber||q.id;
         const err=(q.pdfUploadLastError||"").replace(/[<>]/g,"").slice(0,80);
@@ -1577,10 +1586,14 @@ function renderAllPdfsList(){
       const fecha=(e.fecha||"").slice(0,10);
       const hora=(e.fecha||"").slice(11,16);
       const tag=isLatest?'<span style="background:#C8E6C9;color:#1B5E20;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">ACTUAL</span>':'';
-      return '<a href="'+(e.url||"#")+'" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:'+(isLatest?'#F1F8E9':'#FAFAFA')+';border:1px solid '+(isLatest?'#A5D6A7':'#E0E0E0')+';border-radius:6px;margin-bottom:4px;text-decoration:none;font-size:11px;color:#263238">'+
-        '<span>v'+e.version+tag+' <span style="color:#888;font-size:10px;margin-left:4px">· '+fecha+(hora?' '+hora:'')+'</span></span>'+
-        '<span style="font-size:10.5px;color:#0D47A1;font-weight:600">📥</span>'+
-      '</a>';
+      const url=e.url||"";
+      // v5.4.4 BUG-012 fix: botones explícitos Ver (preview en nueva pestaña) y Descargar (download directo).
+      // Antes la fila completa era un <a> solo con ícono 📥 — UX confusa, Luis no sabía qué hacía al tocar.
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:'+(isLatest?'#F1F8E9':'#FAFAFA')+';border:1px solid '+(isLatest?'#A5D6A7':'#E0E0E0')+';border-radius:6px;margin-bottom:4px;font-size:11px;color:#263238;gap:6px">'+
+        '<span style="flex:1;min-width:0">v'+e.version+tag+' <span style="color:#888;font-size:10px;margin-left:4px">· '+fecha+(hora?' '+hora:'')+'</span></span>'+
+        '<a href="'+url+'" target="_blank" rel="noopener" style="font-size:10px;padding:3px 8px;background:#E3F2FD;color:#0D47A1;border:1px solid #90CAF9;border-radius:10px;text-decoration:none;font-weight:600;white-space:nowrap">👁️ Ver</a>'+
+        '<a href="'+url+'" download style="font-size:10px;padding:3px 8px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:10px;text-decoration:none;font-weight:600;white-space:nowrap">📥 Descargar</a>'+
+      '</div>';
     }).join("");
     return '<div style="padding:12px;border:1px solid #CFD8DC;border-radius:10px;margin-bottom:10px;background:#fff">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:10px">'+
@@ -1589,10 +1602,43 @@ function renderAllPdfsList(){
           '<div style="font-size:11.5px;color:#455A64;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(d.client||"—").replace(/[<>]/g,"")+'</div>'+
           '<div style="font-size:10px;color:#78909C;margin-top:2px">'+kindLabel+' · '+fm(d.total)+' · '+(d.dateISO||"—")+'</div>'+
         '</div>'+
-        '<button onclick="closeAllPdfsModal();loadQuote(\''+d.kind+'\',\''+d.id+'\')" style="font-size:10.5px;background:#ECEFF1;border:1px solid #B0BEC5;color:#455A64;padding:4px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;font-family:inherit">👁️ Abrir</button>'+
+        '<button onclick="closeAllPdfsModal();loadQuote(\''+d.kind+'\',\''+d.id+'\')" style="font-size:10.5px;background:#ECEFF1;border:1px solid #B0BEC5;color:#455A64;padding:4px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;font-family:inherit">📂 Abrir cotización</button>'+
       '</div>'+
       '<div style="margin-top:8px">'+versionesHtml+'</div>'+
     '</div>';
   }).join("");
   listEl.innerHTML=fallidosHtml+html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// v5.4.4: REINTENTAR TODOS LOS PDFs FALLIDOS
+// ═══════════════════════════════════════════════════════════
+// Abre uno por uno los documentos con pdfUploadFailed=true para que Luis
+// los regenere manualmente. No automatizamos el loop porque genPDF/genPropPDF
+// dependen del estado del formulario (inputs cargados por loadQuote). Abrir
+// de a uno con guía explícita es más robusto que simular un submit en loop.
+async function retryAllFailedPdfs(){
+  const fallidos=(quotesCache||[]).filter(q=>q.pdfUploadFailed===true);
+  if(!fallidos.length){
+    alert("✅ No hay PDFs pendientes de subir. Todo al día.");
+    return;
+  }
+  const nombres=fallidos.map(q=>(q.quoteNumber||q.id)+" ("+(q.client||"—")+")").slice(0,5).join("\n• ");
+  const msg="Se van a abrir "+fallidos.length+" documento(s) con PDF pendiente de subir:\n\n• "+nombres+
+    (fallidos.length>5?"\n• ...y "+(fallidos.length-5)+" más":"")+
+    "\n\nPROCESO:\n1. Abriré el primer documento\n2. Tú haces clic en \"Generar PDF\" para regenerarlo\n3. Vuelve a este modal y clic \"Reintentar todos\" de nuevo\n4. Repite hasta que la lista esté vacía\n\n¿Continuar con el primero?";
+  if(!confirm(msg))return;
+  // Abrir el primero
+  const q=fallidos[0];
+  closeAllPdfsModal();
+  try{
+    await loadQuote(q.kind,q.id);
+    // Toast guía (el alert bloquea menos que otro confirm)
+    setTimeout(()=>{
+      alert("📄 Documento abierto: "+(q.quoteNumber||q.id)+"\n\n👉 Clic en \"Generar PDF\" para regenerarlo.\n\nQuedan "+fallidos.length+" pendiente(s).");
+    },400);
+  }catch(e){
+    console.error("[retryAllFailedPdfs] error abriendo doc:",e);
+    alert("⚠️ No pude abrir "+(q.quoteNumber||q.id)+". Error: "+(e&&e.message||e));
+  }
 }

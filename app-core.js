@@ -109,7 +109,7 @@
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.4.3";
+const BUILD_VERSION="v5.4.4";
 const BUILD_DATE="2026-04-22";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -184,12 +184,15 @@ async function savePdfConCopiaStorage(doc,baseName,kind,docId){
   let blob=null;
   try{blob=doc.output("blob")}
   catch(e){console.warn("[savePdfConCopiaStorage] output blob falló:",e)}
+  // v5.4.4: _now y _p declarados AQUÍ (fuera del try) para que estén en scope del catch
+  // BUG-010 fix: antes _now estaba dentro del try, y el catch intentaba usar _now.toISOString()
+  // causando ReferenceError que impedía marcar pdfUploadFailed. Badge ⚠️ nunca se mostraba.
+  const _p=n=>String(n).padStart(2,"0");
+  const _now=new Date();
   // 3-5. Intentar subir a Storage y actualizar Firestore (best-effort)
   if(blob&&cloudOnline){
     try{
       await fbReady();
-      const _p=n=>String(n).padStart(2,"0");
-      const _now=new Date();
       const stamp=_now.getFullYear()+"-"+_p(_now.getMonth()+1)+"-"+_p(_now.getDate())+"_"+_p(_now.getHours())+"h"+_p(_now.getMinutes());
       const storagePath="pdfs/"+kind+"/"+docId+"/v"+String(nextVersion).padStart(2,"0")+"_"+stamp+".pdf";
       const url=await uploadToStorage(blob,storagePath);

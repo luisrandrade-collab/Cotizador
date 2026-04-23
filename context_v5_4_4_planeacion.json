@@ -1,0 +1,468 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Cerrar sesión de planeación del 2026-04-23 y preparar implementación de v5.4.4 HOTFIX + diseño completo de v5.5 Edición de Pedidos + aterrizaje de v6.0 arquitectura ERP.",
+    "generado_el": "2026-04-23",
+    "generado_por": "Claude Opus 4.7 — sesión de diagnóstico + planeación (NO se tocó código en esta sesión)",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final",
+    "naturaleza_de_este_archivo": "PLANEACIÓN FINAL — no refleja código nuevo. La versión en producción sigue siendo v5.4.3. Este JSON documenta: (1) diagnóstico de 4 bugs reales encontrados en uso real, (2) diseño completo de v5.4.4 HOTFIX listo para implementar, (3) diseño completo de v5.5 Edición de Pedidos aprobado por Luis, (4) arquitectura v6.0 ERP documentada para aterrizar en próximas sesiones.",
+    "supersedes": "context_v5_4_3.json (del 2026-04-22) — este reemplaza el anterior"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual_en_produccion": "v5.4.3 ESTABLE",
+    "version_siguiente_planeada": "v5.4.4 HOTFIX — implementar en próximo chat",
+    "version_anterior_estable_probada": "v5.4.2 ESTABLE",
+    "fecha_ultima_actualizacion": "2026-04-23",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/",
+    "nota_url": "URL producción confirmada 2026-04-23. El JSON anterior (v5.4.3) decía 'Cotizador/' pero la ruta real es 'GB-Ciclo-de-ventas/'."
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, follow-up, pipeline, BUILD_VERSION. savePdfConCopiaStorage (v5.4.1+). v5.4.4 debe arreglar BUG-010 scope de _now.",
+      "app-cotizar.js": "módulo de cotizaciones. genPDF usa savePdfConCopiaStorage.",
+      "app-propuesta.js": "módulo de propuestas / eventos.",
+      "app-historial.js": "historial + 4 archivos + buscador + botón 📎 Todos los PDFs. v5.4.4 debe arreglar BUG-012: botones de descarga/preview por versión de PDF.",
+      "app-seguimiento.js": "pestaña seguimiento comercial. v5.4.3 documentó plantillas WhatsApp pero en producción NO aparecen (BUG-011).",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda + exports + mantenimiento."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB persistence",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/GB-Ciclo-de-ventas/)",
+    "pdf": "jsPDF + jspdf-autotable (CDN)",
+    "auth": "Firebase Authentication (email+password + Google) · 3 usuarios",
+    "firebase_plan": "Blaze",
+    "firebase_storage_rules_actualizadas_2026_04_23": {
+      "razon": "BUG-009: reglas anteriores solo permitían pagos/ y entregas/, bloqueando todos los uploads a pdfs/ con 403 Forbidden.",
+      "reglas_publicadas": "rules_version = '2'; service firebase.storage { match /b/{bucket}/o { match /{allPaths=**} { allow read, write: if request.auth != null; } } }",
+      "efecto": "Usuarios autenticados pueden leer/escribir cualquier ruta del bucket.",
+      "estado": "VERIFICADO EN VIVO 2026-04-23 ~10:55 COT — Luis regeneró GB-2026-0112 y apareció en modal como v1 ACTUAL. Regeneró de nuevo y apareció v2 ACTUAL + v1. BUG-009 CONFIRMADO RESUELTO."
+    }
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]",
+      "expuesto_a_usuario": ["viva", "perdida"]
+    }
+  },
+  "SESION_2026_04_23_RESUMEN": {
+    "duracion_aprox": "~90 min de diagnóstico y planeación",
+    "codigo_tocado": "NINGUNO — sesión puramente de planeación",
+    "cambios_en_infraestructura": "1 — reglas de Firebase Storage ampliadas por Luis en vivo",
+    "bugs_descubiertos": 4,
+    "bugs_resueltos_en_sesion": 1,
+    "features_disenadas": 2,
+    "decisiones_arquitectonicas": 1,
+    "entregables_sesion": [
+      "Diagnóstico completo BUG-009, BUG-010, BUG-011, BUG-012",
+      "Fix aplicado para BUG-009 (reglas Storage)",
+      "Diseño completo v5.4.4 HOTFIX",
+      "Diseño completo v5.5 Edición de Pedidos (aprobado por Luis)",
+      "Arquitectura v6.0 ERP documentada (5 módulos + migración + riesgos)",
+      "JSON actualizado para continuar en próximo chat"
+    ]
+  },
+  "bugs_conocidos_abiertos": [
+    {
+      "id": "BUG-010",
+      "titulo": "_now not defined en catch de savePdfConCopiaStorage",
+      "severidad": "Alta — anula mecanismo de detección de uploads fallidos",
+      "ubicacion": "app-core.js línea ~226",
+      "causa_raiz": "const _now = new Date() declarado dentro del try block. El catch externo intenta usar _now.toISOString() pero no está en scope. Además el updateDoc del catch también falla silenciosamente por el mismo ReferenceError. Doble fallo encadenado.",
+      "efecto_operativo": "Cuando un upload falla, flag pdfUploadFailed NUNCA se marca. Por eso Luis NUNCA vio el badge naranja a pesar de decenas de uploads fallando por BUG-009. La app mentía silenciosamente.",
+      "fix_propuesto": "Mover const _now = new Date() al inicio de savePdfConCopiaStorage, FUERA del try. Fix de 2 líneas.",
+      "target_version": "v5.4.4",
+      "estado": "PENDIENTE CÓDIGO"
+    },
+    {
+      "id": "BUG-011",
+      "titulo": "Botón WhatsApp desaparecido en tarjetas de Seguimiento",
+      "severidad": "Alta — regresión silenciosa de feature v5.4.3",
+      "sintoma": "Tarjetas muestran Contactado · Activa · Perdida · Nota · Abrir. NO aparece el botón WhatsApp que v5.4.3 prometía abrir modal con plantillas editables.",
+      "evidencia": "Captura 2026-04-23 de tarjetas Ximena Cabezas, Maria Gracia Diaz, Tarkus Pharma Lab, Realup Media — ninguna tiene botón WhatsApp.",
+      "hipotesis_a_investigar": [
+        "A) Cache viejo del navegador (probar hard refresh primero)",
+        "B) Código v5.4.3 agregó modal + templates pero olvidó el botón en el render de tarjeta",
+        "C) Botón añadido con condición (ej. solo si q.cliente.tel existe) que no se cumple",
+        "D) Deploy GitHub Pages incompleto — archivo no se actualizó"
+      ],
+      "orden_diagnostico": [
+        "1) Hard refresh + inspect en producción",
+        "2) grep app-seguimiento.js local por 'wa-templates-modal' o 'openWaModal'",
+        "3) Verificar archivo deployado: abrir https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/app-seguimiento.js?v=5.4.3 y confirmar que contiene código de plantillas",
+        "4) Si código está pero botón no, revisar función render de tarjeta"
+      ],
+      "target_version": "v5.4.4",
+      "estado": "PENDIENTE DIAGNÓSTICO + FIX"
+    },
+    {
+      "id": "BUG-012",
+      "titulo": "Modal 'Todos los PDFs' no permite descargar PDF específico",
+      "severidad": "CRÍTICA — anula 90% del valor del feature versionado de PDFs",
+      "descubierto_en": "Sesión 2026-04-23 tras resolver BUG-009",
+      "sintoma": "Modal 'Todos los PDFs en la nube' lista versiones v1/v2/v3 de cada documento pero el botón 'Abrir' va al documento en la app (loadQuote), no descarga el PDF. El icono 📄 junto a cada versión no tiene handler funcional.",
+      "caso_de_uso_bloqueado": "Cliente pide reenvío del PDF exacto que se le envió hace N días. Luis debería poder: Historial → GB-XXXX → 📎 PDFs → clic en versión específica → descarga → WhatsApp → envía. Hoy no funciona.",
+      "causa_tecnica": "Cada entrada en pdfHistorial ya tiene campo 'url' (download URL permanente de Firebase Storage). El URL es directamente descargable. El bug es que los botones del modal no están cableados a ese URL — están cableados a loadQuote(docId) o no tienen handler.",
+      "fix_propuesto": [
+        "Por cada versión en el modal, agregar 2 botones:",
+        "Botón Descargar — abre url en ventana nueva (dispara descarga en desktop, abre visor PDF en móvil)",
+        "Botón Ver — abre url en tab nueva (preview antes de descargar)",
+        "Relabelar botón 'Abrir' a 'Abrir cotización' para claridad",
+        "En móvil (caso real Luis): abrir url en navegador móvil → visor nativo → compartir → WhatsApp"
+      ],
+      "impacto_si_no_se_arregla": "Feature de versionado de PDFs queda ornamental — Luis ve que existen pero no puede usarlos para reenviar al cliente",
+      "target_version": "v5.4.4",
+      "estado": "PENDIENTE CÓDIGO"
+    }
+  ],
+  "bugs_resueltos_en_sesion_2026_04_23": [
+    {
+      "id": "BUG-009",
+      "titulo": "Reglas Firebase Storage bloqueaban uploads a pdfs/ con 403 Forbidden",
+      "sintoma_inicial": "Modal 'Todos los PDFs' mostraba 0 documentos a pesar de PDFs regenerados desde v5.4.1.",
+      "causa_raiz": "Reglas cubrían pagos/ y entregas/ (rutas v5.0) pero NO pdfs/ (ruta nueva v5.4.1).",
+      "fix_aplicado": "Luis publicó reglas ampliadas 2026-04-23 ~10:50 COT: rules_version 2 + allPaths=** + auth != null",
+      "verificacion": "Luis regeneró GB-2026-0112 en vivo, apareció v1 ACTUAL. Segunda regeneración mostró v2 ACTUAL + v1. Upload funciona.",
+      "pdfs_huerfanos_identificados": [
+        "GB-2026-0117 (regenerado 09h52 — falló bajo BUG-009)",
+        "GB-2026-0112 (ya recuperado con regeneraciones posteriores v1 y v2)"
+      ],
+      "plan_recuperacion_restante": "Regenerar GB-2026-0117 manualmente. Una vez v5.4.4 tenga botón 'Reintentar todos', bulk de futuros huérfanos será automático.",
+      "estado": "RESUELTO EN PRODUCCIÓN"
+    }
+  ],
+  "version_544_hotfix_PLAN_COMPLETO": {
+    "tipo": "PATCH crítico + features de cierre del ciclo PDF",
+    "prioridad": "URGENTE — bloquea operación diaria en varios frentes",
+    "alcance_cerrado": {
+      "fix_1_bug_010": {
+        "descripcion": "Mover const _now al inicio de savePdfConCopiaStorage",
+        "archivos": ["app-core.js"],
+        "esfuerzo": "2 min",
+        "test": "Simular fallo de Storage (desconectar red, regenerar PDF) y verificar que pdfUploadFailed=true se marca + badge aparece en botón"
+      },
+      "fix_2_bug_011": {
+        "descripcion": "Diagnosticar por qué botón WhatsApp no aparece en Seguimiento, luego fix",
+        "archivos": ["app-seguimiento.js (probable)", "index.html (posible CSS)"],
+        "esfuerzo": "10-20 min (depende del diagnóstico)",
+        "test": "Abrir Seguimiento, confirmar botón WhatsApp visible en cada tarjeta con teléfono del cliente, clic abre modal de plantillas"
+      },
+      "fix_3_bug_012": {
+        "descripcion": "Cablear botones de descarga/preview por versión en modal 'Todos los PDFs' + modal individual de PDFs del doc",
+        "archivos": ["app-historial.js", "index.html (CSS botones)"],
+        "esfuerzo": "20-30 min",
+        "detalle_ui": [
+          "En modal 'Todos los PDFs en la nube': cada fila de versión (v1, v2…) tiene botones inline [Descargar] [Ver]",
+          "Botón 'Abrir' existente se mantiene pero relabelado a 'Abrir cotización' (queda en la fila del documento, no por versión)",
+          "En modal individual del doc (📎 PDFs (N)): mismo tratamiento por versión",
+          "Handler descargar: window.open(entry.url, '_blank') — Firebase Storage URL dispara descarga directa",
+          "Handler ver: window.open(entry.url, '_blank') — navegador decide si preview o download (móvil preview, desktop depende)"
+        ],
+        "test": [
+          "Abrir modal global, clic Descargar en v2 de GB-2026-0112, debe descargar archivo con nombre GB-2026-0112_Prom_Tilata_v02.pdf",
+          "Clic Ver en v1, debe abrir tab con preview del PDF viejo (sin bloquear)",
+          "Móvil: clic Descargar abre app de PDFs nativa, compartir → WhatsApp funciona"
+        ]
+      },
+      "feature_4_reintentar_todos": {
+        "descripcion": "Botón 'Reintentar todos' en modal 'Todos los PDFs' que itera sobre docs con pdfUploadFailed=true e intenta regenerar el PDF desde los datos del doc",
+        "archivos": ["app-historial.js"],
+        "esfuerzo": "15-20 min",
+        "notas": "Requiere regenerar PDF desde los datos del doc porque NO tenemos el blob original. Para cotizaciones usa genPDF(q); para propuestas genPropPDF(q). Si hay muchos huérfanos, procesar secuencial con progreso visible.",
+        "test": "Forzar 2-3 fallos, luego restaurar red, clic 'Reintentar todos', verificar que suben v2 de cada uno correctamente"
+      },
+      "feature_5_verificacion_bug_009": {
+        "descripcion": "Ya HECHO en sesión (Luis verificó en vivo). Solo documentar en commit.",
+        "estado": "HECHO"
+      },
+      "operativo_6_recuperar_huerfano_0117": {
+        "descripcion": "Luis debe abrir GB-2026-0117 y regenerar PDF manualmente para tener copia en Storage",
+        "archivos": "N/A (operativo)",
+        "esfuerzo": "1 min para Luis"
+      }
+    },
+    "archivos_que_cambiaran": [
+      "app-core.js (BUG-010)",
+      "app-seguimiento.js (BUG-011, probable)",
+      "app-historial.js (BUG-012 + Reintentar todos)",
+      "index.html (cache-busting + posibles CSS de nuevos botones)"
+    ],
+    "archivos_sin_cambios_esperados": [
+      "app-assets.js",
+      "app-cotizar.js",
+      "app-propuesta.js",
+      "app-dashboard.js"
+    ],
+    "breaking_changes": "Ninguno. Todo fixes + features aditivos.",
+    "tiempo_total_estimado": "60-90 min de código + testing",
+    "entregable": "ZIP gourmet-bites-v5_4_4.zip con los 9 archivos completos (convención del proyecto)"
+  },
+  "version_545_PLAN_COMPLETO_APROBADO": {
+    "tipo": "MINOR — quick win de alto impacto operativo",
+    "titulo": "Edición de Pedidos sin anular/rehacer",
+    "contexto": "Luis identificó en sesión 2026-04-23 que la fricción de tener que anular+rehacer para cualquier cambio es el principal obstáculo para adopción por Kathy y JP. Feature aprobada con diseño completo.",
+    "principios_de_diseno_aprobados_por_luis": {
+      "permisividad": "Matriz permisiva — en producción también se permite editar, con confirmación explícita",
+      "pdf": "Regeneración manual — botón 'Regenerar PDF' después de editar, Luis decide caso a caso",
+      "audit_trail": "Completo + oculto por defecto — accesible vía botón 🕒 que solo aparece si hay ediciones",
+      "razon_del_cambio": "Campo opcional, no obligatorio — para no generar fricción cuando el cambio es obvio"
+    },
+    "matriz_edicion_por_status": {
+      "pedido_confirmado_no_producido": {
+        "editable": "Todo: productos, cantidades, precios, fechas entrega/producción, notas, datos cliente",
+        "confirmacion_requerida": "No (flujo fluido)",
+        "afecta_cliente": "Sí si cambian montos o productos — botón 'Regenerar PDF' aparece destacado"
+      },
+      "en_produccion": {
+        "editable": "Todo, pero con advertencia explícita",
+        "confirmacion_requerida": "SÍ — modal de advertencia antes de entrar al editor",
+        "modal_advertencia_texto": "Este pedido ya está en producción. Kathy/JP pueden estar preparando estos productos ahora mismo. ¿Qué vas a modificar? [ ] Solo notas/logística (seguro) [ ] Cantidades o productos (requiere avisar al equipo)",
+        "post_guardado": "Toast amarillo: 'Recuerda avisar al equipo de producción sobre este cambio'"
+      },
+      "entregado": {
+        "editable": "Solo notas internas (no afectan cliente, no aparecen en PDF cliente)",
+        "confirmacion_requerida": "No (el scope limitado es la protección)",
+        "afecta_cliente": "Nunca"
+      },
+      "anulada": {
+        "editable": "Nada",
+        "confirmacion_requerida": "N/A (botón editar no aparece)",
+        "razon": "Pedido cerrado, no debe modificarse"
+      }
+    },
+    "regeneracion_pdf_manual": {
+      "comportamiento": "Después de guardar cambios, si hay diferencia en productos/cantidades/precios, aparece botón destacado 'Regenerar PDF del cliente' al lado del botón Guardar",
+      "si_no_cambian_montos": "El botón aparece menos destacado (secundario) o no aparece — para cambios puramente internos",
+      "al_regenerar": "Usa savePdfConCopiaStorage existente. Incrementa versión (v3, v4…) y sube a Storage. El PDF anterior queda archivado automáticamente en pdfHistorial — Luis puede reenviar la versión vieja si el cliente pregunta."
+    },
+    "audit_trail_estructura": {
+      "campo_firestore": "editHistory",
+      "tipo": "array de objetos",
+      "schema": {
+        "fecha": "ISO string — 2026-04-23T14:30:00Z",
+        "usuario": "email del Firebase user",
+        "usuarioDisplay": "Luis | Kathy | JP",
+        "cambios": [
+          {
+            "campo": "productos[0].cant | productos[0].precio | cliente.tel | notasProduccion | eventDate | etc",
+            "antes": "valor previo",
+            "despues": "valor nuevo"
+          }
+        ],
+        "razon": "texto opcional — input de texto libre en el modal de guardar, máx 200 chars"
+      },
+      "ui_acceso": "Botón 🕒 (icono reloj) en el header del pedido, SOLO aparece si editHistory.length > 0. Al clic abre modal 'Historial de cambios' con timeline vertical.",
+      "modal_timeline": "Cada edición como card: fecha+usuario arriba, lista de cambios (campo: antes → después), razón si existe. Orden descendente (más reciente primero).",
+      "privacidad": "Visible para los 3 usuarios (Luis/Kathy/JP). No se muestra nunca al cliente."
+    },
+    "diferencia_anticipo_automatica": {
+      "trigger": "Si al guardar el total cambió Y ya hay pagos registrados",
+      "ui": "Banner informativo arriba del modal de guardar: 'Total anterior: $X · Total nuevo: $Y · Anticipo recibido: $Z · Diferencia a cobrar/devolver: $W'",
+      "accion": "Solo informativo — Luis decide cómo gestionar el pago adicional o devolución externamente. NO se registra automáticamente en pagos.",
+      "razon": "Automatizar pagos/devoluciones es riesgoso. Informar es seguro."
+    },
+    "archivos_impactados_estimado": [
+      "app-core.js (loadQuote + helpers de audit)",
+      "app-cotizar.js y/o app-propuesta.js (botón editar en doc cargado)",
+      "app-historial.js (botón editar en cards de historial)",
+      "index.html (modal advertencia producción + modal historial cambios + CSS)"
+    ],
+    "tiempo_estimado": "2-3 horas de código + testing",
+    "breaking_changes": "Ninguno. editHistory es campo nuevo opcional. Docs viejos sin editHistory no muestran botón 🕒.",
+    "cuando_implementar": "Después de v5.4.4 estable en producción y probada 2-3 días — NO meter todo junto"
+  },
+  "roadmap_v6_0_arquitectura_erp": {
+    "contexto_decision": "Luis confirmó en sesión 2026-04-23 que v6.0 será rediseño mayor tipo ERP: menú reorganizado + módulo Despachos nuevo + módulo Finanzas expandido. NO se hará en fases pequeñas — todo junto en v6.0.",
+    "orden_de_versiones": {
+      "v5.4.4": "HOTFIX (próximo chat)",
+      "v5.5": "Edición de Pedidos (chat siguiente a v5.4.4)",
+      "v5.6_a_v5.9": "Reserva para hotfixes o quick wins que emerjan del uso diario",
+      "v6.0": "Rediseño ERP completo — cuando haya 2-3 semanas de uso estable post v5.5"
+    },
+    "propuesta_menu_5_modulos": [
+      {
+        "id": "dashboard",
+        "label": "Dashboard",
+        "contenido": "Pipeline · KPIs · Operación urgente 3d · Agenda (pestaña interna)",
+        "hoy": "Ya existe"
+      },
+      {
+        "id": "ventas",
+        "label": "Ventas",
+        "contenido": "A. Cotizaciones (crear, editar, historial vivas/perdidas/anuladas) · B. Seguimiento de Ventas (follow-up + plantillas WhatsApp) · C. Propuestas",
+        "nomenclatura_luis": "Ventas > A.Cotizaciones + B.Seguimiento de Ventas confirmado por Luis",
+        "hoy": "Hoy fragmentado en Cotización + Evento + Seguimiento + parte de Historial"
+      },
+      {
+        "id": "operaciones",
+        "label": "Operaciones",
+        "contenido": "Pedidos activos · Producción · Despachos (NUEVO) · Entregas · Historial operativo",
+        "hoy": "Hoy mezclado con comercial en Historial"
+      },
+      {
+        "id": "finanzas",
+        "label": "Finanzas",
+        "contenido": "Cartera por cobrar · Pagos recibidos · Comprobantes · Reportes · Exportables",
+        "hoy": "Hoy solo drill-down 'Por cobrar' en Dashboard"
+      },
+      {
+        "id": "herramientas",
+        "label": "Herramientas",
+        "contenido": "Buscar global · PDFs nube · Backup/Restaurar · Mantenimiento · Config plantillas WhatsApp",
+        "hoy": "Hoy disperso"
+      }
+    ],
+    "tabla_migracion_hoy_a_v60": [
+      {"hoy": "Dashboard", "v60": "Dashboard", "cambio": "Se mantiene"},
+      {"hoy": "Cotización", "v60": "Ventas > A. Cotizaciones > Nueva", "cambio": "Agrupada"},
+      {"hoy": "Evento", "v60": "Ventas > C. Propuestas > Nueva", "cambio": "Agrupada"},
+      {"hoy": "Historial (4 archivos)", "v60": "Se parte: comercial → Ventas > Historial | operativo → Operaciones > Historial", "cambio": "Separación crítica"},
+      {"hoy": "Seguimiento", "v60": "Ventas > B. Seguimiento", "cambio": "Sub-sección"},
+      {"hoy": "Agenda", "v60": "Dashboard > Agenda", "cambio": "Integrada"},
+      {"hoy": "Buscar", "v60": "Herramientas > Buscar global", "cambio": "Reubicada"},
+      {"hoy": "Drill 'Por cobrar'", "v60": "Finanzas > Cartera", "cambio": "Expandida"},
+      {"hoy": "Todos los PDFs", "v60": "Herramientas > PDFs nube + shortcut en doc", "cambio": "Centralizada"}
+    ],
+    "riesgos_tecnicos": [
+      "show(panelX) hardcoded en 7+ archivos debe refactorizarse a router modular",
+      "localStorage keys de pestañas viejas pueden requerir migración",
+      "CSS de pestañas requiere reescritura completa",
+      "Riesgo de perder features pequeñas — inventario exhaustivo PRE-refactor",
+      "Testing manual extensivo con los 3 usuarios acostumbrados al flujo actual"
+    ],
+    "estrategia_implementacion": [
+      "FASE 0: Inventario exhaustivo de features/botones/modales con mapping a nuevo módulo",
+      "FASE 1: Router nuevo coexistiendo con pestañas viejas tras flag",
+      "FASE 2: Migrar módulo por módulo — Herramientas primero (menor riesgo), Ventas al final",
+      "FASE 3: Probar en paralelo 1-2 semanas con ambas UIs",
+      "FASE 4: Deprecar pestañas viejas, limpiar código muerto"
+    ]
+  },
+  "pendientes_v6_0_por_aterrizar": {
+    "despachos_modulo_nuevo": {
+      "estado": "Luis NO tiene claro el alcance — aterrizar en sesión dedicada antes de v6.0",
+      "preguntas_abiertas": [
+        "¿Objeto separado (colección 'despachos') o estado del pedido (campo)?",
+        "¿Quién despacha: interno Luis/Kathy/JP o también terceros domiciliarios?",
+        "¿Se programan anticipadamente (ruta del día) o son reactivos?",
+        "¿Firma/foto del receptor obligatoria u opcional?",
+        "¿Existe despacho parcial? (ej: 8 de 10 bandejas)",
+        "¿Direcciones recurrentes de clientes guardadas para reutilizar?",
+        "¿Costos de despacho: incluidos en total al cliente o internos?"
+      ]
+    },
+    "finanzas_expandido": {
+      "estado": "Estructura general definida. Detalles por aterrizar.",
+      "preguntas_abiertas": [
+        "¿Granularidad de reportes: por cliente, línea de producto, fuente?",
+        "¿Exportables formato DIAN? ¿Facturación electrónica integrada o solo registro?",
+        "¿Conciliación bancaria manual o solo registro?",
+        "¿Gastos operativos también o solo ingresos? (define si es ERP completo o solo módulo ventas)"
+      ]
+    }
+  },
+  "historial_versiones_detallado": [
+    {
+      "version": "v5.4.4",
+      "estado": "PLANEADA — por implementar próximo chat",
+      "tipo": "HOTFIX + 1 feature",
+      "highlights": [
+        "Fix BUG-010 _now scope",
+        "Fix BUG-011 WhatsApp en Seguimiento",
+        "Fix BUG-012 descarga de PDF por versión (crítico)",
+        "Feature Reintentar todos los PDFs"
+      ]
+    },
+    {
+      "version": "v5.4.3",
+      "fecha": "2026-04-22",
+      "tipo": "MINOR — 4 features operativas",
+      "estado": "ESTABLE EN PRODUCCIÓN (con 3 bugs descubiertos 2026-04-23)",
+      "highlights": [
+        "Agenda visual con estados",
+        "Cartera con días desde entrega",
+        "Badge PDFs — INEFECTIVO POR BUG-010",
+        "Plantillas WhatsApp — INVISIBLE POR BUG-011"
+      ]
+    },
+    {"version": "v5.4.2", "fecha": "2026-04-22", "tipo": "PATCH + 2 features", "estado": "ESTABLE"},
+    {"version": "v5.4.1", "fecha": "2026-04-22", "tipo": "MINOR complemento", "estado": "ESTABLE"},
+    {"version": "v5.4.0", "fecha": "2026-04-22", "tipo": "MINOR parcial", "estado": "ESTABLE"},
+    {"version": "v5.3.0", "fecha": "2026-04-21", "tipo": "MINOR", "estado": "ESTABLE"},
+    {"version": "v5.2.3", "fecha": "2026-04-21", "tipo": "PATCH funcional", "estado": "ESTABLE"},
+    {"version": "v5.2.2", "fecha": "2026-04-21", "tipo": "PATCH hotfix", "estado": "ESTABLE"},
+    {"version": "v5.1.0", "fecha": "2026-04-21", "tipo": "MINOR", "estado": "ESTABLE"},
+    {"version": "v5.0.x", "fecha": "2026-04-20", "tipo": "MAJOR + iteraciones", "estado": "Superado"}
+  ],
+  "pendientes_operativos_no_de_codigo": {
+    "urgente": [
+      "Regenerar GB-2026-0117 manualmente para rescatar su PDF huérfano (Luis, 1 min)",
+      "Probar que GB-2026-0112 v1 y v2 siguen accesibles en Firebase Console > Storage > Archivos (ambos en pdfs/quote/GB-2026-0112/)"
+    ],
+    "media_prioridad": [
+      "Configurar PITR y/o Scheduled Backups en Firebase Console si aún no está",
+      "Ejecutar migrarFotosStorage() una vez (pendiente desde v5.0)",
+      "Personalizar plantillas WhatsApp cuando v5.4.4 arregle BUG-011"
+    ],
+    "post_v544": [
+      "Confirmar que Reintentar todos funciona con huérfanos reales",
+      "Validar que descarga de PDF por versión funciona en móvil (Android — caso real de Luis)",
+      "Pilotar edición de pedidos con Kathy antes de oficializarla (una vez v5.5 entregue)"
+    ]
+  },
+  "memoria_para_proximo_chat": {
+    "arranque_sugerido": "Próximo chat: leer este JSON primero, luego implementar v5.4.4 HOTFIX en el orden especificado abajo.",
+    "orden_implementacion_v544": [
+      "1) Hard refresh de Luis en producción + captura fresca de consola regenerando 1 PDF — confirmar BUG-009 sigue resuelto",
+      "2) Fix BUG-010 (_now scope) — 2 líneas en app-core.js",
+      "3) Diagnóstico BUG-011 — hard refresh + grep app-seguimiento.js + verificar archivo deployado",
+      "4) Fix BUG-011 según diagnóstico",
+      "5) Fix BUG-012 — cablear descarga/preview por versión en app-historial.js + CSS en index.html",
+      "6) Feature Reintentar todos — lógica en app-historial.js",
+      "7) Bump BUILD_VERSION a v5.4.4 + cache-busting en index.html",
+      "8) Empaquetar ZIP gourmet-bites-v5_4_4.zip con los 9 archivos completos",
+      "9) present_files con SOLO el ZIP",
+      "10) Mensaje final: qué archivos cambiaron vs cuáles no + warning de posible rename a files.zip"
+    ],
+    "contexto_critico_no_perder": [
+      "Luis aplicó reglas Storage 2026-04-23 — ya funcionan. Verificar que siguen activas al arrancar.",
+      "PDF huérfano pendiente: GB-2026-0117. GB-2026-0112 ya recuperado.",
+      "URL producción: GB-Ciclo-de-ventas/ (no Cotizador/)",
+      "v5.5 aprobada con diseño completo — NO mezclar con v5.4.4",
+      "v6.0 decidido grande — menú ERP 5 módulos + despachos + finanzas",
+      "Nomenclatura Ventas > A.Cotizaciones + B.Seguimiento confirmada",
+      "Audit trail v5.5: completo + oculto + botón reloj + razón opcional"
+    ],
+    "decisiones_aprobadas_no_discutir_de_nuevo": [
+      "v5.4.4 alcance cerrado: 3 bugs + Reintentar todos",
+      "v5.5 matriz permisiva en producción con modal de advertencia",
+      "v5.5 regeneración PDF manual, no automática",
+      "v5.5 audit trail completo oculto con razón opcional",
+      "v6.0 rediseño grande, no en fases",
+      "Entrega: siempre ZIP versionado con los 9 archivos — sesiones sin código NO entregan ZIP"
+    ]
+  },
+  "instrucciones_mantenimiento_json": {
+    "regla_entrega_archivos": "SIEMPRE entregar los 9 archivos empaquetados en ZIP versionado gourmet-bites-vX_Y_Z.zip. present_files recibe SOLO el ZIP (1 filepath). En el mensaje: qué archivos cambiaron vs cuáles no. Warning: present_files puede renombrar a files.zip.",
+    "excepcion_sesiones_sin_codigo": "Si una sesión es puramente de planeación/diagnóstico sin cambios de código (como esta 2026-04-23), solo se entrega el JSON actualizado. NO ZIP, porque no hay archivos empaquetables que cambiaron.",
+    "mantener_al_dia": [
+      "Actualizar version_actual_en_produccion cada vez que se despliega",
+      "Mover bugs de abiertos a resueltos cuando se fixean",
+      "Actualizar historial_versiones_detallado cada release",
+      "Agregar nuevas decisiones a roadmap_v6_0 o pendientes_v6_0",
+      "Limpiar decisiones_aprobadas_no_discutir_de_nuevo cuando se implementen"
+    ]
+  }
+}

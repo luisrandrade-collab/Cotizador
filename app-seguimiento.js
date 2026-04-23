@@ -98,8 +98,11 @@ function renderSegCard(q){
   }
   if(!prodResumen)prodResumen='<span style="color:#999">Sin descripción</span>';
   // Datos de contacto
-  const cel=(q.clientPhone||q.custPhone||"").replace(/\D/g,"");
-  const mail=q.clientEmail||q.custEmail||"";
+  // v5.4.4 BUG-011 fix: los docs reales guardan tel/mail en q.tel y q.mail (ver app-cotizar.js y app-propuesta.js).
+  // Antes solo se leía q.clientPhone/q.custPhone — campos que no existen — por eso en producción nunca aparecía
+  // el botón WhatsApp en Seguimiento a pesar de que el código del modal estaba implementado en v5.4.3.
+  const cel=(q.tel||q.clientPhone||q.custPhone||"").replace(/\D/g,"");
+  const mail=q.mail||q.clientEmail||q.custEmail||"";
   const contactBtns=[];
   if(cel){
     // v5.4.3: botón WhatsApp ya no abre chat directo — abre modal de plantillas
