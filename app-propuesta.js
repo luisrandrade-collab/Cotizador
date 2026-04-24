@@ -332,7 +332,7 @@ function addMenajeItem(){const name=prompt("Nombre del ítem de menaje:");if(!na
 // ─── SAVE / LOAD PROPUESTA ─────────────────────────────────
 async function savePropQuote(silent){
   const cl=$("fp-cli").value.trim()||"Sin nombre";
-  if(!cloudOnline){if(!silent)alert("Sin conexión. No se puede guardar.");return}
+  if(!cloudOnline){if(!silent){if(typeof toast==="function")toast("Sin conexión. No se puede guardar.","error");else alert("Sin conexión. No se puede guardar.")}return}
   // v4.12.7: bloquear guardado como borrador si currentPropNumber es una PF.
   if(currentPropNumber&&currentPropNumber.startsWith("GB-PF-")){
     if(!silent)alert("🔒 Esta es una Propuesta Final ("+currentPropNumber+").\n\nNo se puede guardar como borrador porque es un registro formal.\n\nPara aplicar cambios:\n1. Vuelve al historial (📁).\n2. Toca 🔄 Nueva versión en esta PF.");
@@ -486,16 +486,18 @@ async function savePropQuote(silent){
     if(!silent){
       hideLoader();
       if(creatingChild){
-        alert("✅ Nueva versión creada: "+pNum+"\nLa anterior ("+padreNumeroProp+") quedó archivada.");
+        if(typeof toast==="function")toast("✅ Nueva versión creada: "+pNum+" · La anterior ("+padreNumeroProp+") quedó archivada.","success",5000);
+        else alert("✅ Nueva versión creada: "+pNum+"\nLa anterior ("+padreNumeroProp+") quedó archivada.");
       }else if(cambiosDetectados.length>0&&statusActual==="en_produccion"){
         if(typeof toast==="function")toast("⚠️ Propuesta en producción modificada. Aviso visible al equipo.","warn",5000);
       }else{
-        alert("✅ Guardado: "+pNum);
+        if(typeof toast==="function")toast("✅ Guardado: "+pNum,"success");
+        else alert("✅ Guardado: "+pNum);
       }
     }
     // v5.5.0: refrescar banners tras guardar
     if(typeof renderPropEditBanners==="function")renderPropEditBanners();
-  }catch(e){if(!silent)hideLoader();alert("Error al guardar: "+e.message);console.error(e)}
+  }catch(e){if(!silent)hideLoader();if(typeof toast==="function")toast("Error al guardar: "+e.message,"error",6000);else alert("Error al guardar: "+e.message);console.error(e)}
 }
 
 function loadPropQuote(q){
@@ -543,13 +545,13 @@ function loadPropQuote(q){
 // ─── PROPUESTA FINAL ───────────────────────────────────────
 async function openPropFinalFlow(propId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
-  if(!cloudOnline){alert("Sin conexión. Necesitamos internet para cargar la propuesta.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión. Necesitamos internet para cargar la propuesta.","error",5000);else alert("Sin conexión. Necesitamos internet para cargar la propuesta.");return}
   try{
     showLoader("Cargando propuesta...");
     const {db,doc,getDoc}=window.fb;
     const snap=await getDoc(doc(db,"proposals",propId));
     hideLoader();
-    if(!snap.exists()){alert("No se encontró la propuesta");return}
+    if(!snap.exists()){if(typeof toast==="function")toast("No se encontró la propuesta","error");else alert("No se encontró la propuesta");return}
     propFinalSource={id:propId,...snap.data()};
     propFinalSelection={};
     (propFinalSource.sections||[]).forEach(sec=>{if(sec.options&&sec.options.length){propFinalSelection[sec.id]=sec.options[0].id}});
@@ -601,10 +603,10 @@ function renderPropFinalPicker(){
 
 async function generarPropuestaFinal(){
   if(!propFinalSource)return;
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión.","error");else alert("Sin conexión.");return}
   const secs=propFinalSource.sections||[];
   const sinSeleccion=secs.filter(s=>(s.options||[]).length>0&&!propFinalSelection[s.id]);
-  if(sinSeleccion.length){alert("Falta escoger opción en: "+sinSeleccion.map(s=>s.name).join(", "));return}
+  if(sinSeleccion.length){if(typeof toast==="function")toast("Falta escoger opción en: "+sinSeleccion.map(s=>s.name).join(", "),"warn",5000);else alert("Falta escoger opción en: "+sinSeleccion.map(s=>s.name).join(", "));return}
   try{
     showLoader("Generando Propuesta Final...");
     const pfSections=secs.map(sec=>{

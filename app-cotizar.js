@@ -152,8 +152,8 @@ function chgCustPrice(id,newP){newP=parseInt(newP)||0;if(newP<=0)return;const i=
 async function saveCurrentQuote(silent){
   const cl=$("f-cli").value.trim()||"Sin nombre";
   const items=allIt();
-  if(!items.length){if(!silent)alert("Agrega productos primero");return}
-  if(!cloudOnline){if(!silent)alert("Sin conexión. No se puede guardar.");return}
+  if(!items.length){if(!silent){if(typeof toast==="function")toast("Agrega productos primero","warn");else alert("Agrega productos primero")}return}
+  if(!cloudOnline){if(!silent){if(typeof toast==="function")toast("Sin conexión. No se puede guardar.","error");else alert("Sin conexión. No se puede guardar.")}return}
   // v5.5.0: matriz de edición reemplaza el bloqueo duro v4.13.0
   let oldDoc=null; // snapshot previo para diff del audit trail
   let statusActual="enviada";
@@ -310,24 +310,26 @@ async function saveCurrentQuote(silent){
     if(!silent){
       hideLoader();
       if(creatingChild){
-        alert("✅ Nueva versión creada: "+qNum+"\nLa anterior ("+padreNumeroParaMsg+") quedó archivada.");
+        if(typeof toast==="function")toast("✅ Nueva versión creada: "+qNum+" · La anterior ("+padreNumeroParaMsg+") quedó archivada.","success",5000);
+        else alert("✅ Nueva versión creada: "+qNum+"\nLa anterior ("+padreNumeroParaMsg+") quedó archivada.");
       }else if(cambiosDetectados.length>0&&statusActual==="en_produccion"){
         // Letrero aparece en renderR — aquí solo toast
         if(typeof toast==="function")toast("⚠️ Pedido en producción modificado. Aviso visible al equipo.","warn",5000);
       }else{
-        alert("✅ Guardado: "+qNum);
+        if(typeof toast==="function")toast("✅ Guardado: "+qNum,"success");
+        else alert("✅ Guardado: "+qNum);
       }
     }
     if(curStep==="review")renderR();
-  }catch(e){if(!silent)hideLoader();alert("Error al guardar: "+e.message);console.error(e)}
+  }catch(e){if(!silent)hideLoader();if(typeof toast==="function")toast("Error al guardar: "+e.message,"error",6000);else alert("Error al guardar: "+e.message);console.error(e)}
 }
 
 // ─── PDF COTIZACIÓN ────────────────────────────────────────
 async function genPDF(){
   try{
     const all=allIt();
-    if(!all.length){alert("Agrega productos antes de generar el PDF");return}
-    if(!cloudOnline){alert("Sin conexión. Conecta a internet para generar el PDF con número de cotización.");return}
+    if(!all.length){if(typeof toast==="function")toast("Agrega productos antes de generar el PDF","warn");else alert("Agrega productos antes de generar el PDF");return}
+    if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión. Conecta a internet para generar el PDF con número de cotización.","error",5000);else alert("Sin conexión. Conecta a internet para generar el PDF con número de cotización.");return}
     showLoader("Guardando cotización...");
     await saveCurrentQuote(true);
     if(!currentQuoteNumber){hideLoader();return}
