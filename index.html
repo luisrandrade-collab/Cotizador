@@ -7,17 +7,35 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
-<!-- v6.0.0 cambios:
-  1. 5ta pestaña "Ventas anteriores" en Historial (pedidos entregados + pagados 100%)
-     con sub-filtros por año (Este año, Año anterior, Más antiguas).
-  2. Toggle "Incluir cumplidas" en Pedidos → Entregadas (ver cumplidas mezcladas sin cambiar pestaña).
-  3. Botón ↩️ Anular ya NO aparece (ni funciona) si el pedido está cobrado al 100%.
-     Defensa doble: canAnular() en UI + chequeo en openAnularModal.
-  4. KPI Entregado del mes desglosa: "N entregas · X cumplidas · Y con saldo".
-     Drill-down muestra badge ✅ Cumplida o 💰 Saldo $$$ por fila.
-  5. Helpers nuevos en app-core: isCumplido(q), canAnular(q).
+<!-- VERSION: 2026-04-23-v6.0.2-dashboard-enriquecido-whatsapp-saldo-cortesias -->
+<!-- v6.0.2 cambios (salto directo desde v6.0.0 para quienes no deployaron v6.0.1):
+
+  FIX incluido de v6.0.1:
+  · BUG-014: Pipeline Activo del Dashboard no abría drill-down en ninguna de las
+    3 pipe-cards porque openPipelineDetail escribía en $("dash-detail-body"),
+    un ID que no existe en el DOM (el modal real usa dd-title + dd-list).
+
+  Mejoras nuevas de v6.0.2:
+  1. Toggle "Incluir cumplidas" persiste en localStorage (antes se reseteaba).
+  2. Ventas anteriores: 3 filtros nuevos (Este mes / Últ. 3m / Últ. 6m).
+  3. Cortesías (total=0 + entregado) pasan a Ventas anteriores automáticamente.
+     Badge 🎁 Cortesía en drill-down de Entregado.
+  4. Refactor: openDashDetail y openPipelineDetail unificadas en helpers
+     compartidos (_buildDashDocRow + _renderDashGroupedList). Evita regresiones
+     tipo BUG-014 y elimina ~170 líneas de duplicación.
+  5. Pipe-cards: badge 🔴 de urgencia si hay docs con 7+ días sin mover.
+  6. Pipe-cards: sub-línea incluye clientes únicos.
+  7. Drill-down: chip para alternar orden Monto/Antigüedad. Estado por bucket.
+  8. "Entregados con saldo": desglose de antigüedad 0–3d / 4–14d / +15d.
+     Mismo desglose en el KPI "Por cobrar".
+  9. Chip 💬 WhatsApp en cada fila de "Entregados con saldo". Modal editable
+     con template cercano/tú ("saldito", "¿nos cuentas cuándo...?").
+ 10. "Entregados con saldo" ordena por antigüedad de entrega por defecto.
+ 13. CSS real para .hc-btn-reactivar y .mf-* (antes dependían de style="" inline).
+     Inline styles redundantes removidos de los 2 modales de v5.5.
 -->
+<!-- VERSION PREV: 2026-04-23-v6.0.1-fix-pipeline-activo-drilldown (no deployada) -->
+<!-- VERSION PREV²: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
 <!-- VERSION PREV: 2026-04-23-v5.5.0-edicion-pedidos-matriz-permisiva-audit-trail-versionado-hijo -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -230,6 +248,36 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 /* v6.0.0: Badges en drill-down del dashboard (Entregado) */
 .dd-badge-cumplido{display:inline-block;background:#E8F5E9;color:#1B5E20;padding:1.5px 7px;border-radius:10px;font-size:9.5px;font-weight:700;border:1px solid #A5D6A7}
 .dd-badge-saldo{display:inline-block;background:#FFF3E0;color:#E65100;padding:1.5px 7px;border-radius:10px;font-size:9.5px;font-weight:700;border:1px solid #FFCC80}
+
+/* v6.0.2: Badge 🎁 Cortesía (total=0 entregado) en drill-down de Entregado */
+.dd-badge-cortesia{display:inline-block;background:#F3E5F5;color:#6A1B9A;padding:1.5px 7px;border-radius:10px;font-size:9.5px;font-weight:700;border:1px solid #CE93D8}
+
+/* v6.0.2 Item 7: Chip de ordenamiento del drill-down (Monto/Antigüedad) */
+.dd-sort-bar{display:flex;gap:6px;margin:6px 0 10px 0;padding:0 2px}
+.dd-sort-chip{background:#ECEFF1;color:#546E7A;border:1px solid #CFD8DC;border-radius:16px;padding:5px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:all .15s}
+.dd-sort-chip:active{transform:scale(.96)}
+.dd-sort-chip.act{background:#1976D2;color:#fff;border-color:#1976D2}
+
+/* v6.0.2 Item 8: Desglose de antigüedad de saldo (0–3d / 4–14d / +15d) */
+.dd-aging-bar{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px 0;padding:6px 8px;background:#FAFAFA;border-radius:8px;font-size:10.5px}
+.dd-aging{display:inline-block;padding:3px 9px;border-radius:10px;font-weight:700;font-size:10px;white-space:nowrap}
+.dd-aging-nuevo{background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7}
+.dd-aging-medio{background:#FFF8E1;color:#F57F17;border:1px solid #FFD54F}
+.dd-aging-viejo{background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A}
+
+/* v6.0.2 Item 8: Tag de días desde entrega por fila (badge compacto antes del extra) */
+.dd-dias-tag{display:inline-block;padding:1px 7px;border-radius:8px;font-size:9.5px;font-weight:700;margin-right:2px}
+.dd-dias-tag.nuevo{background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7}
+.dd-dias-tag.medio{background:#FFF8E1;color:#F57F17;border:1px solid #FFD54F}
+.dd-dias-tag.viejo,.dd-dias-tag.rojo{background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A}
+.dd-dias-tag.neutro{background:#ECEFF1;color:#546E7A;border:1px solid #CFD8DC}
+
+/* v6.0.2 Item 9: Chip 💬 WhatsApp inline en fila del drill-down */
+.dd-inline-wa{display:inline-block;background:#E8F5E9;color:#1B5E20;padding:1.5px 8px;border-radius:10px;font-size:9.5px;font-weight:700;border:1px solid #A5D6A7;cursor:pointer;margin-left:4px;-webkit-appearance:none}
+.dd-inline-wa:active{transform:scale(.95);background:#C8E6C9}
+
+/* v6.0.2 Item 5: Badge 🔴 de urgencia en esquina de pipe-cards */
+.pipe-urgent-badge{position:absolute;top:6px;right:8px;background:#FFEBEE;color:#B71C1C;border:1px solid #EF9A9A;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;z-index:2;pointer-events:none}
 
 /* v5.1.0: Botones rápidos 🟢 Viva / ❌ Perdida en tarjetas del Historial */
 .hc-btn-viva-quick{background:linear-gradient(135deg,#66BB6A,#388E3C)!important;color:#fff!important;font-weight:700}
@@ -1043,6 +1091,61 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   color:#fff!important;
   font-weight:700;
 }
+
+/* v6.0.2: Botón ♻️ Reactivar en cards del Historial
+   Antes solo funcionaba por style="" inline en cada <button>. Ahora la
+   clase sostiene el estilo para no depender del inline. */
+.hc-btn-reactivar{
+  background:linear-gradient(135deg,#66BB6A,#388E3C)!important;
+  color:#fff!important;
+  font-weight:700;
+}
+
+/* v6.0.2: Sistema .mf-* — modal ligero alternativo al .modal-box estándar
+   Usado por los modales de v5.5 (edit-history-modal, edit-warning-modal).
+   Antes las clases estaban sin CSS y funcionaban solo por style="" inline.
+   El patrón visual es idéntico a .modal-box pero con header neutro (no negro)
+   para que el contenido del modal decida su propio color de acento. */
+.mf-wrap{
+  background:var(--cl);
+  width:100%;
+  max-width:600px;
+  max-height:85vh;
+  border-radius:16px 16px 0 0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  animation:slideUp .3s;
+}
+.mf-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  padding:14px 16px;
+  border-bottom:1px solid #EEE;
+  background:#FAFAFA;
+}
+.mf-body{
+  padding:12px 14px;
+  overflow-y:auto;
+  flex:1;
+}
+.mf-foot{
+  padding:10px 14px;
+  border-top:1px solid #EEE;
+  background:#FAFAFA;
+}
+.mf-close{
+  background:none;
+  border:none;
+  color:#666;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  padding:0 4px;
+  -webkit-appearance:none;
+}
+.mf-close:active{color:#000}
 
 /* Modal historial de cambios */
 #edit-history-modal .mf-wrap{max-width:520px}
@@ -1904,6 +2007,37 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   </div>
 </div>
 
+<!-- v6.0.2 Item 9: Modal WhatsApp editable para recordatorio de saldo -->
+<div id="wa-saldo-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeSaldoWhatsAppModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+      <span class="mtitle">💬 Recordatorio de saldo</span>
+      <button class="mclose" onclick="closeSaldoWhatsAppModal()">×</button>
+    </div>
+    <div class="mform">
+      <div class="mf-intro" style="background:#E8F5E9;border-left-color:#25D366">
+        Envía un recordatorio amigable al cliente. Puedes editar el mensaje antes de mandarlo.
+      </div>
+      <div class="mf-field">
+        <label>Cliente</label>
+        <input type="text" id="wa-saldo-cli" readonly style="background:#F5F5F5">
+      </div>
+      <div class="mf-field">
+        <label>Teléfono (para WhatsApp)</label>
+        <input type="tel" id="wa-saldo-tel" placeholder="Ej: 3001234567 (sin espacios ni +)">
+      </div>
+      <div class="mf-field">
+        <label>Mensaje</label>
+        <textarea id="wa-saldo-msg" rows="6" style="font-size:13px;line-height:1.5"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn bo" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeSaldoWhatsAppModal()">Cancelar</button>
+        <button class="btn" style="background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;flex:2;font-weight:700" onclick="sendSaldoWhatsApp()">📤 Abrir WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- v5.0.2: Modal de rango de fechas custom -->
 <div id="custom-range-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeCustomRangeModal()">
   <div class="modal-box">
@@ -2180,9 +2314,10 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- v5.5.0: Modal Historial de Cambios (audit trail de ediciones) -->
+<!-- v6.0.2: inline styles redundantes retirados (CSS .mf-* los cubre) -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div id="edit-history-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeEditHistoryModal()">
-  <div class="mf-wrap" style="max-width:520px">
+  <div class="mf-wrap">
     <div class="mf-head">
       <div>
         <div style="font-weight:700;font-size:15px;color:#4527A0">🕒 Historial de cambios</div>
@@ -2190,8 +2325,8 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       </div>
       <button class="mf-close" onclick="closeEditHistoryModal()">×</button>
     </div>
-    <div class="mf-body" id="eh-body" style="padding:12px"></div>
-    <div class="mf-foot" style="padding:10px 14px;border-top:1px solid #eee">
+    <div class="mf-body" id="eh-body"></div>
+    <div class="mf-foot">
       <div style="font-size:10.5px;color:#999;line-height:1.4">Este historial es interno. No se comparte con el cliente.</div>
     </div>
   </div>
@@ -2199,27 +2334,28 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- v5.5.0: Modal Advertencia al editar en producción/aprobada  -->
+<!-- v6.0.2: inline styles redundantes retirados (CSS .mf-* los cubre) -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div id="edit-warning-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeEditWarningModal()">
-  <div class="mf-wrap" style="max-width:440px">
+  <div class="mf-wrap">
     <div class="mf-head">
       <div id="ew-title">⚠️ Advertencia</div>
       <button class="mf-close" onclick="closeEditWarningModal()">×</button>
     </div>
-    <div class="mf-body" id="ew-body" style="padding:14px"></div>
-    <div class="mf-foot" style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid #eee">
+    <div class="mf-body" id="ew-body"></div>
+    <div class="mf-foot" style="display:flex;gap:8px">
       <button class="btn" style="background:#B0BEC5;color:#fff;flex:1" onclick="closeEditWarningModal()">Cancelar</button>
       <button class="btn" style="background:linear-gradient(135deg,#FB8C00,#E65100);color:#fff;flex:1;font-weight:700" onclick="if(window._editWarningProceed)window._editWarningProceed()">Continuar</button>
     </div>
   </div>
 </div>
 
-<script src="app-assets.js?v=6.0.0"></script>
-<script src="app-core.js?v=6.0.0"></script>
-<script src="app-cotizar.js?v=6.0.0"></script>
-<script src="app-propuesta.js?v=6.0.0"></script>
-<script src="app-historial.js?v=6.0.0"></script>
-<script src="app-seguimiento.js?v=6.0.0"></script>
-<script src="app-dashboard.js?v=6.0.0"></script>
+<script src="app-assets.js?v=6.0.2"></script>
+<script src="app-core.js?v=6.0.2"></script>
+<script src="app-cotizar.js?v=6.0.2"></script>
+<script src="app-propuesta.js?v=6.0.2"></script>
+<script src="app-historial.js?v=6.0.2"></script>
+<script src="app-seguimiento.js?v=6.0.2"></script>
+<script src="app-dashboard.js?v=6.0.2"></script>
 </body>
 </html>

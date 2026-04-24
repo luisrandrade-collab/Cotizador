@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v6.0.0 · 2026-04-23
+// app-dashboard.js · v6.0.1 · 2026-04-23
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v5.0.1b: drill-down agrupado + banner HOY + sync agenda + excluir convertidas.
@@ -12,6 +12,12 @@
 //         badge novedades + mantenimiento colapsable + fix botones ancho-completo.
 // v6.0.0: KPI Entregado desglosa cumplidas (pagadas 100%) vs con saldo.
 //         Drill-down muestra badges Cumplida/Saldo. La cifra grande no cambia.
+// v6.0.1: HOTFIX — BUG-014 Pipeline Activo no abría drill-down al hacer clic en
+//         las 3 pipe-cards. openPipelineDetail escribía en $("dash-detail-body"),
+//         un ID que no existe en el DOM (el modal usa dd-title/dd-list). Ahora
+//         usa los IDs reales, sigue el mismo patrón visual que openDashDetail
+//         (agrupado por cliente + chips rápidos Viva/Perdida/Pedido/Aprobar en
+//         docs followables) y el empty state se muestra inline (no alert).
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -817,6 +823,182 @@ async function exportAgendaIcs(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// v6.0.2 · Item 4 — HELPERS UNIFICADOS PARA DRILL-DOWN
+// openDashDetail (KPIs del período) y openPipelineDetail (Pipeline Activo)
+// comparten ahora el mismo render de filas y el mismo modal. Estos helpers
+// eliminan duplicación y garantizan que cualquier mejora futura (item 7
+// sort configurable, item 8 badges, etc) se aplique uniformemente a los dos.
+// ═══════════════════════════════════════════════════════════
+
+// Helper de fila para el drill-down. tagStyle: 'kpi' (Pedido/Evento) o 'pipe' (Cotización/Propuesta).
+// extra: cadena opcional que se concatena al final del meta-row.
+function _buildDashDocRow(q,monto,extra,tagStyle){
+  const fecha=dateOfCreation(q)||"—";
+  const sMeta=STATUS_META[q.status||"enviada"]||STATUS_META.enviada;
+  let tag;
+  if(tagStyle==="pipe"){
+    tag=q.kind==="quote"?'<span class="ui-tag prod">Cotización</span>':'<span class="ui-tag ent">Propuesta</span>';
+  }else{
+    tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
+  }
+  let ecBadge="";
+  if(typeof estadoComercial==="function"){
+    const ec=estadoComercial(q);
+    if(ec&&typeof ESTADO_COMERCIAL_META!=="undefined"&&ESTADO_COMERCIAL_META[ec]){
+      const m=ESTADO_COMERCIAL_META[ec];
+      ecBadge=' <span class="hc-estado-badge '+m.cls+'">'+m.emoji+' '+m.label+'</span>';
+    }
+  }
+  // Chips rápidos para followables (Viva/Perdida/convertir). Igual que en v6.0.1.
+  let quickBtns="";
+  if(typeof isFollowable==="function"&&isFollowable(q)){
+    const esPerdida=typeof isPerdida==="function"&&isPerdida(q);
+    const s=q.status||"enviada";
+    const chips=[];
+    if(esPerdida){
+      chips.push('<button class="dd-chip dd-chip-react" onclick="event.stopPropagation();openReactivarModal(\''+q.id+'\',\''+q.kind+'\',event)" title="Reactivar">♻️</button>');
+    }else{
+      chips.push('<button class="dd-chip dd-chip-viva" onclick="event.stopPropagation();ddQuickViva(\''+q.id+'\',\''+q.kind+'\',event)" title="Viva">🟢</button>');
+      chips.push('<button class="dd-chip dd-chip-perdida" onclick="event.stopPropagation();openPerdidaModal(\''+q.id+'\',\''+q.kind+'\')" title="Perdida">❌</button>');
+      if(q.kind==="quote"&&s==="enviada"){
+        chips.push('<button class="dd-chip dd-chip-convert" onclick="event.stopPropagation();closeDashDetail();openOrderModal(\''+q.id+'\',event)" title="Marcar como pedido">🤝 Pedido</button>');
+      }else if(q.kind==="proposal"&&(s==="enviada"||s==="propfinal")){
+        chips.push('<button class="dd-chip dd-chip-convert" onclick="event.stopPropagation();closeDashDetail();openApproveModal(\''+q.id+'\',\'proposal\',event)" title="Marcar como aprobada">✓ Aprobar</button>');
+      }
+    }
+    quickBtns='<div class="dd-row-chips">'+chips.join("")+'</div>';
+  }
+  return '<div class="dd-row" onclick="closeDashDetail();loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+    '<div class="dd-row-top"><div class="dd-row-cli">'+tag+(q.client||"—")+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
+    '<div class="dd-row-meta"><span class="qnum" style="font-size:9px">'+(q.quoteNumber||q.id)+'</span> · '+fecha+' · <span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+ecBadge+(extra?' · '+extra:'')+'</div>'+
+    quickBtns+
+  '</div>';
+}
+
+// v6.0.2 Item 7: modo de ordenamiento del drill-down. 'monto' (default) o 'antiguedad'.
+// Por bucket (key = tipo de drill-down) para que cada uno recuerde su preferencia.
+if(typeof _dashDetailSortMode==="undefined")var _dashDetailSortMode={};
+
+function _dashDocDate(q, bucketKey){
+  // v6.0.2: para bucket "entregados_con_saldo" usamos fechaEntrega (más viejo = más urgente).
+  // Para los demás usamos dateISO (fecha de creación).
+  if(bucketKey&&bucketKey.indexOf("pipeline:entregados_con_saldo")===0){
+    return q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||q.dateISO||"";
+  }
+  if(bucketKey==="cobrar"){
+    // Misma lógica: por antigüedad de entrega (que es lo que usa el KPI cobrar)
+    return q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||q.dateISO||"";
+  }
+  return q.dateISO||q.createdAtLocal||"";
+}
+
+// Cambia el modo de sort y vuelve a renderizar el drill-down actual.
+function setDashDetailSort(mode){
+  if(!_dashDetailTipoActual)return;
+  _dashDetailSortMode[_dashDetailTipoActual]=mode;
+  // Re-renderizar el drill-down activo
+  if(_dashDetailTipoActual.indexOf("pipeline:")===0){
+    openPipelineDetail(_dashDetailTipoActual.slice(9));
+  }else{
+    openDashDetail(_dashDetailTipoActual);
+  }
+}
+
+// Renderizador unificado del modal agrupado por cliente.
+// opts: {title, rows:[{q,monto,extra}], summaryBuilder, emptyMsg, showSortChip, tipoKey}
+// summaryBuilder: función opcional (rows, clientes) => string HTML del resumen custom.
+// showSortChip: boolean. Si true, renderiza chip para alternar monto/antigüedad.
+// tipoKey: clave del tipo actual para recordar modo de sort (default: _dashDetailTipoActual).
+function _renderDashGroupedList(opts){
+  const {title, rows, summaryBuilder, emptyMsg, showSortChip, tipoKey}=opts;
+  const ttlEl=$("dd-title"),listEl=$("dd-list"),modal=$("dash-detail-modal");
+  if(!ttlEl||!listEl||!modal){console.warn("[DashDetail] modal incompleto en DOM");return}
+  const keySort=tipoKey||_dashDetailTipoActual||"default";
+  const sortMode=_dashDetailSortMode[keySort]||"monto";
+
+  if(!rows.length){
+    ttlEl.textContent=title;
+    listEl.innerHTML='<div class="dd-summary">0 documentos</div><div class="dd-empty">'+(emptyMsg||"Sin documentos en este corte.")+'</div>';
+    modal.classList.remove("hidden");
+    return;
+  }
+
+  // Agrupar por cliente
+  const byClient={};
+  rows.forEach(r=>{
+    const cli=r.q.client||"(Sin cliente)";
+    if(!byClient[cli])byClient[cli]={total:0,items:[]};
+    byClient[cli].total+=r.monto;
+    byClient[cli].items.push(r);
+  });
+  const clientes=Object.keys(byClient).map(cli=>({cli,total:byClient[cli].total,items:byClient[cli].items,count:byClient[cli].items.length}));
+
+  // Ordenar clientes y items internamente según modo
+  if(sortMode==="antiguedad"){
+    // Clientes: por fecha más antigua dentro de ellos (más viejo primero)
+    clientes.forEach(c=>{
+      c._oldest=c.items.reduce((min,r)=>{
+        const d=_dashDocDate(r.q,keySort);
+        return (!min||(d&&d<min))?d:min;
+      },"");
+    });
+    clientes.sort((a,b)=>{
+      if(!a._oldest&&!b._oldest)return 0;
+      if(!a._oldest)return 1;
+      if(!b._oldest)return -1;
+      return a._oldest.localeCompare(b._oldest);
+    });
+    clientes.forEach(c=>c.items.sort((a,b)=>{
+      const da=_dashDocDate(a.q,keySort),db=_dashDocDate(b.q,keySort);
+      if(!da&&!db)return 0;
+      if(!da)return 1;
+      if(!db)return -1;
+      return da.localeCompare(db);
+    }));
+  }else{
+    // monto desc (default)
+    clientes.sort((a,b)=>b.total-a.total);
+    clientes.forEach(c=>c.items.sort((a,b)=>b.monto-a.monto));
+  }
+
+  const html=clientes.map(c=>{
+    if(c.count===1){
+      return '<div class="dd-group">'+c.items.map(r=>_buildDashDocRow(r.q,r.monto,r.extra,opts.tagStyle||"kpi")).join("")+'</div>';
+    }
+    const header='<div class="dd-group-header">'+
+      '<div class="dgh-cli">'+c.cli+'</div>'+
+      '<div class="dgh-meta">'+c.count+' docs</div>'+
+      '<div class="dgh-total">'+fm(c.total)+'</div>'+
+    '</div>';
+    const items=c.items.map(r=>_buildDashDocRow(r.q,r.monto,r.extra,opts.tagStyle||"kpi")).join("");
+    return '<div class="dd-group">'+header+items+'</div>';
+  }).join("");
+
+  // Summary
+  let summary;
+  if(typeof summaryBuilder==="function"){
+    summary=summaryBuilder(rows,clientes,sortMode);
+  }else{
+    const totalSum=rows.reduce((s,r)=>s+r.monto,0);
+    summary='<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+' · '+clientes.length+' cliente'+(clientes.length!==1?'s':'')+'</div>';
+  }
+
+  // Chip de ordenamiento (item 7)
+  let sortChip="";
+  if(showSortChip){
+    const isAnt=sortMode==="antiguedad";
+    sortChip='<div class="dd-sort-bar">'+
+      '<button class="dd-sort-chip'+(isAnt?"":" act")+'" onclick="setDashDetailSort(\'monto\')">$ Monto</button>'+
+      '<button class="dd-sort-chip'+(isAnt?" act":"")+'" onclick="setDashDetailSort(\'antiguedad\')">⏱ Antigüedad</button>'+
+    '</div>';
+  }
+
+  ttlEl.textContent=title;
+  listEl.innerHTML=summary+sortChip+html;
+  modal.classList.remove("hidden");
+}
+
+// ═══════════════════════════════════════════════════════════
 // v4.12.1: DRILL-DOWN — modal con detalle de cada KPI del dashboard
 // ═══════════════════════════════════════════════════════════
 function openDashDetail(tipo){
@@ -829,50 +1011,7 @@ function openDashDetail(tipo){
   // v4.12.7: helper de filtro común — excluye fantasmas y superseded
   // v5.0.3: también excluye anuladas
   const _excluido=q=>q._wrongCollection||q.status==="superseded"||q.status==="anulada";
-  // Helper para fila de doc
-  const docRow=(q,monto,extra)=>{
-    const fecha=dateOfCreation(q)||"—";
-    const sMeta=STATUS_META[q.status||"enviada"]||STATUS_META.enviada;
-    const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
-    // v5.0.5: badge VIVA/PERDIDA solo para followables
-    let ecBadge="";
-    if(typeof estadoComercial==="function"){
-      const ec=estadoComercial(q);
-      if(ec&&typeof ESTADO_COMERCIAL_META!=="undefined"&&ESTADO_COMERCIAL_META[ec]){
-        const m=ESTADO_COMERCIAL_META[ec];
-        ecBadge=' <span class="hc-estado-badge '+m.cls+'">'+m.emoji+' '+m.label+'</span>';
-      }
-    }
-    // v5.3.0: chips compactos inline (no full-width). Botones según tipo/status:
-    //   - Cotización enviada no perdida → 🟢/❌ + 🤝 Pedido (openOrderModal)
-    //   - Propuesta enviada/propfinal no perdida → 🟢/❌ + ✓ Aprobar (openApproveModal)
-    //   - Cualquier followable ya perdida → ♻️ Reactivar
-    // Respeta la regla UX de Luis: "jamás full-width buttons"
-    let quickBtns="";
-    if(typeof isFollowable==="function"&&isFollowable(q)){
-      const esPerdida=typeof isPerdida==="function"&&isPerdida(q);
-      const s=q.status||"enviada";
-      const chips=[];
-      if(esPerdida){
-        chips.push('<button class="dd-chip dd-chip-react" onclick="event.stopPropagation();openReactivarModal(\''+q.id+'\',\''+q.kind+'\',event)" title="Reactivar">♻️</button>');
-      }else{
-        chips.push('<button class="dd-chip dd-chip-viva" onclick="event.stopPropagation();ddQuickViva(\''+q.id+'\',\''+q.kind+'\',event)" title="Viva">🟢</button>');
-        chips.push('<button class="dd-chip dd-chip-perdida" onclick="event.stopPropagation();openPerdidaModal(\''+q.id+'\',\''+q.kind+'\')" title="Perdida">❌</button>');
-        // Botón convertir según tipo
-        if(q.kind==="quote"&&s==="enviada"){
-          chips.push('<button class="dd-chip dd-chip-convert" onclick="event.stopPropagation();closeDashDetail();openOrderModal(\''+q.id+'\',event)" title="Marcar como pedido">🤝 Pedido</button>');
-        }else if(q.kind==="proposal"&&(s==="enviada"||s==="propfinal")){
-          chips.push('<button class="dd-chip dd-chip-convert" onclick="event.stopPropagation();closeDashDetail();openApproveModal(\''+q.id+'\',\'proposal\',event)" title="Marcar como aprobada">✓ Aprobar</button>');
-        }
-      }
-      quickBtns='<div class="dd-row-chips">'+chips.join("")+'</div>';
-    }
-    return '<div class="dd-row" onclick="closeDashDetail();loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="dd-row-top"><div class="dd-row-cli">'+tag+(q.client||"—")+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
-      '<div class="dd-row-meta"><span class="qnum" style="font-size:9px">'+(q.quoteNumber||q.id)+'</span> · '+fecha+' · <span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+ecBadge+(extra?' · '+extra:'')+'</div>'+
-      quickBtns+
-    '</div>';
-  };
+  // v6.0.2: docRow local eliminado. Ahora usamos _buildDashDocRow global (con tagStyle='kpi').
   if(tipo==="cotizado"){
     title="🧾 Cotizado · "+range.label;
     quotesCache.forEach(q=>{
@@ -898,10 +1037,13 @@ function openDashDetail(tipo){
       if(inRange(fEnt)&&status==="entregado"){
         const t=getDocTotal(q);totalSum+=t;
         // v6.0: distinguir cumplidas (pagado 100%) vs con saldo
+        // v6.0.2: distinguir también cortesías (total=0) con badge propio
         const _cumplido=(typeof isCumplido==="function")&&isCumplido(q);
+        const _cortesia=(typeof isCortesia==="function")&&isCortesia(q);
         const _saldoPend=saldoPendiente(q);
         let extraTxt="Entregado: "+fEnt;
-        if(_cumplido)extraTxt='<span class="dd-badge-cumplido">✅ Cumplida</span> · '+extraTxt;
+        if(_cortesia)extraTxt='<span class="dd-badge-cortesia">🎁 Cortesía</span> · '+extraTxt;
+        else if(_cumplido)extraTxt='<span class="dd-badge-cumplido">✅ Cumplida</span> · '+extraTxt;
         else if(_saldoPend>0)extraTxt='<span class="dd-badge-saldo">💰 Saldo '+fm(_saldoPend)+'</span> · '+extraTxt;
         rows.push({q,monto:t,extra:extraTxt});
       }
@@ -973,43 +1115,96 @@ function openDashDetail(tipo){
   }
   // v5.0.1b: Render agrupado por cliente — ordenado por subtotal desc.
   // Clientes con 1 solo doc también se muestran pero sin subtotal redundante.
-  const byClient={};
-  rows.forEach(r=>{
-    const cli=r.q.client||"(Sin cliente)";
-    if(!byClient[cli])byClient[cli]={total:0,items:[]};
-    byClient[cli].total+=r.monto;
-    byClient[cli].items.push(r);
-  });
-  const clientes=Object.keys(byClient).map(cli=>({cli,total:byClient[cli].total,items:byClient[cli].items,count:byClient[cli].items.length}));
-  clientes.sort((a,b)=>b.total-a.total);
-  // Ordenar los docs de cada cliente por monto desc
-  clientes.forEach(c=>c.items.sort((a,b)=>b.monto-a.monto));
+  // v6.0.2 Item 4: delegamos el render al helper unificado _renderDashGroupedList.
+  // Para el tipo "cobrar" pasamos un summaryBuilder custom que incluye el desglose
+  // de antigüedad de saldo (item 8). Para los demás tipos usamos el summary default.
+  // showSortChip=true para bucket "cobrar" y "entregado" donde el orden por antigüedad aporta.
+  const showSortChip=(tipo==="cobrar"||tipo==="entregado");
 
-  let html="";
-  if(!rows.length){
-    html='<div class="dd-empty">Sin documentos en este corte.</div>';
-  }else{
-    html=clientes.map(c=>{
-      // Si el cliente tiene 1 doc, sin header separado (más limpio visualmente)
-      if(c.count===1){
-        return '<div class="dd-group">'+c.items.map(r=>docRow(r.q,r.monto,r.extra)).join("")+'</div>';
+  let summaryBuilder=null;
+  if(tipo==="cobrar"){
+    // v6.0.2 Item 8: desglose de antigüedad de saldo
+    summaryBuilder=(rows)=>{
+      const todayIso=new Date().toISOString().slice(0,10);
+      let s1=0,s2=0,s3=0; // 1-3d, 4-14d, +15d (y al día)
+      rows.forEach(r=>{
+        const q=r.q;
+        const fEnt=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+        if(!fEnt)return;
+        const dias=Math.max(0,Math.floor((new Date(todayIso)-new Date(fEnt))/86400000));
+        if(dias<=3)s1+=r.monto;
+        else if(dias<=14)s2+=r.monto;
+        else s3+=r.monto;
+      });
+      const totalSum=rows.reduce((s,r)=>s+r.monto,0);
+      let desglose="";
+      if(totalSum>0){
+        const parts=[];
+        if(s1>0)parts.push('<span class="dd-aging dd-aging-nuevo">0–3d '+fm(s1)+'</span>');
+        if(s2>0)parts.push('<span class="dd-aging dd-aging-medio">4–14d '+fm(s2)+'</span>');
+        if(s3>0)parts.push('<span class="dd-aging dd-aging-viejo">+15d '+fm(s3)+'</span>');
+        if(parts.length)desglose='<div class="dd-aging-bar">'+parts.join(' · ')+'</div>';
       }
-      // Cliente con varios docs: header con subtotal
-      const header='<div class="dd-group-header">'+
-        '<div class="dgh-cli">'+c.cli+'</div>'+
-        '<div class="dgh-meta">'+c.count+' docs</div>'+
-        '<div class="dgh-total">'+fm(c.total)+'</div>'+
-      '</div>';
-      const items=c.items.map(r=>docRow(r.q,r.monto,r.extra)).join("");
-      return '<div class="dd-group">'+header+items+'</div>';
-    }).join("");
+      return '<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+'</div>'+desglose;
+    };
   }
-  $("dd-title").textContent=title;
-  const summary='<div class="dd-summary">Total: <strong>'+fm(totalSum)+'</strong> · '+rows.length+' documento'+(rows.length!==1?'s':'')+' · '+clientes.length+' cliente'+(clientes.length!==1?'s':'')+'</div>';
-  $("dd-list").innerHTML=summary+html;
-  $("dash-detail-modal").classList.remove("hidden");
+
+  _renderDashGroupedList({
+    title,
+    rows,
+    summaryBuilder,
+    emptyMsg:"Sin documentos en este corte.",
+    showSortChip,
+    tipoKey:tipo,
+    tagStyle:"kpi"
+  });
 }
 function closeDashDetail(){$("dash-detail-modal").classList.add("hidden");_dashDetailTipoActual=null}
+
+// ═══════════════════════════════════════════════════════════
+// v6.0.2 Item 9: Modal WhatsApp — recordatorio amigable de saldo pendiente
+// Se invoca desde el chip 💬 en el drill-down del Pipeline (entregados_con_saldo).
+// El mensaje usa tono cercano/tú con saldo y número de pedido, siempre editable
+// antes de enviar. Al confirmar, abre wa.me con el mensaje URL-encoded.
+// ═══════════════════════════════════════════════════════════
+let _waSaldoDoc=null; // {id,kind,q}
+
+function openSaldoWhatsAppModal(docId,kind){
+  const q=(typeof quotesCache!=="undefined")?quotesCache.find(x=>x.id===docId&&x.kind===kind):null;
+  if(!q){alert("No se encontró el documento.");return}
+  const saldo=(typeof saldoPendiente==="function")?saldoPendiente(q):0;
+  const num=q.quoteNumber||q.id;
+  const cli=q.client||"";
+  // Template cercano/tú (decidido en v6.0.2):
+  const tpl="Hola "+cli+", ¡esperamos estés muy bien! Te escribimos de Gourmet Bites. "+
+    "Quedó un saldito de "+fm(saldo)+" pendiente del pedido "+num+". "+
+    "¿Nos cuentas cuándo lo podemos coordinar? 🙏";
+  _waSaldoDoc={id:docId,kind,q};
+  // Prefill — intentar teléfono desde múltiples campos posibles
+  const tel=(q.clientPhone||q.tel||q.orderData?.tel||q.approvalData?.tel||"").replace(/\D/g,"");
+  const tEl=$("wa-saldo-tel");if(tEl)tEl.value=tel;
+  const cEl=$("wa-saldo-cli");if(cEl)cEl.value=cli;
+  const mEl=$("wa-saldo-msg");if(mEl)mEl.value=tpl;
+  $("wa-saldo-modal").classList.remove("hidden");
+}
+
+function closeSaldoWhatsAppModal(){
+  $("wa-saldo-modal").classList.add("hidden");
+  _waSaldoDoc=null;
+}
+
+function sendSaldoWhatsApp(){
+  const telRaw=($("wa-saldo-tel").value||"").replace(/\D/g,"");
+  const msg=($("wa-saldo-msg").value||"").trim();
+  if(!msg){alert("El mensaje no puede estar vacío.");return}
+  if(!telRaw){alert("Falta el teléfono del cliente.");return}
+  // Normalizar teléfono: si no tiene código de país, asumir Colombia (57)
+  let tel=telRaw;
+  if(tel.length===10&&!tel.startsWith("57"))tel="57"+tel;
+  const url="https://wa.me/"+tel+"?text="+encodeURIComponent(msg);
+  window.open(url,"_blank");
+  closeSaldoWhatsAppModal();
+}
 
 // v5.2.3: helpers para etiquetado rápido desde drill-down del dashboard
 // Reusa quickMarkViva (historial) y openPerdidaModal (seguimiento) sin modificarlos.
@@ -1731,85 +1926,159 @@ window.addEventListener("offline",()=>{
 // v5.0.4: PIPELINE ACTIVO (lo vivo hoy, sin filtro de período)
 // 3 cards clickeables:
 //   🧾 En cotización · 🤝 Pedidos confirmados · 🎉 Entregados con saldo
+// v6.0.2:
+//   - Item 5: badge de urgencia (puntito rojo) si hay docs >= 7 días sin mover.
+//   - Item 6: sub-línea adicional con clientes únicos.
 // ═══════════════════════════════════════════════════════════
 function renderPipelineActivo(){
   const grid=$("pipeline-grid");
   if(!grid)return;
   if(typeof getPipelineActivo!=="function"){grid.innerHTML='<div style="color:#999;font-size:11px">Pipeline no disponible</div>';return}
   const p=getPipelineActivo();
+
+  // v6.0.2 Item 5 + 6: calcular urgencia y clientes únicos por bucket
+  const todayIso=new Date().toISOString().slice(0,10);
+  const stats=(bucketDocs,useEntrega)=>{
+    const clientes=new Set();
+    let urgentes=0,oldestDias=0;
+    bucketDocs.forEach(q=>{
+      if(q.client)clientes.add(q.client);
+      // Para urgencia: cotización y pedidos usan updatedAt, entregados usan fechaEntrega
+      let refDate;
+      if(useEntrega){
+        refDate=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+      }else{
+        refDate=q.updatedAtLocal||q.updatedAtIso||q.dateISO||"";
+        if(q.updatedAt?.toDate){try{refDate=q.updatedAt.toDate().toISOString().slice(0,10)}catch(_){}}
+        if(refDate&&refDate.length>10)refDate=refDate.slice(0,10);
+      }
+      if(!refDate)return;
+      const dias=Math.max(0,Math.floor((new Date(todayIso)-new Date(refDate))/86400000));
+      if(dias>oldestDias)oldestDias=dias;
+      if(dias>=7)urgentes++;
+    });
+    return {cli:clientes.size,urgentes,oldestDias};
+  };
+  const st1=stats(p.en_cotizacion.docs,false);
+  const st2=stats(p.pedidos_confirmados.docs,false);
+  const st3=stats(p.entregados_con_saldo.docs,true);
+
+  const urgentBadge=(n,dias)=>n>0?'<span class="pipe-urgent-badge" title="'+n+' doc(s) con más de 7 días · el más viejo: '+dias+'d">🔴 '+n+'</span>':'';
+  const cliSub=(n)=>n>0?' · '+n+' cliente'+(n!==1?'s':''):"";
+
   grid.innerHTML=
     '<div class="pipe-card pc-cot" onclick="openPipelineDetail(\'en_cotizacion\')">'+
+      urgentBadge(st1.urgentes,st1.oldestDias)+
       '<div class="pipe-card-lab">🧾 En cotización</div>'+
       '<div class="pipe-card-val">'+fm(p.en_cotizacion.total)+'</div>'+
-      '<div class="pipe-card-sub">🟢 '+p.en_cotizacion.count+' viva'+(p.en_cotizacion.count!==1?'s':'')+'</div>'+
+      '<div class="pipe-card-sub">🟢 '+p.en_cotizacion.count+' viva'+(p.en_cotizacion.count!==1?'s':'')+cliSub(st1.cli)+'</div>'+
     '</div>'+
     '<div class="pipe-card pc-ped" onclick="openPipelineDetail(\'pedidos_confirmados\')">'+
+      urgentBadge(st2.urgentes,st2.oldestDias)+
       '<div class="pipe-card-lab">🤝 Pedidos confirmados</div>'+
       '<div class="pipe-card-val">'+fm(p.pedidos_confirmados.total)+'</div>'+
-      '<div class="pipe-card-sub">'+p.pedidos_confirmados.count+' por entregar</div>'+
+      '<div class="pipe-card-sub">'+p.pedidos_confirmados.count+' por entregar'+cliSub(st2.cli)+'</div>'+
     '</div>'+
     '<div class="pipe-card pc-ent" onclick="openPipelineDetail(\'entregados_con_saldo\')">'+
+      urgentBadge(st3.urgentes,st3.oldestDias)+
       '<div class="pipe-card-lab">🎉 Entregados con saldo</div>'+
       '<div class="pipe-card-val">'+fm(p.entregados_con_saldo.total)+'</div>'+
-      '<div class="pipe-card-sub">'+p.entregados_con_saldo.count+' por cobrar</div>'+
+      '<div class="pipe-card-sub">'+p.entregados_con_saldo.count+' por cobrar'+cliSub(st3.cli)+'</div>'+
     '</div>';
 }
 
 // Drill-down de los buckets del Pipeline Activo (click en una pipe-card)
+// v6.0.1: BUG-014 FIX — antes escribía en $("dash-detail-body") (ID inexistente).
+// v6.0.2: Item 4 — delega el render al helper unificado _renderDashGroupedList
+// (ya no duplica la lógica de docRow/agrupado/summary con openDashDetail).
+// v6.0.2: Item 8 — bucket "entregados_con_saldo" muestra desglose de antigüedad.
+// v6.0.2: Item 9 — botón 💬 WhatsApp en cada fila del bucket "entregados_con_saldo".
+// v6.0.2: Item 10 — bucket "entregados_con_saldo" ordena por antigüedad por defecto.
 function openPipelineDetail(bucket){
   if(typeof getPipelineActivo!=="function")return;
   const p=getPipelineActivo();
   const b=p[bucket];
   if(!b)return;
   const titulos={
-    en_cotizacion:"🧾 Documentos en cotización (vivos)",
+    en_cotizacion:"🧾 En cotización (vivos)",
     pedidos_confirmados:"🤝 Pedidos confirmados (por entregar)",
     entregados_con_saldo:"🎉 Entregados con saldo por cobrar"
   };
   const title=titulos[bucket]||"Pipeline";
-  if(!b.docs.length){
-    alert(title+"\n\nNo hay documentos en este momento.");
-    return;
-  }
-  // Reutilizamos el modal de drill-down del dashboard existente
-  const docs=[...b.docs].sort((a,b2)=>(b2.dateISO||"").localeCompare(a.dateISO||""));
   const useSaldo=(bucket==="entregados_con_saldo");
-  let rows=docs.map(q=>{
-    const monto=useSaldo?(typeof saldoPendiente==="function"?saldoPendiente(q):0):(q.total||0);
-    const fecha=q.eventDate||q.dateISO||"—";
-    const sMeta=STATUS_META[q.status||"enviada"]||STATUS_META.enviada;
-    const tag=q.kind==="quote"?'<span class="ui-tag prod">Cotización</span>':'<span class="ui-tag ent">Propuesta</span>';
-    // v5.0.5: badge VIVA/PERDIDA en estado (solo para followables)
-    let ecBadge="";
-    if(typeof estadoComercial==="function"){
-      const ec=estadoComercial(q);
-      if(ec&&typeof ESTADO_COMERCIAL_META!=="undefined"&&ESTADO_COMERCIAL_META[ec]){
-        const m=ESTADO_COMERCIAL_META[ec];
-        ecBadge=' <span class="hc-estado-badge '+m.cls+'">'+m.emoji+' '+m.label+'</span>';
+  const tipoKey="pipeline:"+bucket;
+  _dashDetailTipoActual=tipoKey;
+
+  // v6.0.2 Item 10: bucket "entregados_con_saldo" se inicializa por antigüedad la primera vez
+  if(useSaldo&&!_dashDetailSortMode[tipoKey]){
+    _dashDetailSortMode[tipoKey]="antiguedad";
+  }
+
+  // Construir rows. Para "entregados_con_saldo" agregamos:
+  //   - monto = saldo pendiente (no total)
+  //   - extra con días desde entrega y chip WhatsApp (item 9)
+  //   - _dashDocDate usa fechaEntrega para ordenar (más viejo primero)
+  const todayIso=new Date().toISOString().slice(0,10);
+  const rows=b.docs.map(q=>{
+    const monto=useSaldo?(typeof saldoPendiente==="function"?saldoPendiente(q):0):(getDocTotal(q));
+    let extra=null;
+    if(useSaldo){
+      const cobr=typeof totalCobrado==="function"?totalCobrado(q):0;
+      // v6.0.2 Item 8: mostrar días desde entrega con badge de color
+      const fEnt=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+      let diasTag="";
+      if(fEnt){
+        const dias=Math.max(0,Math.floor((new Date(todayIso)-new Date(fEnt))/86400000));
+        let cls="nuevo";
+        if(dias>14)cls="viejo";
+        else if(dias>3)cls="medio";
+        diasTag='<span class="dd-dias-tag '+cls+'">'+dias+'d</span> ';
       }
+      // v6.0.2 Item 9: chip WhatsApp
+      const waChip=' <span class="dd-inline-wa" onclick="event.stopPropagation();openSaldoWhatsAppModal(\''+q.id+'\',\''+q.kind+'\')" title="Enviar recordatorio por WhatsApp">💬 WhatsApp</span>';
+      extra=diasTag+"Cobrado "+fm(cobr)+" / Total "+fm(getDocTotal(q))+waChip;
+    }else if(q.eventDate){
+      extra="Evento: "+q.eventDate;
     }
-    return '<tr onclick="closeDashDetail();setTimeout(function(){loadQuote(\''+q.kind+'\',\''+q.id+'\')},80)" style="cursor:pointer">'+
-      '<td style="font-size:10px;color:#555">'+(q.quoteNumber||q.id)+'</td>'+
-      '<td>'+tag+'</td>'+
-      '<td>'+(q.client||"—")+'</td>'+
-      '<td style="font-size:10px">'+fecha+'</td>'+
-      '<td><span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+ecBadge+'</td>'+
-      '<td style="text-align:right;font-weight:700">'+fm(monto)+'</td>'+
-      '</tr>';
-  }).join("");
-  const headCell='font-size:10px;text-transform:uppercase;color:#666;padding:6px 8px;border-bottom:1.5px solid #ddd';
-  const html='<div style="padding:4px 0 10px"><h3 style="margin:0 0 4px;color:var(--gd);font-family:\'Cormorant Garamond\',serif">'+title+'</h3>'+
-    '<div style="font-size:12px;color:#777">'+b.count+' documento'+(b.count!==1?'s':'')+' · Total: <strong>'+fm(b.total)+'</strong></div></div>'+
-    '<div style="max-height:60vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
-      '<th style="'+headCell+';text-align:left">Número</th>'+
-      '<th style="'+headCell+';text-align:left">Tipo</th>'+
-      '<th style="'+headCell+';text-align:left">Cliente</th>'+
-      '<th style="'+headCell+';text-align:left">Fecha</th>'+
-      '<th style="'+headCell+';text-align:left">Estado</th>'+
-      '<th style="'+headCell+';text-align:right">'+(useSaldo?"Saldo":"Total")+'</th>'+
-    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
-  const body=$("dash-detail-body");
-  if(body){body.innerHTML=html;$("dash-detail-modal").classList.remove("hidden")}
+    return {q,monto,extra};
+  });
+
+  // Summary custom para cada bucket
+  const summaryBuilder=(rowsArg,clientes)=>{
+    // Bucket 3: entregados_con_saldo → incluir desglose por antigüedad (item 8)
+    if(useSaldo){
+      let s1=0,s2=0,s3=0;
+      rowsArg.forEach(r=>{
+        const q=r.q;
+        const fEnt=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+        if(!fEnt)return;
+        const dias=Math.max(0,Math.floor((new Date(todayIso)-new Date(fEnt))/86400000));
+        if(dias<=3)s1+=r.monto;
+        else if(dias<=14)s2+=r.monto;
+        else s3+=r.monto;
+      });
+      let desglose="";
+      const parts=[];
+      if(s1>0)parts.push('<span class="dd-aging dd-aging-nuevo">0–3d '+fm(s1)+'</span>');
+      if(s2>0)parts.push('<span class="dd-aging dd-aging-medio">4–14d '+fm(s2)+'</span>');
+      if(s3>0)parts.push('<span class="dd-aging dd-aging-viejo">+15d '+fm(s3)+'</span>');
+      if(parts.length)desglose='<div class="dd-aging-bar">'+parts.join(' · ')+'</div>';
+      return '<div class="dd-summary">Saldo por cobrar: <strong>'+fm(b.total)+'</strong> · '+b.count+' documento'+(b.count!==1?'s':'')+' · '+clientes.length+' cliente'+(clientes.length!==1?'s':'')+'</div>'+desglose;
+    }
+    // Otros buckets: summary simple con total
+    const montoLbl="Total";
+    return '<div class="dd-summary">'+montoLbl+': <strong>'+fm(b.total)+'</strong> · '+b.count+' documento'+(b.count!==1?'s':'')+' · '+clientes.length+' cliente'+(clientes.length!==1?'s':'')+'</div>';
+  };
+
+  _renderDashGroupedList({
+    title,
+    rows,
+    summaryBuilder,
+    emptyMsg:"No hay documentos en este bucket.",
+    showSortChip:true,
+    tipoKey,
+    tagStyle:"pipe"
+  });
 }
 
 // ═══════════════════════════════════════════════════════════

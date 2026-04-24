@@ -109,7 +109,7 @@
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v6.0.0";
+const BUILD_VERSION="v6.0.2";
 const BUILD_DATE="2026-04-23";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -454,13 +454,27 @@ function editOnlyNotes(q){
 //   - NO se puede anular (canAnular devuelve false)
 // ═══════════════════════════════════════════════════════════
 
+// v6.0.2: regla extendida para cortesías/muestras (total=0).
+// Un pedido entregado con total=0 se considera cumplido automáticamente
+// (no hay plata por cobrar). Así no queda varado en Pedidos→Entregadas
+// de forma permanente. Se complementa con isCortesia() abajo para poder
+// distinguirlo visualmente en el drill-down y en Ventas anteriores.
 function isCumplido(q){
   if(!q)return false;
   if((q.status||"")!=="entregado")return false;
   const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
-  if(!total||total<=0)return false;
+  // v6.0.2: total=0 (cortesía/muestra) entregado = cumplido automático
+  if(!total||total<=0)return true;
   const cobrado=(typeof totalCobrado==="function")?totalCobrado(q):0;
   return cobrado>=total;
+}
+
+// v6.0.2: ¿es una cortesía/muestra?
+// true si el doc tiene total=0 (cualquier status). Útil para badges visuales.
+function isCortesia(q){
+  if(!q)return false;
+  const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
+  return !total||total<=0;
 }
 
 // ¿Se puede anular este doc?
