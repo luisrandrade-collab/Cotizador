@@ -109,8 +109,8 @@
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v5.5.0";
-const BUILD_DATE="2026-04-22";
+const BUILD_VERSION="v6.0.0";
+const BUILD_DATE="2026-04-23";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
 const APP_YEAR=new Date().getFullYear();
@@ -434,6 +434,51 @@ function warningSeverity(q){
 function editOnlyNotes(q){
   if(!q)return false;
   return (q.status||"")==="entregado";
+}
+
+// ═══════════════════════════════════════════════════════════
+// v6.0.0: VENTAS ANTERIORES — Helpers de pedidos cumplidos
+// ═══════════════════════════════════════════════════════════
+// Un pedido se considera "cumplido" cuando fue entregado Y está
+// pagado por completo. Estos documentos se archivan en la pestaña
+// "Ventas anteriores" para no sobrecargar el operativo diario.
+//
+// Reglas:
+//   - status === "entregado" (requisito operativo)
+//   - totalCobrado(q) >= getDocTotal(q) (requisito financiero)
+//   - total > 0 (un doc sin total no se considera cumplido)
+//
+// Consecuencias:
+//   - Aparece en archivo "ventas_anteriores" (pestaña nueva)
+//   - Por defecto SALE de "Pedidos → Entregadas" (toggle para verlos)
+//   - NO se puede anular (canAnular devuelve false)
+// ═══════════════════════════════════════════════════════════
+
+function isCumplido(q){
+  if(!q)return false;
+  if((q.status||"")!=="entregado")return false;
+  const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
+  if(!total||total<=0)return false;
+  const cobrado=(typeof totalCobrado==="function")?totalCobrado(q):0;
+  return cobrado>=total;
+}
+
+// ¿Se puede anular este doc?
+// Regla v6.0: NO si ya es cumplido (entregado + pagado completo) Y
+// NO si status no está en lista reversible (pedido/aprobada/en_produccion).
+// Antes de v6.0: solo status mandaba; ahora también cobro completo bloquea.
+function canAnular(q){
+  if(!q)return false;
+  const st=q.status||"enviada";
+  if(!["pedido","aprobada","en_produccion"].includes(st))return false;
+  // v6.0: si ya está completamente pagado, bloquear anulación
+  // (requiere devolución grande y operacionalmente ya no tiene sentido)
+  const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
+  if(total>0){
+    const cobrado=(typeof totalCobrado==="function")?totalCobrado(q):0;
+    if(cobrado>=total)return false;
+  }
+  return true;
 }
 
 // Versionado con sufijo -1, -2: solo pre-confirmación del cliente

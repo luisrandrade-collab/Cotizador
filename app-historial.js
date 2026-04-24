@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// app-historial.js · v5.1.0 · 2026-04-21
+// app-historial.js · v6.0.0 · 2026-04-23
 // Historial + ciclo de vida (order/approve/saldo) + pagos +
 // duplicar + features v4.12: foto entrega, notas producción,
 // notas entrega, quién entregó, recibido conforme, comentarios cliente.
@@ -13,6 +13,13 @@
 // v5.1.0: 4 sub-pestañas (Vivas/Pedidos/Perdidas/Anuladas) + buscador por
 //         palabras + botones rápidos 🟢 Viva / ❌ Perdida en tarjetas +
 //         adjuntar comprobante después del pago.
+// v5.5.0: matriz de edición permisiva + botón ✏️ según canEdit + modal
+//         advertencia requestEdit + botón 🕒 timeline de cambios.
+// v6.0.0: 5ta pestaña "📦 Ventas anteriores" (pedidos cumplidos = entregado
+//         + pagado completo) con filtros por año. Toggle "Incluir cumplidas"
+//         en Pedidos → Entregadas. Botón ↩️ Anular ahora respeta canAnular()
+//         que bloquea si el pedido ya fue cobrado al 100%. Defensa doble
+//         en openAnularModal.
 // ═══════════════════════════════════════════════════════════
 
 const METODOS_PAGO=["Efectivo","Nequi","Daviplata","Banco Falabella","Transferencia","Otro"];
@@ -57,6 +64,9 @@ function saldoPendiente(q){const t=(typeof getDocTotal==="function"?getDocTotal(
 if(typeof histArchive==="undefined")var histArchive="vivas";
 if(typeof histFilter==="undefined")var histFilter="all";
 if(typeof histSearch==="undefined")var histSearch="";
+// v6.0: toggle para incluir cumplidas en "Pedidos → Entregadas"
+// (normalmente viven solo en "Ventas anteriores").
+if(typeof histIncluirCumplidos==="undefined")var histIncluirCumplidos=false;
 
 // Normaliza texto: quita tildes, a minúsculas. Para comparar en buscador.
 function _normTxt(s){
@@ -80,7 +90,22 @@ function _docSearchableText(q){
 }
 
 // ¿El doc pertenece al archivo dado?
-function _docEnArchivo(q,arch){
+// v6.0.0: nuevo archivo "ventas_anteriores" para pedidos cumplidos
+// (entregados + pagados completos). Por defecto los cumplidos SALEN
+// de "pedidos" y viven SOLO en "ventas_anteriores". El toggle
+// histIncluirCumplidos los vuelve a mostrar en "pedidos" (útil para
+// búsquedas o chequeos esporádicos sin cambiar de pestaña).
+//
+// IMPORTANTE sobre los contadores:
+//   El parámetro `respectToggle` define si la función respeta el toggle
+//   "Incluir cumplidas" de Pedidos. Para la LISTA filtrada pasamos true
+//   (si toggle=ON, cumplidas aparecen en Pedidos). Para los CONTADORES
+//   de los chips superiores pasamos false → el chip "Pedidos" siempre
+//   muestra el conteo operativo (sin cumplidas) y "Ventas anteriores"
+//   siempre muestra las cumplidas. Así los 5 chips SIEMPRE suman al
+//   total de docs, sin doble conteo cuando el toggle está activo.
+function _docEnArchivo(q,arch,respectToggle){
+  if(respectToggle===undefined)respectToggle=false;
   const s=q.status||"enviada";
   const fu=typeof getFollowUp==="function"?getFollowUp(q):"pendiente";
   if(s==="convertida")return false; // siempre ocultas
@@ -89,7 +114,22 @@ function _docEnArchivo(q,arch){
   if(arch==="perdidas")return fu==="perdida"&&(s==="enviada"||s==="propfinal");
   if(fu==="perdida"&&(s==="enviada"||s==="propfinal"))return false;
   if(arch==="vivas")return ["enviada","propfinal"].includes(s)&&(typeof isFollowable==="function"?isFollowable(q):true);
-  if(arch==="pedidos")return ["pedido","aprobada","en_produccion","entregado"].includes(s);
+  // v6.0: "ventas_anteriores" = pedidos cumplidos (entregado + pagado completo)
+  if(arch==="ventas_anteriores"){
+    return (typeof isCumplido==="function")?isCumplido(q):false;
+  }
+  if(arch==="pedidos"){
+    if(!["pedido","aprobada","en_produccion","entregado"].includes(s))return false;
+    // v6.0: excluir cumplidos (viven en ventas_anteriores).
+    // El toggle "incluir cumplidas" SOLO afecta la LISTA filtrada,
+    // no los contadores de los chips. Así evitamos doble conteo.
+    const _cumplido=(typeof isCumplido==="function")&&isCumplido(q);
+    if(_cumplido){
+      if(respectToggle&&histIncluirCumplidos)return true;
+      return false;
+    }
+    return true;
+  }
   return false;
 }
 
@@ -119,6 +159,14 @@ const HIST_SUBFILTERS={
   ],
   anuladas:[
     {k:"all",label:"Todas"}
+  ],
+  // v6.0: Ventas anteriores — pedidos cumplidos (entregado + pagado)
+  // Permite filtrar por año para no ahogar la lista cuando haya muchos.
+  ventas_anteriores:[
+    {k:"all",label:"Todas"},
+    {k:"year_current",label:"Este año"},
+    {k:"year_prev",label:"Año anterior"},
+    {k:"older",label:"Más antiguas"}
   ]
 };
 
@@ -138,6 +186,15 @@ function _docEnSubfiltro(q,arch,filt){
     const motivo=q.perdidaData?.motivo||"otro";
     return motivo===filt;
   }
+  // v6.0: Ventas anteriores — filtro por año basado en fecha de entrega
+  if(arch==="ventas_anteriores"){
+    const fEnt=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+    const yearDoc=fEnt.slice(0,4);
+    const yearNow=new Date().getFullYear();
+    if(filt==="year_current")return yearDoc===String(yearNow);
+    if(filt==="year_prev")return yearDoc===String(yearNow-1);
+    if(filt==="older")return yearDoc!==""&&parseInt(yearDoc,10)<yearNow-1;
+  }
   return true;
 }
 
@@ -148,7 +205,8 @@ async function renderHist(){
   if(!quotesCache.length){el.innerHTML='<div class="empty"><div class="ic">📁</div><p>No hay cotizaciones guardadas</p></div>';return}
 
   // Contadores por archivo (todos, independiente del sub-filtro/búsqueda)
-  const archCnt={vivas:0,pedidos:0,perdidas:0,anuladas:0};
+  // v6.0: añadimos ventas_anteriores (pedidos cumplidos)
+  const archCnt={vivas:0,pedidos:0,ventas_anteriores:0,perdidas:0,anuladas:0};
   quotesCache.forEach(q=>{
     if(q._wrongCollection)return; // fantasmas excluidos de contadores
     Object.keys(archCnt).forEach(arch=>{
@@ -160,7 +218,8 @@ async function renderHist(){
   const searchNorm=_normTxt(histSearch.trim());
   const filtered=quotesCache.filter(q=>{
     if(q._wrongCollection&&histArchive!=="anuladas")return false;
-    if(!_docEnArchivo(q,histArchive))return false;
+    // v6.0: la lista filtrada SÍ respeta el toggle "incluir cumplidas"
+    if(!_docEnArchivo(q,histArchive,true))return false;
     if(!_docEnSubfiltro(q,histArchive,histFilter))return false;
     if(searchNorm){
       const txt=_docSearchableText(q);
@@ -170,11 +229,13 @@ async function renderHist(){
   });
 
   // Barra de archivos (principal)
+  // v6.0: nuevo archivo "Ventas anteriores" (pedidos cumplidos)
   const archMeta={
-    vivas:   {label:"🟢 Vivas",    cls:"arch-vivas"},
-    pedidos: {label:"🤝 Pedidos",  cls:"arch-pedidos"},
-    perdidas:{label:"❌ Perdidas", cls:"arch-perdidas"},
-    anuladas:{label:"↩️ Anuladas", cls:"arch-anuladas"}
+    vivas:            {label:"🟢 Vivas",            cls:"arch-vivas"},
+    pedidos:          {label:"🤝 Pedidos",          cls:"arch-pedidos"},
+    ventas_anteriores:{label:"📦 Ventas anteriores",cls:"arch-ventas-ant"},
+    perdidas:         {label:"❌ Perdidas",         cls:"arch-perdidas"},
+    anuladas:         {label:"↩️ Anuladas",         cls:"arch-anuladas"}
   };
   const archBar='<div class="hist-archives">'+
     Object.keys(archMeta).map(k=>{
@@ -197,7 +258,10 @@ async function renderHist(){
   subs.forEach(sf=>{
     subCnt[sf.k]=quotesCache.filter(q=>{
       if(q._wrongCollection&&histArchive!=="anuladas")return false;
-      return _docEnArchivo(q,histArchive)&&_docEnSubfiltro(q,histArchive,sf.k);
+      // v6.0: los sub-contadores DEBEN coincidir con la lista que se muestra
+      // abajo, así que respetan el toggle "incluir cumplidas". Si el toggle
+      // está ON, "Todas" y "Entregadas" muestran el número aumentado.
+      return _docEnArchivo(q,histArchive,true)&&_docEnSubfiltro(q,histArchive,sf.k);
     }).length;
   });
   const subBar=subs.length>1?('<div class="hist-subfilters">'+
@@ -205,7 +269,33 @@ async function renderHist(){
       '<span class="cnt">'+(subCnt[sf.k]||0)+'</span></button>').join("")+
     '</div>'):'';
 
-  const header=archBar+searchBar+subBar;
+  // v6.0: toggle "Incluir cumplidas" cuando estás en Pedidos → Entregadas
+  // Permite ver los cumplidos mezclados con los entregados con saldo sin
+  // cambiar de pestaña, útil para comparar o buscar algo específico.
+  let toggleBar='';
+  if(histArchive==="pedidos"&&(histFilter==="entregado"||histFilter==="all")){
+    const totalCumplidos=archCnt.ventas_anteriores;
+    if(totalCumplidos>0){
+      const activo=histIncluirCumplidos?"act":"";
+      const txt=histIncluirCumplidos
+        ?'✅ Mostrando cumplidas ('+totalCumplidos+')'
+        :'📦 '+totalCumplidos+' cumplida'+(totalCumplidos!==1?'s':'')+' en Ventas anteriores';
+      toggleBar='<div class="hist-toggle-cumplidas">'+
+        '<button class="hist-toggle-btn '+activo+'" onclick="toggleIncluirCumplidos()">'+txt+'</button>'+
+        (histIncluirCumplidos?'':'<button class="hist-toggle-link" onclick="setHistArchive(\'ventas_anteriores\')">Ver → </button>')+
+        '</div>';
+    }
+  }
+  // v6.0: banner descriptivo en Ventas anteriores
+  let ventasAntBanner='';
+  if(histArchive==="ventas_anteriores"){
+    ventasAntBanner='<div class="hist-ventas-ant-info">'+
+      '<strong>📦 Ventas anteriores</strong> — Pedidos entregados y pagados completos. '+
+      'Archivo de referencia histórica: el trabajo ya cerró financiera y operativamente.'+
+      '</div>';
+  }
+
+  const header=archBar+searchBar+subBar+toggleBar+ventasAntBanner;
 
   if(!filtered.length){
     const emptyMsg=histSearch
@@ -331,7 +421,10 @@ async function renderHist(){
       actionBtns.push('<button class="btn hc-btn-wrong" onclick="deleteWrongDoc(\''+q.id+'\',event)">🗑️ Eliminar fantasma</button>');
     }
     // v5.0.3: botón ↩️ Anular para docs en estados reversibles (antes de entregar)
-    const _anulable=["pedido","en_produccion","aprobada"].includes(status);
+    // v6.0.0: además, si el doc ya está cobrado al 100%, NO se puede anular
+    // (operativamente no tiene sentido y requiere devolución grande).
+    // Centralizado en canAnular(q) de app-core.
+    const _anulable=(typeof canAnular==="function")?canAnular(q):["pedido","en_produccion","aprobada"].includes(status);
     if(_anulable){
       actionBtns.push('<button class="btn hc-btn-anular" onclick="openAnularModal(\''+q.id+'\',\''+q.kind+'\',event)">↩️ Anular</button>');
     }
@@ -385,6 +478,14 @@ function setHistArchive(arch){
 }
 
 function setHistFilter(k){histFilter=k;renderHist()}
+
+// v6.0: Toggle para incluir/excluir pedidos cumplidos de la vista "Pedidos → Entregadas".
+// Por defecto los cumplidos viven en su propia pestaña "Ventas anteriores" y
+// no aparecen mezclados con los entregados con saldo pendiente.
+function toggleIncluirCumplidos(){
+  histIncluirCumplidos=!histIncluirCumplidos;
+  renderHist();
+}
 
 // v5.1.0: buscador en tiempo real
 let _histSearchTimer=null;
@@ -1268,6 +1369,14 @@ function openAnularModal(docId,kind,ev){
   const status=q.status||"enviada";
   if(!["pedido","aprobada","en_produccion"].includes(status)){
     alert("Solo se pueden anular pedidos/eventos en estado Pedido, Aprobada o En producción.\n\nEstado actual: "+(STATUS_META[status]?.label||status));
+    return;
+  }
+  // v6.0.0: si ya fue cobrado al 100%, bloquear la anulación desde el modal también
+  // (defensa en profundidad — el botón UI ya lo oculta via canAnular).
+  const _total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
+  const _cobrado=totalCobrado(q);
+  if(_total>0&&_cobrado>=_total){
+    alert("❌ No se puede anular este pedido.\n\nEl cliente ya pagó el 100% ("+fm(_cobrado)+" / "+fm(_total)+").\n\nSi necesitas revertir algo, registra una devolución manual desde 'Ver pagos' o edita el pedido con la razón del cambio.");
     return;
   }
   _anularCtx={docId:docId,kind:kind,q:q};
