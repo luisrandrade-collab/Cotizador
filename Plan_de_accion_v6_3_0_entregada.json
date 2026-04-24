@@ -1,0 +1,395 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto completo tras entrega v6.3.0",
+    "proposito": "Arrancar próxima entrega (v6.4.0 o v7.0) tras v6.3.0 entregada el 2026-04-24. Incluye balance de lo implementado en v6.3.0, hallazgos durante implementación, alcance sugerido para v6.4.0 y preguntas abiertas.",
+    "generado_el": "2026-04-24",
+    "generado_por": "Claude Opus 4.7 — sesión de implementación v6.3.0 completada",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — al finalizar cada entrega, mover de roadmap_aprobado a historial_versiones_detallado y actualizar version_actual_en_produccion.",
+    "supersedes": "Plan_de_accion_v6_2_0_entregada.json — este reemplaza al anterior reflejando la entrega de v6.3.0",
+    "como_usar_en_nuevo_chat": "Subir: (1) los 7 archivos JS + index.html de v6.3.0 ya deployada, (2) el script scripts/check.sh, (3) el último backup gourmet-bites-backup-*.json, (4) este JSON. Primer mensaje: 'Arranca con v6.4.0 (o v7.0) siguiendo el roadmap. Antes de codificar pregunta qué items de fuera_de_alcance_actual priorizar.'"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual_en_produccion": "v6.3.0",
+    "siguiente_version_a_entregar": "v6.4.0 o v7.0 (por decidir tras piloto v6.3.0)",
+    "fecha_ultima_actualizacion": "2026-04-24",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos + LOGO_IW (sin cambios desde v5.0.x). 11 líneas.",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, loadQuote, savePdf, búsqueda global, helper h(), toast(), confirmModal() (v6.3.0). 2390 líneas. BUILD_VERSION en línea 112.",
+      "app-cotizar.js": "módulo cotizaciones. runTransaction atómico (v6.3.0 E3-1) en saveCurrentQuote. 510 líneas.",
+      "app-propuesta.js": "módulo propuestas. runTransaction atómico (v6.3.0 E3-1) en saveCurrentProp. 1114 líneas.",
+      "app-historial.js": "historial + buscador + modal PDFs. 1826 líneas.",
+      "app-seguimiento.js": "seguimiento comercial. 484 líneas.",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda + Hoja de Entregas (v6.2.0). 2748 líneas."
+    },
+    "scripts_build": {
+      "scripts/check.sh": "Pre-deploy check ampliado (v6.3.0 E3-2). 6 validaciones: node disponible · sintaxis 7 JS · consistencia BUILD_VERSION (app-core ↔ comentario HTML ↔ 7 script tags) · inventario 10 archivos · modales críticos (5) · alerts puros restantes. Salida en color con códigos ✅/❌/⚠️/ℹ️. Exit 0 si todo OK, exit 1 si errores. Puede correrse desde raíz o desde scripts/."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada", "superseded"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "archivo_historial": {
+      "vivas": "cotizaciones/propuestas sin cerrar y NO perdidas",
+      "pedidos": "pedido/aprobada/en_produccion/entregado (excluye cumplidos por defecto)",
+      "ventas_anteriores": "entregados Y pagados 100% (cumplidos) + cortesías (total=0 + entregado)",
+      "perdidas": "followUp=perdida y status in [enviada, propfinal]",
+      "anuladas": "status=anulada"
+    }
+  },
+  "estado_actual_sistema_datos_reales": {
+    "fuente": "backup gourmet-bites-backup-2026-04-23_21h36.json (v5.5.0, sin cambio schema en v6.2.0 ni v6.3.0)",
+    "nota": "Schema NO cambió entre v5.5.0 → v6.3.0. Datos del backup siguen válidos.",
+    "stats": {
+      "total_docs": 21,
+      "cotizaciones": 18,
+      "propuestas": 1,
+      "propfinales": 2,
+      "superseded": 1,
+      "anuladas": 3,
+      "clientes_unicos": 16,
+      "rango_fechas": "2026-04-17 a 2026-04-24 (7 días de operación real)"
+    },
+    "stats_criticas_para_diseno": {
+      "docs_con_pdfHistorial": 3,
+      "docs_sin_pdfHistorial": 18,
+      "porcentaje_con_pdf": "14%",
+      "implicacion_v610_v630": "86% de docs NO tienen PDF en Storage. Modal preview de v6.1.0 sigue funcionando para ambos casos."
+    },
+    "stats_followUp": {
+      "docs_con_followUp": 0,
+      "implicacion": "Campo no usado activamente. Q1 pendiente aún — CONFIRMAR con Luis si Seguimiento se usa."
+    },
+    "clientes_con_caracteres_especiales": {
+      "apostrofe": 0,
+      "parentesis": 1,
+      "ejemplo": "Mona (Janeth) Acevedo",
+      "implicacion": "Helper h() aplicado sistemáticamente en v6.3.0 a cada nuevo confirmModal."
+    },
+    "docs_con_pagos_registrados": 7
+  },
+  "analisis_tri_perspectiva_hallazgos_top": [
+    {
+      "id": "UX-1",
+      "severidad": "CRITICO",
+      "descripcion": "Bug VER vs EDITAR en 12 sitios (click tarjeta abre formulario en vez de ver).",
+      "resuelto_en": "v6.1.0"
+    },
+    {
+      "id": "UX-2",
+      "severidad": "CRITICO",
+      "descripcion": "221 alert/confirm/prompt nativos. Bloquean hilo, rompen UX móvil.",
+      "resuelto_en": "v6.1.0 (36 alerts) + v6.3.0 (33 alerts + 17 confirms no destructivos). Total migrado: 69+17=86. Destructivos (eliminar, anular, cascade delete) quedan para v6.4+."
+    },
+    {
+      "id": "ARQ-2",
+      "severidad": "CRITICO",
+      "descripcion": "113 innerHTML con concatenación sin escape. XSS latente + rompimiento por apóstrofes.",
+      "resuelto_en": "v6.1.0 (helper h) + v6.3.0 (h() aplicado a todos los cuerpos de confirmModal)"
+    },
+    {
+      "id": "ARQ-3",
+      "severidad": "IMPORTANTE",
+      "descripcion": "loadAllHistory limit(50) por colección. Con 21 docs actuales, tope en 9-10 meses.",
+      "resuelto_en": "POSPUESTO — revisar cuando total_docs >= 80"
+    },
+    {
+      "id": "ARQ-race",
+      "severidad": "IMPORTANTE",
+      "descripcion": "Save versión hija + mark padre superseded eran operaciones separadas. Race condition si caía red entre ellas.",
+      "resuelto_en": "v6.3.0 E3-1 (runTransaction atómico + fallback defensivo al método legacy)"
+    },
+    {
+      "id": "OP-1",
+      "severidad": "FEATURE GAP",
+      "descripcion": "No existía hoja física imprimible para Kathy/JP en entregas del día.",
+      "resuelto_en": "v6.2.0"
+    },
+    {
+      "id": "DX-1",
+      "severidad": "IMPORTANTE",
+      "descripcion": "v6.0.1 casi sale a producción con SyntaxError. Sin validación automática pre-deploy.",
+      "resuelto_en": "v6.3.0 E3-2 (scripts/check.sh con 6 validaciones en color)"
+    }
+  ],
+  "roadmap_aprobado": {
+    "principios": [
+      "Cada entrega deployable independiente",
+      "Rollback trivial entre entregas",
+      "Sin cambio de Firestore schema",
+      "Piloto antes de entrega siguiente",
+      "Siguiente entrega NO arranca hasta confirmar estabilidad de la anterior"
+    ],
+    "estado": "3 entregas del plan v6.x COMPLETADAS (v6.1.0, v6.2.0, v6.3.0). Próximo paso: decidir con Luis si v6.4.x con items abajo o pasar a v7.0 (rediseño grande).",
+    "fuera_de_alcance_actual": {
+      "nota": "Items identificados pero NO abordados en v6.1-v6.3. Candidatos para v6.4 o v7.0.",
+      "items": [
+        {
+          "tema": "Migrar confirms DESTRUCTIVOS a modal con confirmación escrita",
+          "detalle": "7 confirms quedaron sin migrar por ser destructivos: eliminar cliente (core:1792), borrar doc con prompt BORRAR (core:1904), borrar propuesta base huérfana (core:1972), escritura masiva CONFIRMACIÓN FINAL (dashboard:1587), eliminar fantasma individual (historial:1341), limpieza fantasmas batch (historial:1362). Requieren modal con input 'escribe ELIMINAR para confirmar' estilo GitHub.",
+          "esfuerzo_h": "3-4",
+          "prioridad": "MEDIA — los usuarios actuales son Luis/Kathy/JP, confianza alta",
+          "trigger_activacion": "Tras piloto v6.3.0 estable"
+        },
+        {
+          "tema": "Limpiar patrones defensivos alert() de v6.1.0",
+          "detalle": "33 alerts tipo 'if(typeof toast===\"function\")toast(...);else alert(...)' pueden simplificarse a solo toast() ahora que la función siempre existe desde v4.13.0. Limpieza cosmética, no funcional.",
+          "esfuerzo_h": "1",
+          "prioridad": "BAJA"
+        },
+        {
+          "tema": "Paginación real Firestore (cursor startAfter)",
+          "trigger_activacion": "total_docs >= 80 (hoy 21, margen 4x)",
+          "esfuerzo_h": "4-6"
+        },
+        {
+          "tema": "Event delegation para eliminar 267 onclick inline",
+          "justificacion": "Preparatorio para refactors mayores",
+          "esfuerzo_h": "8-12"
+        },
+        {
+          "tema": "Split de app-dashboard.js en 4 archivos",
+          "esfuerzo_h": "6-8"
+        },
+        {
+          "tema": "Tests unitarios para funciones puras",
+          "esfuerzo_h": "5-6"
+        },
+        {
+          "tema": "Modal Anular como wizard 3 pasos",
+          "esfuerzo_h": "3-4"
+        },
+        {
+          "tema": "E2-2: Foto del formato firmado en modal 'Registrar entrega'",
+          "estado": "NO implementada en v6.2.0 por alcance. Reusa entregaData.fotoEntrega. Esfuerzo: 1-2h.",
+          "trigger_activacion": "Si Luis pide rescatarla"
+        },
+        {
+          "tema": "Rediseño ERP grande (5 módulos: Dashboard, Ventas, Operaciones, Finanzas, Herramientas + Despachos NUEVO)",
+          "naturaleza": "Cambio mayor, requiere sesión dedicada de diseño + wireframes",
+          "version_tentativa": "v7.0",
+          "preguntas_abiertas_previas": [
+            "Despachos: ¿objeto separado o estado del pedido?",
+            "Oportunidades como entidad: ¿se adopta?",
+            "Finanzas: ¿granularidad reportes? ¿DIAN?"
+          ]
+        }
+      ]
+    }
+  },
+  "decisiones_aprobadas_no_discutir": [
+    "Roadmap = 3 entregas secuenciales (v6.1.0 → v6.2.0 → v6.3.0), todas COMPLETADAS",
+    "Piloto 1 semana entre entregas, siguiente NO arranca hasta confirmar estabilidad",
+    "Ninguna entrega v6.x cambia Firestore schema",
+    "Rollback entre versiones = subir archivos de versión anterior",
+    "v6.1.0: openDocument usa MODAL PREVIEW UNIFICADO",
+    "v6.1.0: h() aplicado en 5 renders expuestos",
+    "v6.2.0: Hoja de Entregas con rango de fechas, toggle 'Solo pendientes' default ON, orden por hora",
+    "v6.2.0: PDF landscape carta con 7 columnas, 5 filas vacías al final",
+    "v6.2.0: Foto del formato firmado (E2-2) POSPUESTA a v6.4+",
+    "v6.3.0 E3-1: runTransaction atómico en versión hija (cotizar + propuesta) CON fallback defensivo legacy + log solo en consola (Kathy/JP no ven detalle técnico)",
+    "v6.3.0 E3-2: scripts/check.sh automatizado (no checklist manual) con 6 validaciones en color",
+    "v6.3.0 E3-3: migración de alerts informativos + confirms NO destructivos en paralelo. Destructivos quedan para v6.4+",
+    "Versionado: MAJOR.MINOR.PATCH (v6.3.0 fue MINOR, un hotfix futuro sería v6.3.1)",
+    "Entrega de código: ZIP gourmet-bites-vX_Y_Z.zip con TODOS los archivos (v6.2.0=9, v6.3.0=10 con scripts/check.sh)",
+    "ZIP puede ser renombrado a files.zip por present_files — siempre advertirlo",
+    "Paginación Firestore POSPUESTA hasta total_docs >= 80",
+    "Rediseño ERP grande es v7.0"
+  ],
+  "preguntas_abiertas_para_luis": [
+    {
+      "id": "Q1",
+      "pregunta": "¿Usas activamente la pestaña Seguimiento? Backup sigue mostrando 0/21 docs con followUp marcado.",
+      "impacto_si_no_se_usa": "Seguimiento podría simplificarse o absorberse en Historial→Vivas en v7.0",
+      "responder_en": "Antes de arrancar v7.0"
+    },
+    {
+      "id": "Q2",
+      "pregunta": "¿Quieres migrar los 18 docs viejos sin PDF a Storage (helper admin) o prefieres 'generar bajo demanda'?",
+      "impacto": "Si SÍ, tarea de 1-2h. Si NO, queda como generar bajo demanda con modal preview de v6.1.0",
+      "responder_en": "Decidido: NO priorizado — modal preview cubre el caso de uso. Mover a decisiones_aprobadas si se confirma."
+    },
+    {
+      "id": "Q4",
+      "pregunta": "Tras piloto v6.2.0: ¿la hoja impresa en móvil (carta, horizontal) cabe bien? ¿Alguna columna se corta?",
+      "impacto": "Si alguna columna incomoda, ajuste en v6.3.1 (hotfix) o v6.4.0",
+      "responder_en": "Tras 3-5 entregas reales usando la hoja"
+    },
+    {
+      "id": "Q5",
+      "pregunta": "¿La sección 'RECIBE' de la Hoja de Entregas debe quedar vacía o precargar q.att?",
+      "impacto": "Actualmente vacía. Cambio trivial si prefiere precargar.",
+      "responder_en": "Tras piloto v6.2.0"
+    },
+    {
+      "id": "Q6_NUEVA",
+      "pregunta": "Tras piloto v6.3.0: ¿el fallback defensivo de runTransaction (método legacy) se ha activado alguna vez? (Revisar consola del navegador en busca de '[v6.3.0 E3-1] runTransaction falló'). Si nunca se activó en 1-2 semanas de uso real, eliminar en v6.5+.",
+      "responder_en": "Tras 2 semanas de v6.3.0 en producción"
+    },
+    {
+      "id": "Q7_NUEVA",
+      "pregunta": "¿Arrancar v6.4.0 (items no destructivos) o ir directo a v7.0 (rediseño ERP)? Los 7 confirms destructivos y la limpieza cosmética de alerts defensivos son candidatos naturales de v6.4.0 (~5h total).",
+      "responder_en": "Tras piloto v6.3.0 estable"
+    }
+  ],
+  "historial_versiones_detallado": [
+    {
+      "version": "v6.3.0",
+      "tipo": "MINOR",
+      "estado": "EN PRODUCCIÓN",
+      "fecha": "2026-04-24",
+      "naturaleza": "Robustez técnica + higiene (Entrega 3 del roadmap v6.x)",
+      "highlights": [
+        "E3-1: runTransaction atómico al crear versión hija en cotizaciones (app-cotizar.js) y propuestas (app-propuesta.js)",
+        "E3-1: Fallback defensivo al método legacy si la transacción falla + log solo en consola ([v6.3.0 E3-1] ...)",
+        "E3-2: scripts/check.sh con 6 validaciones (node disponible · sintaxis 7 JS · BUILD_VERSION consistencia · inventario 10 archivos · modales críticos · alerts puros) · salida en color · exit 0/1",
+        "E3-3: 33 alerts informativos migrados a toast() (estimado original ~14, real más del doble)",
+        "E3-3: 17 confirms no destructivos migrados a confirmModal() genérico nuevo",
+        "confirmModal() nuevo en app-core.js: soporta Promise + callbacks, 3 tonos (primary/warn/danger), degrada a confirm() nativo si falta HTML",
+        "Modal #confirm-modal agregado a index.html siguiendo el patrón .mf-wrap/.mf-head/.mf-body/.mf-foot existente",
+        "Scripts cache-buster actualizados: ?v=6.0.2 → ?v=6.3.0 en los 7 <script src>",
+        "Helper h() aplicado a TODOS los cuerpos de confirmModal (defensa XSS consistente)",
+        "Sin cambio Firestore schema · Rollback = subir archivos v6.2.0"
+      ],
+      "archivos_entregados": [
+        "app-assets.js (sin cambios)",
+        "app-core.js (BUILD_VERSION v6.3.0 + confirmModal + 12 confirms/alerts migrados)",
+        "app-cotizar.js (runTransaction + 5 confirms/alerts migrados)",
+        "app-propuesta.js (runTransaction + 9 confirms/alerts migrados)",
+        "app-historial.js (2 confirms + alerts migrados)",
+        "app-seguimiento.js (1 confirm migrado)",
+        "app-dashboard.js (4 confirms + 11 alerts migrados)",
+        "index.html (VERSION actualizada, modal #confirm-modal agregado, ?v=6.3.0)",
+        "scripts/check.sh (NUEVO)",
+        "Plan_de_accion_v6_3_0_entregada.json (este archivo)"
+      ]
+    },
+    {
+      "version": "v6.2.0",
+      "tipo": "FEATURE",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "Hoja de Entregas del Día imprimible PDF (landscape carta, 7 columnas)",
+        "Modal selector con rango de fechas + toggle 'Solo pendientes' default ON",
+        "Orden por horaEntrega con fallback alfabético por cliente",
+        "NOTAS PAGO con color semántico (CANCELADO verde / SALDO rojo)",
+        "5 filas vacías al final para entregas no planificadas"
+      ]
+    },
+    {
+      "version": "v6.1.0",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "openDocument() con modal preview unificado (12 sitios)",
+        "Helper h() escape HTML en 5 renders expuestos",
+        "36 alerts informativos migrados a toast (cotizar:7, propuesta:7, historial:22)",
+        "toast() con 3er parámetro duration opcional"
+      ]
+    },
+    {
+      "version": "v6.0.2",
+      "fecha": "2026-04-24",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": ["BUG-014 fix", "Toggle persistente localStorage", "Filtros mes Ventas anteriores", "Cortesías como cumplidas", "Refactor drill-down", "Pipe-cards urgencia", "Modal WhatsApp"]
+    },
+    {
+      "version": "v6.0.1",
+      "fecha": "2026-04-23",
+      "tipo": "HOTFIX",
+      "estado": "NO DEPLOYADA — superseded por v6.0.2",
+      "highlights": ["BUG-014"]
+    },
+    {
+      "version": "v6.0.0",
+      "fecha": "2026-04-23",
+      "tipo": "MAJOR",
+      "estado": "SUPERSEDED",
+      "highlights": ["Pestaña Ventas anteriores", "canAnular", "KPI Entregado desglose"]
+    },
+    {
+      "version": "v5.5.0",
+      "fecha": "2026-04-23",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": ["Matriz edición permisiva", "Versionado hijo", "Audit trail"]
+    }
+  ],
+  "instrucciones_mantenimiento_json": {
+    "al_entregar_v640_o_v70": "ZIP gourmet-bites-vX_Y_Z.zip con TODOS los archivos del proyecto + JSON actualizado (mover versión a historial, actualizar version_actual_en_produccion)",
+    "sesion_sin_codigo": "Solo JSON actualizado. No ZIP.",
+    "registrar_respuestas_a_preguntas_abiertas": "Cuando Luis responda Q1/Q4/Q5/Q6/Q7, mover la respuesta a decisiones_aprobadas_no_discutir y eliminar de preguntas_abiertas"
+  },
+  "notas_implementacion_v630": {
+    "fecha_entrega": "2026-04-24",
+    "implementado_por": "Claude Opus 4.7",
+    "archivos_modificados_count": 8,
+    "archivos_nuevos": ["scripts/check.sh"],
+    "archivos_no_tocados": ["app-assets.js"],
+    "sesiones_requeridas": "5 turnos de chat (el alcance real superó la estimación del plan original por ~2x en alerts y confirms)",
+    "decisiones_tomadas_en_implementacion": [
+      {
+        "decision": "Migrar 33 alerts puros en lugar de los ~14 estimados",
+        "justificacion": "Inventario real con grep mostró 33 alerts() puros (no fallback defensivo). El estimado del plan subestimó. Se migraron todos porque la infraestructura (toast()) ya estaba lista y costaba lo mismo hacerlo bien.",
+        "impacto_futuro": "Cero alert() puros en el código v6.3.0. Solo quedan 33 fallbacks defensivos v6.1.0 (if typeof toast else alert) que son inocuos."
+      },
+      {
+        "decision": "Migrar 17 confirms no destructivos (estimado original ~10)",
+        "justificacion": "Criterio de 'destructivo vs no destructivo' aplicado caso a caso. Destructivo = borra datos permanentemente o cambia ciclo de vida (eliminar, anular, cascade delete). No destructivo = reversible o cambia estado temporal (reset, descartar borrador, versión nueva, sync, normalizar).",
+        "impacto_futuro": "7 confirms destructivos quedaron para v6.4+: core:1792 (eliminar cliente), core:1904 (borrar doc), core:1972 (borrar prop base huérfana), dashboard:1587 (escritura masiva), historial:1341 (eliminar fantasma), historial:1362 (batch fantasmas). Requieren modal con input 'escribe ELIMINAR'."
+      },
+      {
+        "decision": "confirmModal() soporta Promise + callbacks simultáneamente",
+        "justificacion": "Funciones async del código pueden usar `const ok = await confirmModal(...)`. Funciones sync (como resetAllNotasCot) usan `confirmModal({..., onOk: () => {...}})`. Dual API evita refactorizar funciones sync a async sin necesidad.",
+        "impacto_futuro": "Flexible para cualquier llamador. Degrada a confirm() nativo si HTML falta (defensa extrema)."
+      },
+      {
+        "decision": "Fallback defensivo de runTransaction solo loguea en consola (no toast)",
+        "justificacion": "Kathy/JP no necesitan ver detalle técnico 'modo compatibilidad'. Un toast confundiría más que ayudar. Luis puede revisar consola del navegador tras piloto para saber si el fallback se activa (pregunta Q6_NUEVA).",
+        "impacto_futuro": "Si el fallback nunca se activa en 2 semanas, eliminarlo en v6.5+ (simplifica el código)."
+      },
+      {
+        "decision": "scripts/check.sh con 6 validaciones en lugar de 2 estimadas",
+        "justificacion": "Luis pidió ampliar el script. Se agregaron: node disponible, consistencia de los 7 script tags, modales críticos presentes, conteo de alerts puros. Salida en color ✅/❌/⚠️/ℹ️.",
+        "impacto_futuro": "Script robusto que detecta regresiones automáticamente. Si Luis agrega nuevos modales críticos, actualizar REQUIRED_MODALS array."
+      },
+      {
+        "decision": "Actualización del cache-buster ?v=6.0.2 → ?v=6.3.0 en los 7 scripts de index.html",
+        "justificacion": "Los scripts estaban con versión vieja desde v6.0.2 (bug menor). Ahora están alineados con BUILD_VERSION para forzar cache-bust al deployar.",
+        "impacto_futuro": "El check.sh valida esta coincidencia automáticamente en cada deploy."
+      }
+    ],
+    "bug_detectado_no_bloqueante": null,
+    "validacion_sintactica": "Los 7 archivos JS pasan node -c sin errores. scripts/check.sh ejecuta completo con ✅ en las 6 validaciones. BUILD_VERSION consistente en app-core.js (v6.3.0), comentario HTML (v6.3.0) y los 7 script tags (?v=6.3.0). Cero alerts() puros en ningún archivo. 7 confirms destructivos documentados para v6.4+.",
+    "tests_pendientes_piloto": [
+      "Crear cotización v1 → editar y guardar como v2 → verificar v1.status='superseded' y v2.supersededBy=null en Firestore",
+      "Network throttling (DevTools) durante save-hijo → padre NO queda huérfano (transacción atómica)",
+      "Revisar consola en busca de '[v6.3.0 E3-1] runTransaction falló' tras 2 semanas — si no aparece, fallback seguro de eliminar en v6.5+",
+      "Probar modal confirmModal: descartar borrador cotización, descartar borrador propuesta, reset cláusulas, reset condiciones, versión nueva vs sobrescribir (cotizar), versión nueva vs sobrescribir (propuesta), cerrar sesión, reset password email, sync agenda completa, sync pendientes, migrar fotos, normalizar docs, regenerar PF, nueva cotización, nueva propuesta, reset plantillas WhatsApp, eliminar sección propuesta, reintentar PDFs fallidos, producción mismo día",
+      "Verificar modal confirmModal en móvil (iOS Safari + Android Chrome): botones legibles, body HTML se renderiza OK, clic fuera = cancelar",
+      "Verificar que h() escape correctamente en cliente con paréntesis (Mona (Janeth) Acevedo) — no debería romper HTML",
+      "bash scripts/check.sh antes de cada deploy futuro — que retorne exit 0 con todas en verde"
+    ]
+  }
+}
