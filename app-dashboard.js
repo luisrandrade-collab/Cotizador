@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v6.0.1 · 2026-04-23
+// app-dashboard.js · v6.2.0 · 2026-04-24
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v5.0.1b: drill-down agrupado + banner HOY + sync agenda + excluir convertidas.
@@ -18,6 +18,16 @@
 //         usa los IDs reales, sigue el mismo patrón visual que openDashDetail
 //         (agrupado por cliente + chips rápidos Viva/Perdida/Pedido/Aprobar en
 //         docs followables) y el empty state se muestra inline (no alert).
+// v6.2.0: Hoja de Entregas del Día (E2-1).
+//         · Nueva función generarHojaEntregas(fromDate, toDate, soloPendientes)
+//           que produce PDF físico firmable para Kathy/JP en las entregas.
+//         · Abre modal selector (rango fechas + toggle "Solo pendientes")
+//           desde botón 🖨️ en bloque "Operación urgente 3d".
+//         · Tabla con 7 columnas del formato físico aprobado: FECHA, CLIENTE,
+//           PRODUCTOS, DIRECCIÓN, RECIBE, NOTAS PAGO, FIRMA.
+//         · Orden por horaEntrega, fallback alfabético por cliente.
+//         · Reusa LOGO_IW, savePdf, isCumplido, totalCobrado, saldoPendiente.
+//         · Sin cambio Firestore schema.
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -2426,4 +2436,289 @@ function dismissNovedades(ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   saveLastVisit();
   const el=$("dash-banner-novedades");if(el)el.classList.add("hidden");
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// v6.2.0 · HOJA DE ENTREGAS DEL DÍA (E2-1)
+// ═══════════════════════════════════════════════════════════════════
+// Genera un PDF físico firmable que reemplaza la hoja Word manual que
+// Kathy/JP usan hoy cuando entregan. El cliente firma directo sobre el
+// papel. Si entrega tercero, Luis imprime doble (OK con savePdf → share).
+//
+// Flujo:
+//   1. Usuario pulsa 🖨️ "Imprimir hoja del día" en dashboard
+//   2. Se abre modal selector: rango fechas (default hoy-hoy) + toggle
+//      "Solo pendientes" (default ON)
+//   3. Al confirmar → genera PDF con tabla de 7 columnas + 5 filas vacías
+//      al final para entregas no planificadas del día
+//   4. savePdf dispara share sheet (móvil) o descarga (desktop)
+//
+// Campos usados (todos ya en schema actual):
+//   q.eventDate/q.fechaEntrega · q.horaEntrega · q.client · q.dir · q.city
+//   q.cart · q.cust · q.status · helpers isCumplido/totalCobrado/saldoPendiente
+// ═══════════════════════════════════════════════════════════════════
+
+// Helper: formatea fecha ISO "2026-04-24" → "24 ABR 2026" (formato hoja física)
+function hojaFormatFecha(iso){
+  if(!iso)return "—";
+  const parts=iso.slice(0,10).split("-");
+  if(parts.length!==3)return iso;
+  const meses=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+  const m=parseInt(parts[1],10);
+  if(isNaN(m)||m<1||m>12)return iso;
+  return parts[2]+" "+meses[m-1]+" "+parts[0];
+}
+
+// Helper: construye la celda "PRODUCTOS A ENTREGAR" con bullets
+// Combina q.cart (catálogo) + q.cust (custom). Máx. ~120 chars por línea
+// para que autoTable no se vuelva loco con celdas gigantes.
+function hojaProductosCelda(q){
+  const items=[];
+  (q.cart||[]).forEach(i=>{
+    const qty=i.qty||1;
+    const name=(i.n||i.name||"—").trim();
+    const detail=i.d?" ("+i.d.trim()+")":"";
+    items.push("• "+qty+" "+name+detail);
+  });
+  (q.cust||[]).forEach(i=>{
+    const qty=i.qty||1;
+    const name=(i.n||i.name||"—").trim();
+    const detail=i.d?" ("+i.d.trim()+")":"";
+    items.push("• "+qty+" "+name+detail);
+  });
+  return items.length?items.join("\n"):"—";
+}
+
+// Helper: construye la celda "NOTAS PAGO"
+// CANCELADO si está cumplido (pagado 100% o cortesía con total=0)
+// Sino "SALDO $XXX" con el saldo pendiente formateado
+function hojaNotasPago(q){
+  if(typeof isCumplido==="function"&&isCumplido(q))return "CANCELADO";
+  const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||q.totalReal||0);
+  const cobrado=(typeof totalCobrado==="function")?totalCobrado(q):0;
+  if(total>0&&cobrado>=total)return "CANCELADO";
+  const saldo=(typeof saldoPendiente==="function")?saldoPendiente(q):Math.max(0,total-cobrado);
+  if(saldo<=0&&total===0)return "CORTESÍA";
+  return "SALDO "+fm(saldo);
+}
+
+// Helper: construye la celda "DIRECCIÓN" combinando dir + city
+function hojaDireccionCelda(q){
+  const dir=(q.dir||"").trim();
+  const city=(q.city||"").trim();
+  if(dir&&city)return dir+"\n"+city;
+  if(dir)return dir;
+  if(city)return city;
+  return "—";
+}
+
+// Filtro principal: selecciona docs según rango y toggle
+function hojaFiltrarDocs(fromDate,toDate,soloPendientes){
+  const docs=[];
+  (quotesCache||[]).forEach(q=>{
+    if(q._wrongCollection)return;
+    const fecha=q.eventDate||q.fechaEntrega;
+    if(!fecha)return;
+    const fIso=fecha.slice(0,10);
+    if(fIso<fromDate||fIso>toDate)return;
+    const st=q.status||"enviada";
+    // Excluir siempre: anulada/superseded/convertida (no entregables)
+    if(["anulada","superseded","convertida"].includes(st))return;
+    if(soloPendientes){
+      // Solo pendientes de entrega: pedido, aprobada, en_produccion
+      if(!["pedido","aprobada","en_produccion"].includes(st))return;
+    }else{
+      // Incluye también entregados del rango (para reimprimir si se perdió)
+      if(!["pedido","aprobada","en_produccion","entregado"].includes(st))return;
+    }
+    docs.push(q);
+  });
+  // Orden: por horaEntrega asc, fallback alfabético por cliente
+  docs.sort((a,b)=>{
+    const ha=(a.horaEntrega||"zz").toString();
+    const hb=(b.horaEntrega||"zz").toString();
+    if(ha!==hb)return ha.localeCompare(hb);
+    const ca=(a.client||"").toString().toLowerCase();
+    const cb=(b.client||"").toString().toLowerCase();
+    return ca.localeCompare(cb);
+  });
+  return docs;
+}
+
+// Abre el modal selector desde el botón del dashboard
+function openHojaEntregasModal(){
+  const modal=$("hoja-entregas-modal");
+  if(!modal){if(typeof toast==="function")toast("Error: modal no disponible","error");return}
+  // Defaults: hoy-hoy, toggle ON
+  const hoy=new Date().toISOString().slice(0,10);
+  const fromInput=$("he-from");
+  const toInput=$("he-to");
+  const soloInput=$("he-solo-pendientes");
+  if(fromInput)fromInput.value=hoy;
+  if(toInput)toInput.value=hoy;
+  if(soloInput)soloInput.checked=true;
+  modal.classList.remove("hidden");
+}
+
+function closeHojaEntregasModal(){
+  const modal=$("hoja-entregas-modal");
+  if(modal)modal.classList.add("hidden");
+}
+
+// Handler del botón "Generar" del modal
+async function confirmarGenerarHojaEntregas(){
+  const from=($("he-from")||{}).value||"";
+  const to=($("he-to")||{}).value||"";
+  const solo=($("he-solo-pendientes")||{}).checked;
+  if(!from||!to){
+    if(typeof toast==="function")toast("Selecciona ambas fechas","warn");
+    else alert("Selecciona ambas fechas");
+    return;
+  }
+  if(from>to){
+    if(typeof toast==="function")toast("La fecha 'desde' debe ser anterior o igual a 'hasta'","warn");
+    else alert("La fecha 'desde' debe ser anterior o igual a 'hasta'");
+    return;
+  }
+  closeHojaEntregasModal();
+  await generarHojaEntregas(from,to,solo);
+}
+
+// Función principal: genera el PDF
+async function generarHojaEntregas(fromDate,toDate,soloPendientes){
+  // Verifica jsPDF disponible
+  if(!window.jspdf||!window.jspdf.jsPDF){
+    if(typeof toast==="function")toast("Error: jsPDF no cargado","error");
+    else alert("Error: jsPDF no cargado");
+    return;
+  }
+  const docs=hojaFiltrarDocs(fromDate,toDate,soloPendientes);
+  if(!docs.length){
+    const msg=soloPendientes?
+      "Sin entregas pendientes en el rango seleccionado":
+      "Sin entregas en el rango seleccionado";
+    if(typeof toast==="function")toast(msg,"warn",4000);
+    else alert(msg);
+    return;
+  }
+
+  if(typeof showLoader==="function")showLoader("Generando hoja...");
+
+  try{
+    const {jsPDF}=window.jspdf;
+    // Landscape (horizontal) carta: más ancho para 7 columnas
+    const doc=new jsPDF("l","mm","letter");
+    const W=279.4,H=215.9,mg=10;
+
+    // ─── Header: logo centrado ───
+    try{
+      const li=new Image();li.src=LOGO_IW;
+      // Logo más pequeño en landscape para dejar sitio a la tabla
+      doc.addImage(li,"JPEG",(W-50)/2,4,50,50*(272/500));
+    }catch(e){console.warn("Logo no agregado:",e)}
+
+    let y=4+50*(272/500)+2;
+    doc.setDrawColor(201,169,110);doc.setLineWidth(0.4);
+    doc.line(mg+20,y,W-mg-20,y);
+
+    // Título
+    y+=5;
+    doc.setFont("helvetica","bold");doc.setFontSize(12);
+    doc.setTextColor(26,26,26);
+    const rangoTxt=(fromDate===toDate)?
+      hojaFormatFecha(fromDate):
+      hojaFormatFecha(fromDate)+" → "+hojaFormatFecha(toDate);
+    doc.text("HOJA DE ENTREGAS — "+rangoTxt,W/2,y,{align:"center"});
+
+    // Subtítulo con conteo + filtro aplicado
+    y+=5;
+    doc.setFontSize(8.5);doc.setFont("helvetica","normal");
+    doc.setTextColor(100,100,100);
+    const filtroTxt=soloPendientes?"Solo pendientes":"Pendientes + entregados";
+    doc.text(docs.length+" entrega"+(docs.length!==1?"s":"")+" · "+filtroTxt,W/2,y,{align:"center"});
+    doc.setTextColor(26,26,26);
+
+    y+=4;
+
+    // ─── Construcción del body de la tabla ───
+    const body=docs.map(q=>[
+      hojaFormatFecha(q.eventDate||q.fechaEntrega)+(q.horaEntrega?"\n"+q.horaEntrega:""),
+      (q.client||"—").toString().toUpperCase(),
+      hojaProductosCelda(q),
+      hojaDireccionCelda(q),
+      "",  // RECIBE — vacío para que firmen
+      hojaNotasPago(q),
+      ""   // FIRMA — vacío para firma del cliente
+    ]);
+
+    // 5 filas vacías al final para entregas no planificadas del día
+    for(let i=0;i<5;i++){
+      body.push(["","","","","","",""]);
+    }
+
+    // ─── Tabla ───
+    const tw=W-mg*2;
+    // Anchos relativos de las 7 columnas (suman 100)
+    // FECHA: 10 · CLIENTE: 15 · PRODUCTOS: 27 · DIRECCIÓN: 17 · RECIBE: 10 · NOTAS: 11 · FIRMA: 10
+    doc.autoTable({
+      startY:y,
+      margin:{left:mg,right:mg},
+      head:[["FECHA","CLIENTE","PRODUCTOS A ENTREGAR","DIRECCIÓN","RECIBE","NOTAS PAGO","FIRMA"]],
+      body:body,
+      theme:"grid",
+      headStyles:{
+        fillColor:[26,26,26],textColor:255,fontStyle:"bold",
+        fontSize:8,halign:"center",valign:"middle",cellPadding:2.5
+      },
+      bodyStyles:{
+        fontSize:7.5,cellPadding:2,valign:"top",
+        minCellHeight:16 // altura mínima cómoda para firmar
+      },
+      alternateRowStyles:{fillColor:[250,250,248]},
+      columnStyles:{
+        0:{halign:"center",cellWidth:tw*0.10,fontStyle:"bold"},
+        1:{halign:"left",cellWidth:tw*0.15,fontStyle:"bold"},
+        2:{halign:"left",cellWidth:tw*0.27},
+        3:{halign:"left",cellWidth:tw*0.17},
+        4:{halign:"center",cellWidth:tw*0.10},
+        5:{halign:"center",cellWidth:tw*0.11,fontStyle:"bold"},
+        6:{halign:"center",cellWidth:tw*0.10}
+      },
+      didParseCell:function(data){
+        // Colorea celda NOTAS PAGO según contenido
+        if(data.section==="body"&&data.column.index===5){
+          const txt=(data.cell.raw||"").toString();
+          if(txt==="CANCELADO"||txt==="CORTESÍA"){
+            data.cell.styles.textColor=[46,125,50]; // verde
+          }else if(txt.indexOf("SALDO")===0){
+            data.cell.styles.textColor=[198,40,40]; // rojo
+          }
+        }
+      }
+    });
+
+    // Footer con página
+    const pageCount=doc.internal.getNumberOfPages();
+    for(let i=1;i<=pageCount;i++){
+      doc.setPage(i);
+      doc.setFontSize(7);doc.setTextColor(120,120,120);
+      doc.text("Gourmet Bites by Andrade Matuk · Generado "+new Date().toLocaleString("es-CO",{dateStyle:"short",timeStyle:"short"})+" · Página "+i+" de "+pageCount,
+        W/2,H-5,{align:"center"});
+    }
+
+    // Nombre del archivo
+    const filename="HojaEntregas_"+fromDate+(fromDate===toDate?"":"_a_"+toDate)+".pdf";
+
+    if(typeof hideLoader==="function")hideLoader();
+
+    // Reusa savePdf (Web Share API en móvil, doc.save en desktop)
+    await savePdf(doc,filename);
+
+    if(typeof toast==="function")toast("Hoja generada ("+docs.length+" entrega"+(docs.length!==1?"s":"")+")","ok",3500);
+  }catch(e){
+    console.error("[generarHojaEntregas] error:",e);
+    if(typeof hideLoader==="function")hideLoader();
+    if(typeof toast==="function")toast("Error al generar la hoja: "+(e.message||e),"error",5000);
+    else alert("Error al generar la hoja: "+(e.message||e));
+  }
 }

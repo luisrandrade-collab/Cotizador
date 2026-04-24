@@ -7,36 +7,32 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-24-v6.1.0-modal-preview-unificado-escape-html-toast -->
-<!-- v6.1.0 cambios (E1-1, E1-2, E1-3 del roadmap 3 entregas):
+<!-- VERSION: 2026-04-24-v6.2.0-hoja-entregas-del-dia -->
+<!-- v6.2.0 cambios (E2-1 del roadmap 3 entregas):
 
-  E1-1: openDocument() con modal preview unificado
-  · Bug UX-1 resuelto: click en tarjeta (historial, dashboard, seguimiento,
-    búsqueda) ya NO abre formulario de edición directo. Abre modal preview
-    con resumen del doc + botones contextuales:
-      👁️ Ver PDF (si hay pdfHistorial) · 💬 WhatsApp (si saldo > 0)
-      ✏️ Editar (si canEdit, respeta requiresWarning) · 📄 Generar PDF
-  · 12 sitios migrados: 3 en historial, 6 en dashboard, 1 en seguimiento,
-    2 en core (búsqueda global + panel cliente).
-  · Diseño unificado: NO hay branch "PDF si existe/formulario si no" porque
-    86% de docs (18/21 al 24-abr) no tienen pdfHistorial.
+  E2-1: Hoja de Entregas del Día (feature nuevo)
+  · Reemplaza la hoja Word manual que Kathy/JP usan hoy al entregar.
+  · Nuevo botón 🖨️ "Imprimir hoja del día" en Dashboard, dentro del
+    bloque "Operación urgente · próximos 3 días".
+  · Modal selector abre con rango fechas (default hoy-hoy) + toggle
+    "Solo pendientes" (default ON). Toggle OFF incluye entregados del
+    rango para poder reimprimir si se perdió el papel.
+  · PDF landscape carta con tabla de 7 columnas del formato físico
+    aprobado por Luis: FECHA, CLIENTE, PRODUCTOS A ENTREGAR, DIRECCIÓN,
+    RECIBE, NOTAS PAGO, FIRMA.
+  · Orden por q.horaEntrega asc, fallback alfabético por cliente.
+  · NOTAS PAGO: "CANCELADO" (verde) si pagado 100% / cortesía; sino
+    "SALDO $XXX" (rojo) con saldo pendiente formateado.
+  · 5 filas vacías al final para entregas no planificadas del día.
+  · Reusa LOGO_IW, savePdf (Web Share API), isCumplido/totalCobrado/
+    saldoPendiente. Sin campos nuevos en Firestore.
 
-  E1-2: Helper h() escape HTML (defensa XSS + apóstrofes/angles)
-  · Aplicado en los 5 renders expuestos: renderHist, renderSegCard,
-    _renderDashGroupedList, doSearch, showClientHistoryPanel.
-  · Campos envueltos: q.client, q.att, q.quoteNumber, q.comentarioCliente,
-    texto de nota de seguimiento. Reemplaza .replace(/[<>]/g,"") dispersos.
-
-  E1-3: Migración alerts informativos a toast
-  · 36 alerts migrados (cotizar:7, propuesta:7, historial:22) a toast()
-    no bloqueante. Toast ahora acepta 3er parámetro duration opcional.
-  · Alerts destructivos (confirm de eliminar/anular) quedan para v6.3.0.
-
-  Sin cambio Firestore schema · Rollback = subir archivos de v6.0.2.
+  Sin cambio Firestore schema · Rollback = subir archivos de v6.1.0.
 -->
-<!-- VERSION PREV: 2026-04-23-v6.0.2-dashboard-enriquecido-whatsapp-saldo-cortesias -->
-<!-- VERSION PREV²: 2026-04-23-v6.0.1-fix-pipeline-activo-drilldown (no deployada) -->
-<!-- VERSION PREV³: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
+<!-- VERSION PREV: 2026-04-24-v6.1.0-modal-preview-unificado-escape-html-toast -->
+<!-- VERSION PREV²: 2026-04-23-v6.0.2-dashboard-enriquecido-whatsapp-saldo-cortesias -->
+<!-- VERSION PREV³: 2026-04-23-v6.0.1-fix-pipeline-activo-drilldown (no deployada) -->
+<!-- VERSION PREV⁴: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -622,6 +618,13 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .urgent-prod-chip:hover{background:#FFE0B2}
 .urgent-prod-chip:active{background:#FFB300;color:#fff;transform:scale(.95)}
 .urgent-prod-done{font-size:9.5px;font-weight:700;padding:4px 8px;border-radius:14px;background:#E8F5E9;color:#1B5E20;border:1px solid #81C784;white-space:nowrap;display:inline-block}
+/* v6.2.0: botón "Imprimir hoja del día" junto al título del bloque urgente */
+.btn-hoja-entregas{font-size:10.5px;font-weight:700;padding:6px 11px;border-radius:16px;background:linear-gradient(135deg,#455A64,#263238);color:#fff;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.1px;transition:all .12s;-webkit-appearance:none;line-height:1.2;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.btn-hoja-entregas:hover{background:linear-gradient(135deg,#546E7A,#37474F);box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.btn-hoja-entregas:active{transform:scale(.96)}
+@media (max-width:420px){
+  .btn-hoja-entregas{font-size:10px;padding:5px 9px}
+}
 
 /* ════════════ v5.3.0: Secciones colapsables progressive disclosure ════════════ */
 .dash-collapsible{background:#fff;border-radius:10px;margin:10px 0;overflow:hidden;box-shadow:var(--sh)}
@@ -1287,7 +1290,11 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
   <div class="dash-grid" id="dash-cards"></div>
 
   <!-- v5.3.0: Zona 3 · OPERACIÓN URGENTE (próximos 3 días) — SIEMPRE VISIBLE, LADO A LADO -->
-  <div class="dash-urgent-title">⏰ Operación urgente · próximos 3 días</div>
+  <!-- v6.2.0: Botón "🖨️ Imprimir hoja del día" al lado del título para generar PDF firmable -->
+  <div class="dash-urgent-title" style="justify-content:space-between">
+    <span style="display:flex;align-items:center;gap:6px">⏰ Operación urgente · próximos 3 días</span>
+    <button type="button" class="btn-hoja-entregas" onclick="openHojaEntregasModal()" title="Generar hoja física firmable para entregar">🖨️ Imprimir hoja del día</button>
+  </div>
   <div class="dash-urgent-split">
     <div class="urgent-card urgent-prod" id="dash-urgent-producir">
       <div class="urgent-hdr">
@@ -2035,6 +2042,41 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <div id="dp-subtitle" style="font-size:12.5px;color:#455A64;margin-bottom:12px;line-height:1.5"></div>
       <div id="dp-body"></div>
       <div id="dp-footer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- v6.2.0: Modal selector para generar Hoja de Entregas del Día -->
+<!-- Abierto desde botón 🖨️ "Imprimir hoja del día" en bloque Operación urgente del dashboard -->
+<div id="hoja-entregas-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeHojaEntregasModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#455A64,#263238)">
+      <span class="mtitle">🖨️ Hoja de entregas</span>
+      <button class="mclose" onclick="closeHojaEntregasModal()">×</button>
+    </div>
+    <div class="mform">
+      <div class="mf-intro" style="background:#ECEFF1;border-left-color:#455A64">
+        Genera un PDF con las entregas del rango para imprimir y que el cliente firme al recibir. Reemplaza la hoja manual.
+      </div>
+      <div class="mf-field">
+        <label>Desde</label>
+        <input type="date" id="he-from" />
+      </div>
+      <div class="mf-field">
+        <label>Hasta</label>
+        <input type="date" id="he-to" />
+      </div>
+      <div class="mf-field" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #F0F0F0;margin-top:6px">
+        <input type="checkbox" id="he-solo-pendientes" checked style="width:18px;height:18px;accent-color:#455A64;cursor:pointer;flex-shrink:0">
+        <label for="he-solo-pendientes" style="margin:0;cursor:pointer;font-size:13px;line-height:1.35">
+          <span style="font-weight:700;display:block">Solo pendientes</span>
+          <span style="color:#666;font-size:11.5px;display:block;margin-top:1px">Si lo desactivas, también se incluyen entregados del rango (útil para reimprimir).</span>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn bo" style="background:#ECEFF1;color:#455A64;flex:1" onclick="closeHojaEntregasModal()">Cancelar</button>
+        <button class="btn" style="background:linear-gradient(135deg,#455A64,#263238);color:#fff;flex:2;font-weight:700" onclick="confirmarGenerarHojaEntregas()">📄 Generar hoja</button>
+      </div>
     </div>
   </div>
 </div>
