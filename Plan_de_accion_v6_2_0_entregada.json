@@ -1,0 +1,484 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto completo tras entrega v6.2.0",
+    "proposito": "Arrancar Entrega 3 (v6.3.0 — Robustez técnica + higiene) tras v6.2.0 entregada el 2026-04-24. Incluye balance de lo implementado en v6.2.0, hallazgos durante implementación, y alcance aprobado de v6.3.0 sin cambios.",
+    "generado_el": "2026-04-24",
+    "generado_por": "Claude Opus 4.7 — sesión de implementación v6.2.0 completada",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — al finalizar cada entrega, mover de roadmap_aprobado a historial_versiones_detallado y actualizar version_actual_en_produccion.",
+    "supersedes": "Plan_de_accion_v6_1_0_entregada.json — este reemplaza al anterior reflejando la entrega de v6.2.0",
+    "como_usar_en_nuevo_chat": "Subir: (1) los 7 archivos JS + index.html de v6.2.0 ya deployada, (2) el último backup gourmet-bites-backup-*.json, (3) este JSON. Primer mensaje: 'Arranca con Entrega 3 (v6.3.0 — Robustez técnica) del roadmap siguiendo exactamente el alcance documentado en entrega_3_v630'."
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": [
+        "Luis",
+        "Kathy",
+        "JP"
+      ]
+    },
+    "version_actual_en_produccion": "v6.2.0",
+    "siguiente_version_a_entregar": "v6.3.0",
+    "fecha_ultima_actualizacion": "2026-04-24",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos + LOGO_IW (sin cambios desde v5.0.x). 11 líneas.",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, loadQuote, savePdf, búsqueda global, helper h(). 2288 líneas. BUILD_VERSION en línea 112.",
+      "app-cotizar.js": "módulo cotizaciones (sin cambios desde v5.5.0 salvo migración alerts en v6.1.0). 445 líneas.",
+      "app-propuesta.js": "módulo propuestas (sin cambios desde v5.5.0 salvo migración alerts en v6.1.0). 1035 líneas.",
+      "app-historial.js": "historial + buscador + modal PDFs. 1816 líneas. Ubicación BUG click tarjeta: línea 479.",
+      "app-seguimiento.js": "seguimiento comercial. 477 líneas.",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda + Hoja de Entregas (v6.2.0). 2725 líneas. generarHojaEntregas desde línea 2588."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": [
+      "enviada",
+      "pedido",
+      "en_produccion",
+      "entregado",
+      "anulada",
+      "superseded"
+    ],
+    "propuesta_status": [
+      "enviada",
+      "propfinal",
+      "aprobada",
+      "en_produccion",
+      "entregado",
+      "convertida",
+      "superseded",
+      "anulada"
+    ],
+    "archivo_historial": {
+      "vivas": "cotizaciones/propuestas sin cerrar y NO perdidas",
+      "pedidos": "pedido/aprobada/en_produccion/entregado (excluye cumplidos por defecto)",
+      "ventas_anteriores": "entregados Y pagados 100% (cumplidos) + cortesías (total=0 + entregado)",
+      "perdidas": "followUp=perdida y status in [enviada, propfinal]",
+      "anuladas": "status=anulada"
+    }
+  },
+  "estado_actual_sistema_datos_reales": {
+    "fuente": "backup gourmet-bites-backup-2026-04-23_21h36.json (v5.5.0, re-analizado tras v6.2.0)",
+    "nota": "Schema no cambió entre v5.5.0 y v6.2.0 — datos del backup son válidos",
+    "stats": {
+      "total_docs": 21,
+      "cotizaciones": 18,
+      "propuestas": 1,
+      "propfinales": 2,
+      "superseded": 1,
+      "anuladas": 3,
+      "clientes_unicos": 16,
+      "rango_fechas": "2026-04-17 a 2026-04-24 (7 días de operación real)"
+    },
+    "validacion_hoja_entregas_con_datos_reales": {
+      "fuente": "Simulación corrida en sesión v6.2.0 sobre el backup",
+      "rango_probado": "2026-04-17 a 2026-04-24 (7 días)",
+      "docs_pendientes_con_toggle_on": 3,
+      "docs_con_toggle_off": 9,
+      "orden_verificado": "Por horaEntrega ascendente con fallback alfabético por cliente — funciona correctamente con 3 docs a las 13:00 (Maria Teresa Lozano antes que Scarlet Cundi)",
+      "cliente_con_parentesis_manejado": "Mona (Janeth) Acevedo aparece correctamente — autoTable recibe el string como dato, no hay inyección"
+    },
+    "stats_criticas_para_diseno": {
+      "docs_con_pdfHistorial": 3,
+      "docs_sin_pdfHistorial": 18,
+      "porcentaje_con_pdf": "14%",
+      "implicacion_v610": "86% de docs NO tienen PDF en Storage. Modal preview de v6.1.0 funciona para ambos casos (con y sin PDF)."
+    },
+    "stats_followUp": {
+      "docs_con_followUp": 0,
+      "implicacion": "Campo no usado activamente. CONFIRMAR con Luis si Seguimiento se usa antes de invertir en mejoras de esa pestaña. Pregunta abierta Q1."
+    },
+    "clientes_con_caracteres_especiales": {
+      "apostrofe": 0,
+      "parentesis": 1,
+      "ejemplo": "Mona (Janeth) Acevedo",
+      "implicacion": "Hoy NO hay clientes que rompan onclick inline. Helper h() en v6.1.0 es defensivo a futuro."
+    },
+    "docs_con_pagos_registrados": 7
+  },
+  "analisis_tri_perspectiva_hallazgos_top": [
+    {
+      "id": "UX-1",
+      "severidad": "CRITICO",
+      "descripcion": "Bug VER vs EDITAR en 12 sitios (click tarjeta abre formulario en vez de ver). Bug arquitectónico, no local.",
+      "resuelto_en": "v6.1.0"
+    },
+    {
+      "id": "UX-2",
+      "severidad": "CRITICO",
+      "descripcion": "221 alert/confirm/prompt nativos. Bloquean hilo, rompen UX móvil. 80 solo en app-historial.js.",
+      "resuelto_en": "v6.1.0 (36 informativos) + v6.3.0 (resto ~14 informativos + ~10 confirm no destructivos)"
+    },
+    {
+      "id": "ARQ-2",
+      "severidad": "CRITICO",
+      "descripcion": "113 innerHTML con concatenación sin escape. XSS latente + rompimiento por apóstrofes.",
+      "resuelto_en": "v6.1.0 (helper h)"
+    },
+    {
+      "id": "ARQ-3",
+      "severidad": "IMPORTANTE",
+      "descripcion": "loadAllHistory limit(50) por colección. Con 21 docs actuales, tope en 9-10 meses.",
+      "resuelto_en": "POSPUESTO — revisar cuando total_docs >= 80"
+    },
+    {
+      "id": "ARQ-race",
+      "severidad": "IMPORTANTE",
+      "descripcion": "Save versión hija + mark padre superseded son operaciones separadas. Race condition si cae red entre ellas.",
+      "resuelto_en": "v6.3.0 (runTransaction)"
+    },
+    {
+      "id": "OP-1",
+      "severidad": "FEATURE GAP",
+      "descripcion": "No existía hoja física imprimible para Kathy/JP en entregas del día. Usaban hoja manual en Word.",
+      "resuelto_en": "v6.2.0"
+    }
+  ],
+  "roadmap_aprobado": {
+    "principios": [
+      "3 entregas secuenciales, cada una deployable independiente",
+      "Rollback trivial entre entregas (subir archivos de versión anterior)",
+      "Sin cambio de Firestore schema en ninguna entrega",
+      "Piloto 1 semana con Kathy/JP entre entregas",
+      "Siguiente entrega NO arranca hasta confirmar estabilidad de la anterior"
+    ],
+    "entrega_3_v630": {
+      "nombre": "v6.3.0 — Robustez técnica + higiene",
+      "naturaleza": "Técnica invisible · sin cambio schema · rollback = subir v6.2.0",
+      "tiempo_estimado": "6-8 horas",
+      "estado": "APROBADA · pendiente confirmar estabilidad de v6.2.0 (piloto 1 semana Kathy/JP)",
+      "cambios": [
+        {
+          "id": "E3-1",
+          "nombre": "Transacción atómica al crear versión hija",
+          "problema": "En app-cotizar.js:267-296 y app-propuesta.js equivalente, save-hijo + mark-padre-superseded están separados. Si cae red entre ellos, padre queda vivo sin supersededBy. Backup confirma 1 superseded existente — bug activo. Bug ARQ-race.",
+          "implementacion": {
+            "patron": "runTransaction(db, async tx => { tx.set(childRef, qObj); tx.update(parentRef, {status: 'superseded', supersededBy: qNum}); })",
+            "fallback_defensivo": "Si runTransaction falla por rules u otra causa, caer al método actual (save separado). Mantener fallback 1-2 versiones antes de eliminar.",
+            "aplicar_en": [
+              "app-cotizar.js saveCurrentQuote block creatingChild",
+              "app-propuesta.js saveCurrentProp block creatingChild"
+            ]
+          },
+          "esfuerzo_h": "2-3"
+        },
+        {
+          "id": "E3-2",
+          "nombre": "Pre-deploy check automatizado",
+          "problema": "v6.0.1 casi sale a producción con SyntaxError (llave } extra en app-dashboard.js). Se detectó por suerte.",
+          "implementacion": {
+            "opcion_recomendada": "Script scripts/check.sh que corra 'node -c' en los 5 archivos JS antes de generar ZIP + validar BUILD_VERSION coincida en core e index.html",
+            "opcion_alternativa": "Checklist manual si Luis prefiere"
+          },
+          "pregunta_luis_pendiente": "Q3: ¿script bash automatizado o checklist manual?",
+          "esfuerzo_h": "1-2"
+        },
+        {
+          "id": "E3-3",
+          "nombre": "Migrar ~14 alerts adicionales + confirms simples a modal propio",
+          "problema": "Continuar migración iniciada en v6.1.0. Bug UX-2.",
+          "alcance": "~14 alerts informativos restantes (reducido de ~30 estimado porque v6.1.0 migró 36 en vez de 20) + ~10 confirm() no destructivos (ej. 'Restablecer condiciones a default?'). Los confirm DESTRUCTIVOS (eliminar, anular) quedan para v6.4+ — requieren modal con confirmación escrita.",
+          "esfuerzo_h": "2-3"
+        }
+      ],
+      "archivos_a_modificar": [
+        "app-cotizar.js (runTransaction en saveCurrentQuote)",
+        "app-propuesta.js (runTransaction en saveCurrentProp)",
+        "app-core.js, app-historial.js, app-dashboard.js (migración alerts restantes)",
+        "scripts/check.sh (nuevo, si se aprueba opción automatizada)",
+        "index.html (BUILD_VERSION v6.3.0)"
+      ],
+      "checklist_pre_deploy": [
+        "node -c en archivos modificados (y correr script si se creó)",
+        "Crear cotización v1 → editar → guardar como v2 → verificar v1 superseded y v2 enviada",
+        "Network throttling (DevTools) durante save-hijo → padre no queda huérfano",
+        "Probar que alerts migrados aparecen como toast/modal, no nativo"
+      ],
+      "criterio_exito_piloto": [
+        "Cero doc huérfano en quotes/ con status enviada y ya tiene hijo supersededBy (revisar Firebase Console semanal)",
+        "Experiencia más limpia al guardar/editar (menos pop-ups nativos)"
+      ],
+      "plan_rollback": {
+        "trigger": "Fallo al guardar o transacciones que rompen flujo",
+        "accion": "Subir archivos de v6.2.0",
+        "tiempo": "< 5 min"
+      }
+    },
+    "fuera_de_alcance_actual": {
+      "nota": "Las siguientes quedaron identificadas pero NO son v6.x. Se abordan cuando haya 3-4 semanas estables post-v6.3.0 o cuando los triggers activen.",
+      "items": [
+        {
+          "tema": "Paginación real Firestore (cursor startAfter)",
+          "trigger_activacion": "total_docs >= 80 (hoy 21, margen 4x)",
+          "esfuerzo_h": "4-6"
+        },
+        {
+          "tema": "Event delegation para eliminar 267 onclick inline",
+          "justificacion": "Preparatorio para refactors mayores",
+          "esfuerzo_h": "8-12"
+        },
+        {
+          "tema": "Split de app-dashboard.js en 4 archivos",
+          "esfuerzo_h": "6-8"
+        },
+        {
+          "tema": "Tests unitarios para funciones puras",
+          "esfuerzo_h": "5-6"
+        },
+        {
+          "tema": "Modal Anular como wizard 3 pasos",
+          "esfuerzo_h": "3-4"
+        },
+        {
+          "tema": "E2-2 pospuesta: Foto del formato firmado en modal 'Registrar entrega'",
+          "estado": "NO implementada en v6.2.0 por decisión de alcance (se priorizó E2-1). Reusa entregaData.fotoEntrega que ya existe en schema. Esfuerzo: 1-2h.",
+          "trigger_activacion": "Si Luis pide rescatar esta feature en v6.4+"
+        },
+        {
+          "tema": "Rediseño ERP grande (5 módulos: Dashboard, Ventas, Operaciones, Finanzas, Herramientas + Despachos NUEVO)",
+          "naturaleza": "Cambio mayor, requiere sesión dedicada de diseño + wireframes",
+          "version_tentativa": "v7.0",
+          "preguntas_abiertas_previas": [
+            "Despachos: ¿objeto separado o estado del pedido?",
+            "Oportunidades como entidad: ¿se adopta?",
+            "Finanzas: ¿granularidad reportes? ¿DIAN?"
+          ]
+        }
+      ]
+    }
+  },
+  "decisiones_aprobadas_no_discutir": [
+    "Roadmap = 3 entregas secuenciales (v6.1.0 → v6.2.0 → v6.3.0), NO sub-versiones intermedias",
+    "Piloto 1 semana entre entregas, siguiente NO arranca hasta confirmar estabilidad",
+    "Ninguna entrega cambia Firestore schema",
+    "Rollback entre versiones = subir archivos de versión anterior",
+    "v6.1.0: openDocument usa MODAL PREVIEW UNIFICADO, no branch 'PDF si existe/formulario si no'",
+    "v6.1.0: h() aplicado en 5 renders expuestos, no globalmente",
+    "v6.1.0: migración alerts CONSERVADORA — solo informativos, destructivos quedan",
+    "v6.2.0: Hoja de Entregas con rango de fechas, toggle 'Solo pendientes' default ON, orden por hora",
+    "v6.2.0: NO agrupa por zona (son pocas entregas al día)",
+    "v6.2.0: PDF landscape carta con 7 columnas exactas del formato físico",
+    "v6.2.0: 5 filas vacías al final del PDF para entregas no planificadas",
+    "v6.2.0: Foto del formato firmado (E2-2) POSPUESTA a v6.4+ por alcance",
+    "v6.3.0: confirm destructivos (eliminar, anular) quedan fuera — v6.4+",
+    "Paginación Firestore POSPUESTA hasta total_docs >= 80",
+    "Rediseño ERP grande es v7.0, NO v6.x",
+    "Entrega con código: ZIP gourmet-bites-vX_Y_Z.zip con 9 archivos (8 del proyecto + este JSON actualizado)",
+    "Entrega sin código (planeación): solo JSON, no ZIP"
+  ],
+  "preguntas_abiertas_para_luis": [
+    {
+      "id": "Q1",
+      "pregunta": "¿Usas activamente la pestaña Seguimiento? Backup muestra 0/21 docs con followUp marcado.",
+      "impacto_si_no_se_usa": "Seguimiento podría simplificarse o absorberse en Historial→Vivas",
+      "responder_en": "Antes de v6.3.0 si es posible"
+    },
+    {
+      "id": "Q2",
+      "pregunta": "¿Quieres migrar los 18 docs viejos sin PDF a Storage (helper admin) o prefieres 'generar bajo demanda'?",
+      "impacto": "Si SÍ, se agrega a v6.3.0. Si NO, queda como 'generar bajo demanda' con modal preview de v6.1.0",
+      "responder_en": "Tras 2-3 semanas de v6.1.0 en uso"
+    },
+    {
+      "id": "Q3",
+      "pregunta": "Pre-deploy check de v6.3.0: ¿script bash automatizado o checklist manual escrito?",
+      "impacto": "Define formato de E3-2",
+      "responder_en": "Al iniciar v6.3.0"
+    },
+    {
+      "id": "Q4",
+      "pregunta": "Tras piloto v6.2.0: ¿la hoja impresa en móvil (carta, horizontal) cabe bien? ¿Alguna columna se corta o queda muy estrecha?",
+      "impacto": "Si alguna columna incomoda, ajustar anchos en v6.3.0 (o en un hotfix si es crítico)",
+      "responder_en": "Tras 3-5 entregas reales usando la hoja"
+    },
+    {
+      "id": "Q5",
+      "pregunta": "¿La sección 'RECIBE' debe quedar vacía para que escriba el cliente, o precargar q.att si existe?",
+      "impacto": "Actualmente vacía (decisión de diseño: el cliente escribe su nombre al firmar). Si Luis prefiere precargar el contacto, cambio trivial.",
+      "responder_en": "Tras piloto v6.2.0"
+    }
+  ],
+  "instrucciones_proximo_chat": {
+    "paso_1_subir_archivos": "Subir: (a) los 7 JS + index.html de v6.2.0 ya en producción, (b) último backup gourmet-bites-backup-*.json, (c) este JSON como contexto",
+    "paso_2_primer_mensaje": "Escribir: 'Arranca con Entrega 3 (v6.3.0 — Robustez técnica) del roadmap_aprobado.entrega_3_v630. Implementa E3-1 (runTransaction versión hija) y E3-3 (migración alerts restantes). Para E3-2 confirma primero preferencia por script bash o checklist manual. Al terminar entrega ZIP gourmet-bites-v6_3_0.zip con los 9 archivos.'",
+    "paso_3_entrega_final_esperada": "ZIP con 9 archivos. Mensaje debe indicar qué archivos cambiaron vs cuáles no. Usar present_files con 1 solo filepath. Advertir que present_files puede renombrar a files.zip.",
+    "paso_4_post_entrega": "Luis deploya, corre checklist_pre_deploy de v6.3.0, pilotea 1 semana con foco en detectar regresiones de guardado.",
+    "paso_5_siguiente_entrega": "Tras v6.3.0 estable, decidir con Luis si se inicia v6.4.x (items de fuera_de_alcance_actual como E2-2 foto firmada, modal anular wizard) o si se planifica sesión dedicada para v7.0 (rediseño ERP)."
+  },
+  "historial_versiones_detallado": [
+    {
+      "version": "v6.3.0",
+      "tipo": "MINOR",
+      "estado": "PLANEADA — arranca tras v6.2.0 estable",
+      "highlights": [
+        "runTransaction versión hija",
+        "pre-deploy check",
+        "~14 alerts más a toast/modal + ~10 confirm no destructivos"
+      ]
+    },
+    {
+      "version": "v6.2.0",
+      "tipo": "FEATURE",
+      "estado": "EN PRODUCCIÓN",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "Hoja de Entregas del Día imprimible PDF (landscape carta, 7 columnas del formato físico)",
+        "Modal selector con rango de fechas + toggle 'Solo pendientes' default ON",
+        "Orden por horaEntrega con fallback alfabético por cliente",
+        "Botón 🖨️ 'Imprimir hoja del día' en bloque Operación urgente del dashboard",
+        "NOTAS PAGO con color semántico: CANCELADO verde / SALDO rojo",
+        "5 filas vacías al final para entregas no planificadas",
+        "Reusa LOGO_IW, savePdf (Web Share API), helpers isCumplido/totalCobrado/saldoPendiente",
+        "Sin cambio Firestore schema"
+      ]
+    },
+    {
+      "version": "v6.1.0",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "openDocument() con modal preview unificado (12 sitios)",
+        "Helper h() escape HTML en 5 renders expuestos",
+        "36 alerts informativos migrados a toast (cotizar:7, propuesta:7, historial:22)",
+        "toast() con 3er parámetro duration opcional",
+        "Modal doc-preview-modal con botones contextuales Ver PDF / WhatsApp / Editar / Generar PDF"
+      ]
+    },
+    {
+      "version": "v6.0.2",
+      "fecha": "2026-04-24",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "BUG-014 fix",
+        "Toggle persistente localStorage",
+        "Filtros mes Ventas anteriores",
+        "Cortesías como cumplidas",
+        "Refactor drill-down",
+        "Pipe-cards urgencia",
+        "Modal WhatsApp"
+      ]
+    },
+    {
+      "version": "v6.0.1",
+      "fecha": "2026-04-23",
+      "tipo": "HOTFIX",
+      "estado": "NO DEPLOYADA — superseded por v6.0.2",
+      "highlights": [
+        "BUG-014"
+      ]
+    },
+    {
+      "version": "v6.0.0",
+      "fecha": "2026-04-23",
+      "tipo": "MAJOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "Pestaña Ventas anteriores",
+        "canAnular",
+        "KPI Entregado desglose"
+      ]
+    },
+    {
+      "version": "v5.5.0",
+      "fecha": "2026-04-23",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "Matriz edición permisiva",
+        "Versionado hijo",
+        "Audit trail"
+      ]
+    }
+  ],
+  "instrucciones_mantenimiento_json": {
+    "al_entregar_v630": "ZIP gourmet-bites-v6_3_0.zip con 9 archivos + JSON actualizado (mover entrega_3_v630 a historial, actualizar version_actual='v6.3.0', siguiente='v6.4.0' o v7.0)",
+    "al_entregar_v640_o_v70": "Mismo patrón. Tras v6.3.0, decidir con Luis si se inicia v6.4.x con items de fuera_de_alcance_actual o se pasa a v7.0 (rediseño grande)",
+    "sesion_sin_codigo": "Solo JSON actualizado. No ZIP.",
+    "registrar_respuestas_a_preguntas_abiertas": "Cuando Luis responda Q1/Q2/Q3/Q4/Q5, mover la respuesta a decisiones_aprobadas_no_discutir y eliminar de preguntas_abiertas"
+  },
+  "notas_implementacion_v620": {
+    "fecha_entrega": "2026-04-24",
+    "implementado_por": "Claude Opus 4.7",
+    "archivos_modificados": [
+      "app-core.js (BUILD_VERSION v6.1.0 → v6.2.0)",
+      "app-dashboard.js (header actualizado con nota v6.2.0 + 9 funciones nuevas al final: hojaFormatFecha, hojaProductosCelda, hojaNotasPago, hojaDireccionCelda, hojaFiltrarDocs, openHojaEntregasModal, closeHojaEntregasModal, confirmarGenerarHojaEntregas, generarHojaEntregas)",
+      "index.html (comentario VERSION a v6.2.0, botón 🖨️ en bloque Operación urgente, CSS .btn-hoja-entregas con media query móvil, modal hoja-entregas-modal con date pickers + toggle)"
+    ],
+    "archivos_no_tocados": [
+      "app-assets.js",
+      "app-cotizar.js",
+      "app-propuesta.js",
+      "app-historial.js",
+      "app-seguimiento.js"
+    ],
+    "decisiones_tomadas_en_implementacion": [
+      {
+        "decision": "PDF en landscape (horizontal) carta en vez de vertical",
+        "justificacion": "7 columnas no caben legibles en portrait. Landscape deja anchos razonables para PRODUCTOS (27%) y DIRECCIÓN (17%) que son las celdas con más texto.",
+        "impacto_futuro": "Si Luis prefiere portrait, cambiar 'l' → 'p' en new jsPDF y redistribuir anchos de columnas (esperar piloto antes de ajustar)."
+      },
+      {
+        "decision": "Celda 'RECIBE' se deja VACÍA (no precarga q.att)",
+        "justificacion": "El formato físico original que Luis mostró deja esta columna vacía para que el receptor escriba su nombre. Precargar con q.att crearía inconsistencia si entrega un tercero distinto al contacto registrado. Pregunta Q5 del JSON.",
+        "impacto_futuro": "Si Luis pide precarga, cambio trivial de 1 línea en el map del body"
+      },
+      {
+        "decision": "Celda 'NOTAS PAGO' usa color semántico (verde CANCELADO / rojo SALDO $)",
+        "justificacion": "Lectura rápida en papel para Kathy/JP: reconocen al instante si hay que cobrar. Usa didParseCell de autoTable para colorear solo la columna 5.",
+        "impacto_futuro": "Ninguno"
+      },
+      {
+        "decision": "minCellHeight:16 en bodyStyles del autoTable",
+        "justificacion": "Fuerza altura cómoda incluso para filas con 1 solo producto, para que el cliente tenga espacio suficiente donde firmar.",
+        "impacto_futuro": "Si entregas muy largas producen saltos incómodos de página, reducir a 14 en v6.3 (esperar piloto)."
+      },
+      {
+        "decision": "Estado 'enviada' EXCLUIDO del filtro (incluso con toggle OFF)",
+        "justificacion": "Una cotización 'enviada' no es un pedido confirmado, no tiene sentido llevar al cliente una hoja con firma para algo que aún no compró. Solo se incluye desde 'pedido' en adelante.",
+        "impacto_futuro": "Si Luis pide incluir enviadas por alguna razón, agregar al array con permiso de toggle"
+      },
+      {
+        "decision": "Hora 'zz' como fallback en sort cuando no hay horaEntrega",
+        "justificacion": "String 'zz' ordena después de cualquier hora HH:MM válida, empujando al final los docs sin hora definida, que quedan ordenados alfabéticamente entre sí.",
+        "impacto_futuro": "Ninguno — patrón limpio"
+      },
+      {
+        "decision": "5 filas vacías al final, no 4",
+        "justificacion": "Plan pedía 4-5; el rango alto da más margen para entregas no planificadas (pasa frecuentemente en el negocio según contexto).",
+        "impacto_futuro": "Si 5 resultan demasiadas (sobra mucha hoja vacía), reducir a 3 en v6.3.0"
+      }
+    ],
+    "bug_detectado_no_bloqueante": null,
+    "validacion_sintactica": "Los 7 archivos JS pasan node -c sin errores. HTML balanceado (493 apertura / 493 cierre de <div>). Validación funcional: simulación del filtro sobre el backup real retorna 3 pendientes y 9 con toggle OFF en rango 7 días, orden correcto por hora, cliente con paréntesis (Mona (Janeth) Acevedo) manejado correctamente.",
+    "tests_pendientes_piloto": [
+      "Generar hoja para HOY → verificar PDF se descarga/comparte vía savePdf",
+      "Generar hoja para rango 7 días → verificar ordenamiento por hora y fallback alfabético",
+      "Toggle 'Solo pendientes' ON → no aparecen entregados, solo pedido/aprobada/en_produccion",
+      "Toggle OFF → aparecen pendientes + entregados (para reimpresión)",
+      "Rango sin resultados → toast warn, no se genera PDF",
+      "Rango inválido (from > to) → toast warn, no se genera PDF",
+      "Verificar productos bullet list en celda (cart + cust combinados con • viñeta)",
+      "Verificar NOTAS PAGO muestra CANCELADO (verde), SALDO $XXX (rojo), o CORTESÍA correctamente",
+      "Imprimir PDF real desde móvil → verificar que cabe en hoja carta landscape y columnas no se cortan (Q4)",
+      "Firma física del cliente en celda FIRMA → ¿hay espacio suficiente? (minCellHeight:16 = ~16mm)",
+      "Ejecutar con q.status='enviada' en el rango → no debe aparecer en ninguna configuración del toggle"
+    ]
+  }
+}
