@@ -1,0 +1,265 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Cierre de sesión 2026-04-23 noche con v6.0.0 ENTREGADA — Ventas anteriores + canAnular + KPI desglose.",
+    "generado_el": "2026-04-23",
+    "generado_por": "Claude Opus 4.7 — sesión de implementación de v6.0",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final",
+    "supersedes": "context_v5_5_0.json (2026-04-23 mañana) — este reemplaza el anterior"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual_entregada": "v6.0.0 — ZIP entregado 2026-04-23 noche",
+    "version_siguiente_planeada": "v6.0.x hotfixes si emergen · v6.1 rediseño ERP completo (5 módulos)",
+    "version_en_produccion_hasta_deploy": "v5.5.0 (hasta que Luis suba v6.0.0 a GitHub Pages)",
+    "fecha_ultima_actualizacion": "2026-04-23",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers. v6.0.0: BUILD_VERSION v6.0.0 + 2 helpers nuevos (isCumplido, canAnular).",
+      "app-cotizar.js": "módulo cotizaciones (sin cambios desde v5.5.0).",
+      "app-propuesta.js": "módulo propuestas (sin cambios desde v5.5.0).",
+      "app-historial.js": "historial + buscador + modal PDFs. v6.0.0: 5ta pestaña 'Ventas anteriores', toggle 'Incluir cumplidas', canAnular en UI + defensa en openAnularModal, sub-filtros por año en Ventas anteriores, banner descriptivo.",
+      "app-seguimiento.js": "seguimiento comercial (sin cambios desde v5.4.4)",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda. v6.0.0: KPI Entregado desglosa cumplidas vs con saldo, drill-down con badges."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/GB-Ciclo-de-ventas/)",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze",
+    "firebase_storage_rules": "rules_version 2 · allPaths auth != null · verificado desde 2026-04-23"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada", "superseded"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]",
+      "expuesto_a_usuario": ["viva", "perdida"]
+    },
+    "archivo_historial": {
+      "vivas": "cotizaciones/propuestas sin cerrar y NO perdidas",
+      "pedidos": "pedido/aprobada/en_produccion/entregado (excluye cumplidos por defecto)",
+      "ventas_anteriores": "NUEVO v6.0 — entregados Y pagados 100% (cumplidos)",
+      "perdidas": "followUp=perdida y status in [enviada, propfinal]",
+      "anuladas": "status=anulada"
+    },
+    "nota_v600": "Nueva clasificación 'cumplido' = status=entregado Y totalCobrado>=total Y total>0. Afecta qué pestaña muestra el doc y si se puede anular."
+  },
+  "version_600_ENTREGADA": {
+    "fecha_entrega": "2026-04-23 noche",
+    "tipo": "MAJOR — reorganización del historial + refuerzo de política de anulación",
+    "estado": "ZIP gourmet-bites-v6_0_0.zip entregado — pendiente deploy por Luis",
+    "origen_de_los_3_cambios": {
+      "reporte_usuario": "Imágenes del 2026-04-23 noche mostraron: (1) pedidos en_produccion + pagados 100% con botón Anular activo (Maria Teresa Lozano 0113, Tarkus Pharma 0111), (2) necesidad de mover pedidos cumplidos a carpeta separada para no ahogar lo operativo, (3) sensación de que el conteo de entregados no cuadraba con lo operativo.",
+      "diagnóstico": "El botón Anular en v5.5 solo chequeaba status, no el nivel de cobro. La pestaña Pedidos → Entregadas mezclaba todo lo entregado (operativo + cerrado financieramente). El KPI del dashboard contaba todo junto sin desglose.",
+      "decisiones_aprobadas_por_luis": [
+        "Cumplidos (entregado + pagado 100%) se mueven a pestaña propia 'Ventas anteriores'",
+        "Por defecto SALEN de Pedidos → Entregadas, pero toggle permite verlos sin cambiar de pestaña",
+        "Anular se bloquea si el pedido ya fue cobrado al 100% (defensa doble: UI + modal)",
+        "KPI Entregado del mes NO cambia cifra grande, pero agrega desglose 'N entregas · X cumplidas · Y con saldo'"
+      ]
+    },
+    "helpers_v600_en_app_core": [
+      "isCumplido(q) — true si status=entregado Y cobrado>=total Y total>0",
+      "canAnular(q) — true si status en [pedido,aprobada,en_produccion] Y NO está cobrado al 100%"
+    ],
+    "cambios_por_archivo": {
+      "app-core.js": [
+        "BUILD_VERSION subió de v5.5.0 a v6.0.0",
+        "BUILD_DATE actualizado a 2026-04-23",
+        "Agregados isCumplido(q) y canAnular(q) después de editOnlyNotes"
+      ],
+      "app-historial.js": [
+        "Header de archivo actualizado a v6.0.0",
+        "Estado global nuevo: histIncluirCumplidos (default false)",
+        "_docEnArchivo reconoce archivo 'ventas_anteriores' y excluye cumplidos de 'pedidos' por defecto",
+        "HIST_SUBFILTERS tiene entrada nueva con filtros por año (Este año/Año anterior/Más antiguas)",
+        "_docEnSubfiltro implementa lógica de años para ventas_anteriores",
+        "archMeta y archCnt incluyen ventas_anteriores (grid ahora de 5 columnas)",
+        "Toggle 'Incluir cumplidas' renderizado condicionalmente en Pedidos → Entregadas/Todas",
+        "Banner descriptivo morado en Ventas anteriores",
+        "Handler toggleIncluirCumplidos() agregado",
+        "Botón ↩️ Anular en card usa canAnular(q) en vez de lista hardcoded de status",
+        "openAnularModal tiene defensa extra: alert y return si cobrado>=total"
+      ],
+      "app-dashboard.js": [
+        "Header actualizado a v6.0.0",
+        "Variables entCumplidasN y entConSaldoN calculadas en el loop principal",
+        "KPI Entregado muestra '{N} entregas · {X} cumplidas · {Y} con saldo'",
+        "openDashDetail('entregado') agrega badges .dd-badge-cumplido / .dd-badge-saldo en cada fila"
+      ],
+      "index.html": [
+        "Comentario de versión subido a v6.0.0 con changelog inline",
+        ".hist-archives cambió de grid-template-columns:repeat(4,1fr) a repeat(5,1fr)",
+        "Clase .arch-ventas-ant agregada (morado #5E35B1)",
+        "Media query ajustado para 5 columnas en pantallas estrechas",
+        "Estilos nuevos: .hist-toggle-cumplidas, .hist-toggle-btn, .hist-toggle-link, .hist-ventas-ant-info",
+        "Estilos nuevos: .dd-badge-cumplido, .dd-badge-saldo"
+      ]
+    },
+    "archivos_modificados": ["app-core.js", "app-historial.js", "app-dashboard.js", "index.html"],
+    "archivos_sin_cambios": ["app-assets.js", "app-cotizar.js", "app-propuesta.js", "app-seguimiento.js"],
+    "breaking_changes": "Ninguno. Docs antiguos siguen funcionando. La definición de 'cumplido' es derivada (no se guarda en Firestore). Si el usuario prefiere el comportamiento anterior, puede activar el toggle 'Incluir cumplidas' y ver todo como antes.",
+    "validacion_global": "Los 7 archivos JS pasan node -c. HTML estructuralmente balanceado (div 468/468, button 120/120, span 101/101, script 10/10). Test de integración de isCumplido/canAnular con 6 escenarios pasó. Test de no-doble-conteo con 10 docs reales de Luis (1 pedido + 4 en_prod + 5 entregados cumplidos) pasó con toggle OFF y ON.",
+    "revision_integral_pre_deploy": {
+      "fecha": "2026-04-23 noche",
+      "riesgos_identificados": 6,
+      "fixes_aplicados_antes_del_ZIP_final": [
+        "FIX_A_cache_busting: Se subieron los 7 <script src='?v=5.5.0'> a '?v=6.0.0' en index.html. Sin este fix los navegadores servirían el JS cacheado viejo junto con el HTML nuevo, produciendo ReferenceError en la nueva pestaña y el toggle. Usuarios afectados hasta que hicieran Ctrl+F5 manual.",
+        "FIX_B_no_doble_conteo: _docEnArchivo(q,arch,respectToggle=false) ahora recibe flag. Los chips superiores llaman sin flag (default=false → NO respetan toggle → chip 'Pedidos' siempre operativo, chip 'Ventas anteriores' siempre cumplidos). La lista y los sub-contadores sí respetan toggle (respectToggle=true). Sin este fix, con toggle activo los cumplidos se sumaban dos veces y la suma de los 5 chips dejaba de cuadrar con el total de docs."
+      ],
+      "riesgos_aceptados_no_bloqueantes": [
+        "Orden de declaración: isCumplido (en app-core.js) depende de totalCobrado (app-historial.js) y getDocTotal (app-dashboard.js). Protegido con typeof ... === 'function' pero frágil si alguna vez se llama durante el init temprano. No es un problema real hoy.",
+        "Pedidos entregados con total=0 (cortesías, muestras) nunca se marcan como cumplidos y se quedan en Pedidos→Entregadas indefinidamente. Si aparece el caso, se resuelve en v6.0.1.",
+        "archMeta[histArchive] puede dar TypeError si histArchive toma un valor fuera del meta. histArchive NO se persiste (vuelve a 'vivas' al refrescar), así que el riesgo es muy bajo."
+      ]
+    },
+    "pendiente_luis": [
+      "Subir los 4 archivos modificados a GitHub Pages (app-core.js, app-historial.js, app-dashboard.js, index.html)",
+      "Hard refresh (Ctrl+F5) para invalidar cache",
+      "Probar: abrir Historial → ver pestaña '📦 Ventas anteriores' entre Pedidos y Perdidas",
+      "Probar: Jaime Castañeda (0109) debe aparecer en Ventas anteriores, NO en Pedidos → Entregadas",
+      "Probar: en Pedidos → Entregadas debe aparecer banner morado 'X cumplidas en Ventas anteriores' con enlace",
+      "Probar: al activar toggle 'Incluir cumplidas', Jaime vuelve a aparecer en Pedidos",
+      "Probar: Maria Teresa (0113) y Tarkus (0111) — botón Anular debe DESAPARECER (están pagados 100%)",
+      "Probar: si de alguna forma se fuerza openAnularModal con un doc pagado, muestra alert y bloquea",
+      "Probar: Dashboard → KPI Entregado muestra desglose 'N cumplidas · Y con saldo'",
+      "Probar: clic en card Entregado → drill-down muestra badges ✅ Cumplida o 💰 Saldo",
+      "Probar en móvil real con Kathy/JP (grid de 5 columnas en pantalla estrecha)"
+    ]
+  },
+  "issues_conocidos_v601": [
+    "La definición de 'cumplido' es 100% derivada (status + cobrado). Si luego queremos cerrar manualmente sin el criterio de cobro (ej: regalo, intercambio), habría que agregar un flag explícito.",
+    "En pantallas muy estrechas (<320px) los 5 chips del archivo se ven apretados. Aceptable — el 99% de uso es en móviles de 375px+.",
+    "El toggle 'Incluir cumplidas' es per-sesión (no persiste). Si Luis lo quiere pegajoso, se puede guardar en localStorage en v6.0.1."
+  ],
+  "bugs_conocidos_abiertos": [],
+  "bugs_resueltos_en_sesiones_previas": [
+    {"id": "BUG-009", "titulo": "Reglas Firebase Storage", "resuelto_en": "v5.4.4 infra"},
+    {"id": "BUG-010", "titulo": "_now scope en catch", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-011", "titulo": "WhatsApp en Seguimiento (campos q.tel/q.mail)", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-012", "titulo": "Descarga PDF por versión", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-013", "titulo": "Botón Anular visible en pedidos pagados 100%", "resuelto_en": "v6.0.0", "detalle": "Reportado por Luis 2026-04-23 con capturas de 0113 Maria Teresa y 0111 Tarkus. Fix: canAnular() chequea cobrado>=total."}
+  ],
+  "roadmap_v6_x_arquitectura_erp": {
+    "contexto": "v6.0 fue el primer paso de rediseño: reorganizar el historial. v6.1 sería el rediseño mayor tipo ERP: 5 módulos + Despachos nuevo + Finanzas expandido.",
+    "orden_de_versiones": {
+      "v6.0.0": "Ventas anteriores + canAnular + KPI desglose — ENTREGADA 2026-04-23",
+      "v6.0.x": "Hotfixes o quick wins (ej: toggle persistente en localStorage, filtro mes en Ventas anteriores)",
+      "v6.1.0": "Rediseño ERP completo — cuando haya 2-3 semanas estables post v6.0"
+    },
+    "propuesta_menu_5_modulos": [
+      {"id": "dashboard", "label": "Dashboard", "contenido": "Pipeline · KPIs · Operación urgente · Agenda"},
+      {"id": "ventas", "label": "Ventas", "contenido": "A. Cotizaciones · B. Seguimiento · C. Propuestas"},
+      {"id": "operaciones", "label": "Operaciones", "contenido": "Pedidos · Producción · Despachos (NUEVO) · Entregas · Historial operativo"},
+      {"id": "finanzas", "label": "Finanzas", "contenido": "Cartera · Pagos · Comprobantes · Reportes · Exportables · Ventas anteriores (migra desde Historial)"},
+      {"id": "herramientas", "label": "Herramientas", "contenido": "Buscar global · PDFs nube · Backup/Restaurar · Mantenimiento · Config plantillas"}
+    ],
+    "nota_ventas_anteriores": "En v6.1 'Ventas anteriores' probablemente migre del módulo Historial al módulo Finanzas, porque ahí es donde vive el reporting histórico. v6.0 lo dejamos en Historial para no desorientar al usuario."
+  },
+  "pendientes_v6_1_por_aterrizar": {
+    "despachos_modulo_nuevo": {
+      "estado": "Luis NO tiene claro el alcance — sesión dedicada antes de v6.1",
+      "preguntas_abiertas": [
+        "¿Objeto separado (colección 'despachos') o estado del pedido?",
+        "¿Quién despacha: interno o terceros?",
+        "¿Programación anticipada o reactivos?",
+        "¿Firma/foto receptor obligatoria?",
+        "¿Despacho parcial?",
+        "¿Direcciones recurrentes guardadas?",
+        "¿Costos en total al cliente o internos?"
+      ]
+    },
+    "finanzas_expandido": {
+      "preguntas_abiertas": [
+        "¿Granularidad reportes: cliente/línea/fuente?",
+        "¿Formato DIAN? ¿Facturación electrónica?",
+        "¿Conciliación bancaria manual?",
+        "¿Gastos operativos o solo ingresos?"
+      ]
+    }
+  },
+  "historial_versiones_detallado": [
+    {"version": "v6.0.0", "fecha": "2026-04-23 noche", "tipo": "MAJOR", "estado": "ENTREGADA (ZIP) — pendiente deploy", "highlights": ["5ta pestaña Historial 'Ventas anteriores'", "Toggle 'Incluir cumplidas' en Pedidos → Entregadas", "canAnular bloquea pedidos pagados 100%", "KPI Entregado desglosa cumplidas vs con saldo", "2 helpers nuevos (isCumplido, canAnular)"]},
+    {"version": "v5.5.0", "fecha": "2026-04-23 mañana", "tipo": "MINOR", "estado": "SUPERSEDED por v6.0.0", "highlights": ["Edición de Pedidos con matriz permisiva", "Versionado hijo -1/-2 pre-confirmación", "Audit trail editHistory con botón 🕒", "Banner diferencia-anticipo informativo", "14 helpers v5.5 en app-core.js"]},
+    {"version": "v5.4.4", "fecha": "2026-04-23", "tipo": "HOTFIX", "estado": "SUPERSEDED", "highlights": ["BUG-010 _now scope", "BUG-011 WhatsApp Seguimiento", "BUG-012 Ver/Descargar PDF por versión", "Reintentar todos PDFs"]},
+    {"version": "v5.4.3", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.4.2", "fecha": "2026-04-22", "tipo": "PATCH + features", "estado": "SUPERSEDED"},
+    {"version": "v5.4.1", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.4.0", "fecha": "2026-04-22", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.3.0", "fecha": "2026-04-21", "tipo": "MINOR", "estado": "SUPERSEDED"},
+    {"version": "v5.0.x-v5.2.x", "fecha": "2026-04-20/21", "tipo": "MAJOR + iteraciones", "estado": "SUPERSEDED"}
+  ],
+  "pendientes_operativos_no_de_codigo": {
+    "urgente_post_v600": [
+      "Subir los 4 archivos modificados a GitHub Pages",
+      "Hard refresh + verificar los 3 flujos según sección pendiente_luis",
+      "Pilotar con Kathy/JP un par de días antes de dar v6.0.0 por estable"
+    ],
+    "media_prioridad": [
+      "Configurar PITR y/o Scheduled Backups en Firebase Console",
+      "Ejecutar migrarFotosStorage() (pendiente desde v5.0)"
+    ],
+    "post_estabilizacion_v600": [
+      "Recopilar feedback real de 2-3 semanas de uso de Ventas anteriores",
+      "Decidir si persistir histIncluirCumplidos en localStorage",
+      "Aterrizar preguntas abiertas de Despachos y Finanzas para v6.1"
+    ]
+  },
+  "memoria_para_proximo_chat": {
+    "arranque_sugerido": "v6.0.0 ENTREGADA 2026-04-23 noche. Próximo chat: esperar 2-3 semanas de uso estable + recopilar feedback. Si emergen hotfixes chicos → v6.0.1. Luego aterrizar alcance de Despachos y Finanzas antes de arrancar v6.1.",
+    "contexto_critico_no_perder": [
+      "v6.0.0 ZIP entregado 2026-04-23 — Luis debe hacer deploy de 4 archivos (core, historial, dashboard, index.html)",
+      "'Cumplido' = entregado + pagado 100%. Definición derivada, no persiste en Firestore.",
+      "Ventas anteriores es una VISTA, no una colección. Si el pago se revierte, el doc vuelve a Pedidos automáticamente.",
+      "canAnular() es la fuente de verdad para el botón ↩️. Si más adelante se quiere permitir anular pagados, cambiar esa función y punto.",
+      "KPI Entregado del mes NO cambió la cifra principal — solo agregó desglose. Luis confirmó que prefería no perder el total agregado.",
+      "URL producción: GB-Ciclo-de-ventas/",
+      "v6.1 rediseño grande decidido — 5 módulos · Despachos + Finanzas aún sin alcance"
+    ],
+    "decisiones_aprobadas_no_discutir_de_nuevo": [
+      "v6.0 cumplido = entregado + cobrado 100% + total>0",
+      "v6.0 cumplidos salen de Pedidos → Entregadas por default, toggle los devuelve",
+      "v6.0 canAnular bloquea pagados al 100% — confirmado por el bug reportado con 0113 y 0111",
+      "v6.0 KPI Entregado mantiene cifra agregada, solo agrega sub-línea de desglose",
+      "v6.0 sub-filtros de Ventas anteriores son por año (Este año / Año anterior / Más antiguas)",
+      "v5.5 matriz permisiva en producción con modal de advertencia (sigue vigente)",
+      "v5.5 versionado con sufijo SOLO pre-confirmación (regla cerrada)",
+      "v5.5 regeneración PDF manual con botón destacado condicional",
+      "v5.5 audit trail completo oculto con razón opcional",
+      "v5.5 aviso a Kathy/JP mediante letrero visible en app (NO WhatsApp automático)",
+      "v5.5 banner diferencia-anticipo solo informativo (cero automatización de pagos)",
+      "v6.1 rediseño grande, no en fases",
+      "Entrega: ZIP versionado con 9 archivos (8 + JSON) cuando hay código"
+    ],
+    "descubrimientos_sesion_v600": [
+      "El botón Anular en v5.5 solo chequeaba status, NO consideraba si ya había pagos. En producción esto generó botones Anular visibles en docs pagados al 100% (0113 Maria Teresa, 0111 Tarkus), lo cual desde el negocio es incorrecto porque implicaría hacer una devolución grande y el producto ya está en la cocina o entregado.",
+      "La pestaña Pedidos → Entregadas mezclaba dos conceptos operativamente distintos: (a) entregados con saldo pendiente = cartera viva, y (b) entregados pagados = cerrados financieramente. v6.0 los separa.",
+      "El conteo del 5 del historial SÍ cuadraba matemáticamente (1+0+4+5=10), lo que Luis percibía era sobrecarga visual: entregados pagados mezclados con entregados con saldo pendiente hacían que la lista operativa se sintiera más grande de lo útil. Resuelto al mover cumplidos a su propia pestaña.",
+      "El dashboard tiene dos lugares donde 'entregado' se cuenta: (1) KPI card con monto y count, (2) drill-down modal con lista detallada. Los dos se actualizaron en v6.0 para mostrar el desglose cumplida/saldo."
+    ]
+  },
+  "instrucciones_mantenimiento_json": {
+    "regla_entrega_archivos": "SIEMPRE entregar los 9 archivos empaquetados en ZIP versionado gourmet-bites-vX_Y_Z.zip. present_files recibe SOLO el ZIP (1 filepath). En el mensaje: qué archivos cambiaron vs cuáles no. Warning: present_files puede renombrar a files.zip.",
+    "excepcion_sesiones_sin_codigo": "Si sesión es puramente planeación/diagnóstico, solo se entrega el JSON actualizado. NO ZIP.",
+    "mantener_al_dia": [
+      "Actualizar version_actual_entregada cada release",
+      "Mover bugs entre abiertos/resueltos según progreso",
+      "Actualizar historial_versiones_detallado cada release",
+      "Limpiar decisiones_aprobadas_no_discutir_de_nuevo cuando se implementen"
+    ]
+  }
+}

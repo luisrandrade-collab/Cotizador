@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// app-dashboard.js · v5.2.1 · 2026-04-21
+// app-dashboard.js · v6.0.0 · 2026-04-23
 // Dashboard + mini-dash + agenda mensual + agenda semanal
 // scrollable + export .ics idempotente + comentarios recientes.
 // v5.0.1b: drill-down agrupado + banner HOY + sync agenda + excluir convertidas.
@@ -7,9 +7,11 @@
 // v5.0.3: excluir anuladas en todos los KPIs.
 // v5.0.4: Pipeline Activo (pipeline vivo sin filtro de fecha) + banner follow-up.
 // v5.0.5: badge VIVA/PERDIDA en drill-down y pipeline detail.
-// v5.2.1: Hotfix render robusto + logs detallados\n// v5.2.0: Dashboard rediseñado (bento grid, render robusto con try-catch por
+// v5.2.0/v5.2.1: Dashboard rediseñado (bento grid, render robusto con try-catch por
 //         sección) + 3 reportes nuevos (conversión/pérdidas motivo/vista cliente) +
 //         badge novedades + mantenimiento colapsable + fix botones ancho-completo.
+// v6.0.0: KPI Entregado desglosa cumplidas (pagadas 100%) vs con saldo.
+//         Drill-down muestra badges Cumplida/Saldo. La cifra grande no cambia.
 // ═══════════════════════════════════════════════════════════
 
 // ─── HELPER: total real de cualquier doc ───────────────────
@@ -78,6 +80,9 @@ async function renderDashboard(){
   let cotCount=0,cotMonto=0,cotClientes=new Set();
   let venCount=0,venMonto=0,venClientes=new Set();
   let entCount=0,entMonto=0;
+  // v6.0: desglose de entregas en cumplidas (pagadas 100%) vs con saldo pendiente.
+  // No cambia la cifra principal (entMonto/entCount) pero añade contexto visual.
+  let entCumplidasN=0,entConSaldoN=0;
   let porCobrarTotal=0,porCobrarN=0;
   const recaudoMet={};METODOS_PAGO.forEach(m=>recaudoMet[m]=0);
   let totalRecaudo=0;
@@ -100,7 +105,12 @@ async function renderDashboard(){
         const fEnt=q.fechaEntrega||q.eventDate;
         if(inRange(fCre)&&status!=="convertida"){cotCount++;cotMonto+=total;if(q.client)cotClientes.add(q.client)}
         if(inRange(fVen)&&["pedido","aprobada","en_produccion","entregado"].includes(status)){venCount++;venMonto+=total;if(q.client)venClientes.add(q.client)}
-        if(inRange(fEnt)&&status==="entregado"){entCount++;entMonto+=total}
+        if(inRange(fEnt)&&status==="entregado"){
+          entCount++;entMonto+=total;
+          // v6.0: clasificar entre cumplida (pagada 100%) y con saldo
+          if(typeof isCumplido==="function"&&isCumplido(q))entCumplidasN++;
+          else entConSaldoN++;
+        }
         if(["pedido","aprobada","en_produccion","entregado"].includes(status)){const pend=saldoPendiente(q);if(pend>0){porCobrarTotal+=pend;porCobrarN++}}
         getPagos(q).forEach(p=>{if(inRange(p.fecha)){const m=METODOS_PAGO.includes(p.metodo)?p.metodo:"Otro";recaudoMet[m]+=parseInt(p.monto)||0}});
       }catch(eDoc){
@@ -117,7 +127,7 @@ async function renderDashboard(){
     el.innerHTML=
       '<div class="dash-card cot" style="cursor:pointer" onclick="openDashDetail(\'cotizado\')"><div class="dash-card-icon">🧾</div><div class="dash-card-lab">Cotizado</div><div class="dash-card-val">'+fm(cotMonto)+'</div><div class="dash-card-sub">'+cotCount+' doc · '+cotClientes.size+' cliente'+(cotClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
       '<div class="dash-card vendido" style="cursor:pointer" onclick="openDashDetail(\'vendido\')"><div class="dash-card-icon">🤝</div><div class="dash-card-lab">Vendido</div><div class="dash-card-val">'+fm(venMonto)+'</div><div class="dash-card-sub">'+venCount+' pedido'+(venCount!==1?'s':'')+' · '+venClientes.size+' cliente'+(venClientes.size!==1?'s':'')+'</div>'+_hint+'</div>'+
-      '<div class="dash-card entregado" style="cursor:pointer" onclick="openDashDetail(\'entregado\')"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+'</div>'+_hint+'</div>'+
+      '<div class="dash-card entregado" style="cursor:pointer" onclick="openDashDetail(\'entregado\')"><div class="dash-card-icon">🎉</div><div class="dash-card-lab">Entregado</div><div class="dash-card-val">'+fm(entMonto)+'</div><div class="dash-card-sub">'+entCount+' entrega'+(entCount!==1?'s':'')+(entCount>0?' · '+entCumplidasN+' cumplida'+(entCumplidasN!==1?'s':'')+' · '+entConSaldoN+' con saldo':'')+'</div>'+_hint+'</div>'+
       '<div class="dash-card recaudo" style="cursor:pointer" onclick="openDashDetail(\'recaudo\')"><div class="dash-card-icon">💵</div><div class="dash-card-lab">Recaudado</div><div class="dash-card-val">'+fm(totalRecaudo)+'</div><div class="dash-card-sub">en el período</div>'+_hint+'</div>'+
       '<div class="dash-card cobrar" style="cursor:pointer" onclick="openDashDetail(\'cobrar\')"><div class="dash-card-icon">⚠️</div><div class="dash-card-lab">Por cobrar</div><div class="dash-card-val">'+fm(porCobrarTotal)+'</div><div class="dash-card-sub">'+porCobrarN+' documento'+(porCobrarN!==1?'s':'')+' (todos los activos)</div>'+_hint+'</div>';
   },"kpis-cards");
@@ -885,7 +895,16 @@ function openDashDetail(tipo){
       if(_excluido(q))return;
       const status=q.status||"enviada";
       const fEnt=q.fechaEntrega||q.eventDate;
-      if(inRange(fEnt)&&status==="entregado"){const t=getDocTotal(q);totalSum+=t;rows.push({q,monto:t,extra:"Entregado: "+fEnt})}
+      if(inRange(fEnt)&&status==="entregado"){
+        const t=getDocTotal(q);totalSum+=t;
+        // v6.0: distinguir cumplidas (pagado 100%) vs con saldo
+        const _cumplido=(typeof isCumplido==="function")&&isCumplido(q);
+        const _saldoPend=saldoPendiente(q);
+        let extraTxt="Entregado: "+fEnt;
+        if(_cumplido)extraTxt='<span class="dd-badge-cumplido">✅ Cumplida</span> · '+extraTxt;
+        else if(_saldoPend>0)extraTxt='<span class="dd-badge-saldo">💰 Saldo '+fm(_saldoPend)+'</span> · '+extraTxt;
+        rows.push({q,monto:t,extra:extraTxt});
+      }
     });
   }else if(tipo==="cobrar"){
     title="⚠️ Por cobrar · todos los pedidos activos";
