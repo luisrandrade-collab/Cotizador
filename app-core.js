@@ -109,7 +109,7 @@
 // ═══════════════════════════════════════════════════════════
 
 // ─── BUILD METADATA ────────────────────────────────────────
-const BUILD_VERSION="v6.0.2";
+const BUILD_VERSION="v6.1.0";
 const BUILD_DATE="2026-04-23";
 // v5.0: PIN reemplazado por Firebase Auth. Se deja referencia histórica para rollback.
 // const PIN_CODE_LEGACY="8421";
@@ -1667,7 +1667,7 @@ async function doSearch(){
   el.innerHTML=dedup.slice(0,30).map(r=>{
     if(r.type==="cot"||r.type==="prop"){
       const q=r.data;const qn=q.quoteNumber||r.id;
-      return '<div class="search-result" onclick="loadQuote(\''+(r.type==="cot"?"quote":"proposal")+'\',\''+r.id+'\')"><div class="sr-top"><div><span class="qnum">'+qn+'</span> <strong>'+(q.client||"—")+'</strong></div><span class="sr-type t-'+r.type+'">'+(r.type==="cot"?"Cotización":"Propuesta")+'</span></div>'+(q.total?'<div style="font-size:13px;color:var(--gr);font-weight:700">'+fm(q.total)+'</div>':'')+'<div style="font-size:11px;color:var(--soft)">'+(q.dateISO?new Date(q.dateISO).toLocaleDateString("es-CO"):"")+'</div></div>';
+      return '<div class="search-result" onclick="openDocument(\''+(r.type==="cot"?"quote":"proposal")+'\',\''+r.id+'\')"><div class="sr-top"><div><span class="qnum">'+h(qn)+'</span> <strong>'+h(q.client||"—")+'</strong></div><span class="sr-type t-'+r.type+'">'+(r.type==="cot"?"Cotización":"Propuesta")+'</span></div>'+(q.total?'<div style="font-size:13px;color:var(--gr);font-weight:700">'+fm(q.total)+'</div>':'')+'<div style="font-size:11px;color:var(--soft)">'+(q.dateISO?new Date(q.dateISO).toLocaleDateString("es-CO"):"")+'</div></div>';
     }
     if(r.type==="cli"){const c=r.data;return '<div class="search-result" onclick="pickClientFromSearch(\''+c.id+'\')"><div class="sr-top"><div><strong>'+c.name+'</strong>'+(c.idtype?' — '+c.idtype+' '+c.idnum:'')+'</div><span class="sr-type t-cli">Cliente</span></div><div style="font-size:11px;color:var(--mid)">'+(c.tel||"")+(c.mail?' · '+c.mail:'')+'</div></div>'}
     if(r.type==="prod"){const p=r.data;return '<div class="search-result" style="border-left-color:#6A1B9A"><div class="sr-top"><div><strong>'+p.n+'</strong></div><span class="sr-type t-prod">Catálogo</span></div>'+(p.d?'<div style="font-size:11px;color:var(--soft)">'+p.d+'</div>':'')+'<div style="font-size:13px;color:var(--gr);font-weight:700">'+fm(p.p)+' · '+p.u+'</div><div style="font-size:10px;color:var(--mid)">'+p.c+'</div></div>'}
@@ -1796,9 +1796,9 @@ function showClientHistoryPanel(name,modo){
     const fecha=q.dateISO?new Date(q.dateISO).toLocaleDateString("es-CO"):"—";
     const total=q.total?fm(q.total):"";
     const coment=q.comentarioCliente?.texto;
-    return '<div class="chp-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="chp-item-top"><span><span class="qnum" style="font-size:9px">'+(q.quoteNumber||q.id)+'</span> · '+fecha+(total?' · '+total:"")+'</span><span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span></div>'+
-      (coment?'<div class="chp-item-coment">💬 '+coment.slice(0,140)+(coment.length>140?'...':'')+'</div>':'')+
+    return '<div class="chp-item" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
+      '<div class="chp-item-top"><span><span class="qnum" style="font-size:9px">'+h(q.quoteNumber||q.id)+'</span> · '+fecha+(total?' · '+total:"")+'</span><span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span></div>'+
+      (coment?'<div class="chp-item-coment">💬 '+h(coment.slice(0,140))+(coment.length>140?'...':'')+'</div>':'')+
     '</div>';
   }).join("")||'<div class="chp-empty">Sin pedidos previos.</div>';
 }
@@ -1971,6 +1971,208 @@ async function executeDelCascade(){
   }catch(e){hideLoader();alert("Error en cascada: "+e.message);console.error(e)}
 }
 
+// ═══════════════════════════════════════════════════════════
+// v6.1.0: HELPER h() · Escape HTML para defensa XSS + apóstrofes/angles
+// ═══════════════════════════════════════════════════════════
+// Aplicado defensivamente en los 5 renders expuestos donde q.client, q.att,
+// q.id, q.quoteNumber, q.comentarioCliente y nombres de productos se
+// inyectan vía innerHTML. Reemplaza los .replace(/[<>]/g,"") dispersos.
+//
+// Nota: devuelve string vacío para null/undefined para no imprimir literal
+// "null" en la UI cuando un campo está ausente.
+function h(s){
+  if(s==null)return "";
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+// ═══════════════════════════════════════════════════════════
+// v6.1.0: MODAL PREVIEW UNIFICADO · openDocument(kind,id)
+// ═══════════════════════════════════════════════════════════
+// Bug UX-1: 12 sitios (historial, dashboard, seguimiento, búsqueda) hacían
+// click → loadQuote → abrir formulario de edición directamente. Con 86%
+// de docs sin pdfHistorial, el flujo correcto es VER primero, editar sólo
+// si se decide hacerlo explícitamente.
+//
+// Diseño aprobado: SIEMPRE abrir modal uniforme. NO branch
+// "PDF si existe / formulario si no" porque sería UX inconsistente.
+//
+// Botones contextuales:
+//   👁️ Ver PDF      — solo si q.pdfHistorial tiene entradas (abre última versión)
+//   💬 WhatsApp     — solo si saldo pendiente > 0 (reusa openSaldoWhatsAppModal)
+//   ✏️ Editar       — siempre si canEdit(q) (respeta requiresWarning → requestEdit)
+//   📄 Generar PDF  — siempre (llama loadQuote y salta a vista genPDF/genPropPDF)
+let _docPreviewCtx=null; // {kind,id,q}
+
+async function openDocument(kind,id){
+  try{
+    // 1. Localizar doc en cache (rápido, sin lectura Firestore extra)
+    let q=(quotesCache||[]).find(x=>x.id===id&&x.kind===kind);
+    // Si no está en cache (ej. búsqueda desde fuera del historial), leer Firestore
+    if(!q){
+      const {db,doc,getDoc}=window.fb;
+      let coll;
+      if(kind==="quote")coll="quotes";
+      else if(id&&id.startsWith("GB-PF-"))coll="propfinals";
+      else coll="proposals";
+      showLoader("Cargando...");
+      const snap=await getDoc(doc(db,coll,id));
+      hideLoader();
+      if(!snap.exists()){
+        if(typeof toast==="function")toast("No se encontró el documento","error");
+        else alert("No se encontró el documento");
+        return;
+      }
+      q={...snap.data(),id,kind};
+    }
+    _docPreviewCtx={kind,id,q};
+    // 2. Poblar header, body y footer del modal
+    _docPreviewRender(q,kind,id);
+    // 3. Mostrar modal
+    const m=$("doc-preview-modal");
+    if(m)m.classList.remove("hidden");
+  }catch(e){
+    hideLoader();
+    if(typeof toast==="function")toast("Error al abrir: "+e.message,"error");
+    else alert("Error al abrir: "+e.message);
+    console.error("[openDocument]",e);
+  }
+}
+
+function _docPreviewRender(q,kind,id){
+  // HEADER: # + cliente + fecha + status badge
+  const qNum=q.quoteNumber||id;
+  const isProp=(kind==="proposal");
+  const isPF=(id&&id.startsWith("GB-PF-"));
+  const tipoLbl=isPF?"Propuesta Final":(isProp?"Propuesta":"Cotización");
+  const st=q.status||"enviada";
+  const sMeta=(typeof STATUS_META!=="undefined"&&STATUS_META[st])||{label:st,cls:st};
+  const fecha=(q.dateISO||"").slice(0,10)||"—";
+  const titleEl=$("dp-title");
+  if(titleEl)titleEl.textContent=qNum;
+  const subEl=$("dp-subtitle");
+  if(subEl){
+    subEl.innerHTML='<strong>'+h(q.client||"—")+'</strong> · '+h(tipoLbl)+
+      ' · '+h(fecha)+
+      ' · <span class="hc-status '+h(sMeta.cls)+'">'+h(sMeta.label)+'</span>';
+  }
+  // BODY: resumen del doc + (si hay PDF) aviso de que puedes verlo con botón
+  const bodyEl=$("dp-body");
+  if(bodyEl){
+    const hasPdf=Array.isArray(q.pdfHistorial)&&q.pdfHistorial.length>0;
+    const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||0);
+    const fmt=(typeof fm==="function")?fm:(n=>"$"+n);
+    const cobrado=(typeof totalCobrado==="function")?totalCobrado(q):0;
+    const saldo=(typeof saldoPendiente==="function")?saldoPendiente(q):Math.max(0,total-cobrado);
+    const numProductos=((q.cart||[]).length+(q.cust||[]).length);
+    const productosRes=isProp
+      ?((q.sections||[]).length+" sección"+((q.sections||[]).length!==1?"es":"")+" · "+(q.pers||"?")+" personas")
+      :(numProductos+" producto"+(numProductos!==1?"s":""));
+    const eventD=q.eventDate?('<div class="dp-row"><span class="dp-k">📅 Entrega</span><span class="dp-v">'+h(q.eventDate)+(q.horaEntrega?' a las '+h(q.horaEntrega):'')+'</span></div>'):"";
+    const dirD=q.dir?('<div class="dp-row"><span class="dp-k">📍 Dirección</span><span class="dp-v">'+h(q.dir)+(q.city?', '+h(q.city):'')+'</span></div>'):"";
+    const telD=q.tel?('<div class="dp-row"><span class="dp-k">📞 Teléfono</span><span class="dp-v">'+h(q.tel)+'</span></div>'):"";
+    const comentD=q.comentarioCliente?.texto?('<div class="dp-row"><span class="dp-k">💬 Comentario</span><span class="dp-v" style="font-style:italic">'+h(q.comentarioCliente.texto)+'</span></div>'):"";
+    const pdfNotice=hasPdf
+      ?'<div class="dp-notice dp-notice-ok">📎 Hay '+q.pdfHistorial.length+' PDF'+(q.pdfHistorial.length!==1?'s':'')+' guardado'+(q.pdfHistorial.length!==1?'s':'')+' en la nube. Toca «Ver PDF» para abrir la última versión.</div>'
+      :'<div class="dp-notice dp-notice-warn">⚠️ Este documento no tiene PDF en la nube. Puedes generarlo ahora con «Generar PDF» o solo verlo/editarlo.</div>';
+    bodyEl.innerHTML=
+      pdfNotice+
+      '<div class="dp-summary">'+
+        '<div class="dp-row"><span class="dp-k">Contenido</span><span class="dp-v">'+h(productosRes)+'</span></div>'+
+        (!isProp?('<div class="dp-row"><span class="dp-k">Total</span><span class="dp-v" style="font-weight:700;color:#2E7D32">'+h(fmt(total))+'</span></div>'):"")+
+        ((!isProp&&cobrado>0)?('<div class="dp-row"><span class="dp-k">Cobrado</span><span class="dp-v">'+h(fmt(cobrado))+(saldo>0?' · <span style="color:#E65100">Saldo '+h(fmt(saldo))+'</span>':' · ✅ Pagado 100%')+'</span></div>'):"")+
+        eventD+dirD+telD+comentD+
+      '</div>';
+  }
+  // FOOTER: botones contextuales
+  const footerEl=$("dp-footer");
+  if(footerEl){
+    const btns=[];
+    const hasPdf=Array.isArray(q.pdfHistorial)&&q.pdfHistorial.length>0;
+    if(hasPdf){
+      btns.push('<button class="btn dp-btn-verpdf" onclick="docPreviewVerPdf()">👁️ Ver PDF</button>');
+    }
+    const total=(typeof getDocTotal==="function")?getDocTotal(q):(q.total||0);
+    const saldo=(typeof saldoPendiente==="function")?saldoPendiente(q):0;
+    // WhatsApp solo si hay saldo pendiente (reusa openSaldoWhatsAppModal existente)
+    if(saldo>0&&total>0&&typeof openSaldoWhatsAppModal==="function"){
+      btns.push('<button class="btn dp-btn-wa" onclick="docPreviewWhatsApp()">💬 WhatsApp saldo</button>');
+    }
+    // Editar si la matriz lo permite
+    const editable=(typeof canEdit==="function")?canEdit(q):true;
+    if(editable&&!isPF){
+      btns.push('<button class="btn dp-btn-edit" onclick="docPreviewEdit()">✏️ Editar</button>');
+    }else if(isPF&&st!=="superseded"){
+      // PF firmadas: redirigir a "Nueva versión" (igual que loadQuote ya hace)
+      btns.push('<button class="btn dp-btn-edit" onclick="docPreviewEdit()">🔄 Nueva versión</button>');
+    }
+    // Generar PDF: siempre (si no hay PDF, primero; si hay, regenerar)
+    btns.push('<button class="btn dp-btn-genpdf" onclick="docPreviewGenerarPdf()">📄 '+(hasPdf?"Regenerar":"Generar")+' PDF</button>');
+    footerEl.innerHTML=btns.join("");
+  }
+}
+
+function closeDocPreviewModal(){
+  const m=$("doc-preview-modal");
+  if(m)m.classList.add("hidden");
+  _docPreviewCtx=null;
+}
+
+function docPreviewVerPdf(){
+  if(!_docPreviewCtx)return;
+  const q=_docPreviewCtx.q;
+  if(!Array.isArray(q.pdfHistorial)||!q.pdfHistorial.length){
+    if(typeof toast==="function")toast("No hay PDF guardado","warn");
+    return;
+  }
+  // Última versión (mayor version)
+  const sorted=[...q.pdfHistorial].sort((a,b)=>(b.version||0)-(a.version||0));
+  const url=sorted[0]?.url;
+  if(!url){
+    if(typeof toast==="function")toast("URL del PDF no disponible","error");
+    return;
+  }
+  window.open(url,"_blank","noopener");
+}
+
+function docPreviewWhatsApp(){
+  if(!_docPreviewCtx)return;
+  const {kind,id}=_docPreviewCtx;
+  if(typeof openSaldoWhatsAppModal==="function"){
+    closeDocPreviewModal();
+    openSaldoWhatsAppModal(id,kind);
+  }
+}
+
+function docPreviewEdit(){
+  if(!_docPreviewCtx)return;
+  const {kind,id,q}=_docPreviewCtx;
+  closeDocPreviewModal();
+  // Respetar la lógica de matriz de edición del botón ✏️ existente:
+  // si requiere advertencia, usar requestEdit (modal de advertencia); sino loadQuote directo.
+  const needsWarn=(typeof requiresWarning==="function"&&requiresWarning(q));
+  if(needsWarn&&typeof requestEdit==="function"){
+    requestEdit(kind,id);
+  }else if(typeof loadQuote==="function"){
+    loadQuote(kind,id);
+  }
+}
+
+async function docPreviewGenerarPdf(){
+  // Flujo: cerrar modal → cargar el doc en el formulario (loadQuote) → llevar al usuario
+  // hasta la vista donde puede pulsar 📄 Generar PDF. Mantener simple: NO autodisparar
+  // genPDF() porque puede pedir validaciones, y el usuario ya sabe el flujo del botón.
+  if(!_docPreviewCtx)return;
+  const {kind,id}=_docPreviewCtx;
+  closeDocPreviewModal();
+  if(typeof toast==="function")toast("Cargando para generar PDF…","info",2000);
+  if(typeof loadQuote==="function")await loadQuote(kind,id);
+}
+
 async function loadQuote(kind,id){
   try{
     const {db,doc,getDoc}=window.fb;
@@ -2059,10 +2261,13 @@ async function loadQuote(kind,id){
 
 // ═══════════════════════════════════════════════════════════
 // v4.13.0: Toast no bloqueante (reemplaza alerts informativos)
+// v6.1.0: Tercer parámetro opcional `duration` (ms) para mensajes que
+//         requieran más/menos tiempo en pantalla que el auto-cálculo.
 // ═══════════════════════════════════════════════════════════
-// Uso: toast("Guardado", "success") · toast("Sin conexión", "error") · toast("Aviso", "warn")
+// Uso: toast("Guardado", "success") · toast("Sin conexión", "error")
+//      toast("Aviso largo", "warn", 7000) // duración custom
 // Tipos: success | error | warn | info (default)
-function toast(msg,type){
+function toast(msg,type,duration){
   const tp=type||"info";
   let wrap=$("toast-wrap");
   if(!wrap){
@@ -2074,7 +2279,9 @@ function toast(msg,type){
   el.className="toast toast-"+tp;
   el.textContent=msg;
   wrap.appendChild(el);
-  // Auto-remove tras ~3.5s (un poco más para mensajes largos)
-  const ms=Math.min(6000,2500+msg.length*30);
+  // v6.1.0: si llega duration explícita úsala; sino auto-calcular (~3.5s base)
+  const ms=(typeof duration==="number"&&duration>0)
+    ?duration
+    :Math.min(6000,2500+msg.length*30);
   setTimeout(()=>{el.classList.add("toast-out");setTimeout(()=>el.remove(),300)},ms);
 }

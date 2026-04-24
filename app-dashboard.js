@@ -196,7 +196,7 @@ async function renderDashboard(){
           const tag=q.kind==="quote"?'<span class="ui-tag prod">Pedido</span>':'<span class="ui-tag ent">Evento</span>';
           const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
           const total=fm(getDocTotal(q));
-          return '<div class="dash-up-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
+          return '<div class="dash-up-item" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
         }).join("");
         return '<div class="dash-up-day"><div class="dash-up-day-label">'+dayLabel(d)+'</div>'+items+'</div>';
       }).join("");
@@ -411,7 +411,7 @@ function renderWeekEventCard(q,iso,todayIso){
   if(q.kind==="quote"&&["pedido","en_produccion"].includes(sCls)&&!q.produced&&iso>=todayIso){
     accionChip='<button class="we-accion-chip" onclick="event.stopPropagation();toggleProduced(\''+q.id+'\',event)" title="Marcar como producido">🔪 Producido</button>';
   }
-  return '<div class="wd-ev '+sCls+(opEstado?' op-'+opEstado.cls:'')+'" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+  return '<div class="wd-ev '+sCls+(opEstado?' op-'+opEstado.cls:'')+'" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
     '<div class="we-row-top">'+
       '<span class="we-cli">'+tag+(q.client||"—").replace(/[<>]/g,"")+'</span>'+
       (hora?'<span class="we-hora-big">⏰ '+hora+'</span>':'')+
@@ -550,7 +550,7 @@ function renderMonth(){
     const mom=q.momento?q.momento:'';
     const hora=q.horaEntrega?'⏰ '+q.horaEntrega:'';
     const meta=[pax+mom,hora].filter(Boolean).join(' · ');
-    return '<div class="cal-ev-card '+q.status+'" id="cal-ev-'+p.d+'-'+q.id+'" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')"><div class="cal-ev-date"><div class="d">'+p.d+'</div><div class="m">'+mShort[p.m]+'</div></div><div class="cal-ev-body"><div class="cal-ev-cli">'+(q.client||"—")+typeTag+' <span class="hc-status '+sMeta.cls+'" style="margin-left:4px">'+sMeta.label+'</span></div><div class="cal-ev-meta"><span>'+meta+'</span></div></div></div>';
+    return '<div class="cal-ev-card '+q.status+'" id="cal-ev-'+p.d+'-'+q.id+'" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')"><div class="cal-ev-date"><div class="d">'+p.d+'</div><div class="m">'+mShort[p.m]+'</div></div><div class="cal-ev-body"><div class="cal-ev-cli">'+(q.client||"—")+typeTag+' <span class="hc-status '+sMeta.cls+'" style="margin-left:4px">'+sMeta.label+'</span></div><div class="cal-ev-meta"><span>'+meta+'</span></div></div></div>';
   }).join("");
 }
 function calFocusDay(d){
@@ -868,9 +868,9 @@ function _buildDashDocRow(q,monto,extra,tagStyle){
     }
     quickBtns='<div class="dd-row-chips">'+chips.join("")+'</div>';
   }
-  return '<div class="dd-row" onclick="closeDashDetail();loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-    '<div class="dd-row-top"><div class="dd-row-cli">'+tag+(q.client||"—")+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
-    '<div class="dd-row-meta"><span class="qnum" style="font-size:9px">'+(q.quoteNumber||q.id)+'</span> · '+fecha+' · <span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+ecBadge+(extra?' · '+extra:'')+'</div>'+
+  return '<div class="dd-row" onclick="closeDashDetail();openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
+    '<div class="dd-row-top"><div class="dd-row-cli">'+tag+h(q.client||"—")+'</div><div class="dd-row-monto">'+fm(monto)+'</div></div>'+
+    '<div class="dd-row-meta"><span class="qnum" style="font-size:9px">'+h(q.quoteNumber||q.id)+'</span> · '+fecha+' · <span class="hc-status '+sMeta.cls+'">'+sMeta.label+'</span>'+ecBadge+(extra?' · '+extra:'')+'</div>'+
     quickBtns+
   '</div>';
 }
@@ -1827,7 +1827,7 @@ function urgentItemHtml(q){
   const prodChip=q.produced?
     '<span class="urgent-prod-done" title="Producido '+(q.producedAt||"").slice(0,10)+'">🔪 Producido</span>':
     '<button class="urgent-prod-chip" onclick="event.stopPropagation();toggleProduced(\''+q.id+'\',\''+q.kind+'\',event)">🔪 Producido</button>';
-  return '<div class="urgent-item" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+  return '<div class="urgent-item" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
     '<div class="urgent-item-top">'+
       '<div class="urgent-item-txt">'+
         '<div class="urgent-cli">'+cli+'</div>'+
@@ -2329,7 +2329,7 @@ function renderClienteView(){
     const bg=fu==="perdida"?"#C62828":(statusColor[s]||"#90A4AE");
     const num=q.quoteNumber||q.id;
     const total=getDocTotal(q);
-    return '<div class="cli-view-doc" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+    return '<div class="cli-view-doc" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
       '<span class="cvd-num">'+num+'</span>'+
       '<span class="cvd-status" style="background:'+bg+'22;color:'+bg+';border:1px solid '+bg+'55">'+statusLabel+'</span>'+
       '<span class="cvd-total">'+fm(total)+'</span>'+

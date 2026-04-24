@@ -7,36 +7,36 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
 <title>Gourmet Bites - Cotizador</title>
-<!-- VERSION: 2026-04-23-v6.0.2-dashboard-enriquecido-whatsapp-saldo-cortesias -->
-<!-- v6.0.2 cambios (salto directo desde v6.0.0 para quienes no deployaron v6.0.1):
+<!-- VERSION: 2026-04-24-v6.1.0-modal-preview-unificado-escape-html-toast -->
+<!-- v6.1.0 cambios (E1-1, E1-2, E1-3 del roadmap 3 entregas):
 
-  FIX incluido de v6.0.1:
-  · BUG-014: Pipeline Activo del Dashboard no abría drill-down en ninguna de las
-    3 pipe-cards porque openPipelineDetail escribía en $("dash-detail-body"),
-    un ID que no existe en el DOM (el modal real usa dd-title + dd-list).
+  E1-1: openDocument() con modal preview unificado
+  · Bug UX-1 resuelto: click en tarjeta (historial, dashboard, seguimiento,
+    búsqueda) ya NO abre formulario de edición directo. Abre modal preview
+    con resumen del doc + botones contextuales:
+      👁️ Ver PDF (si hay pdfHistorial) · 💬 WhatsApp (si saldo > 0)
+      ✏️ Editar (si canEdit, respeta requiresWarning) · 📄 Generar PDF
+  · 12 sitios migrados: 3 en historial, 6 en dashboard, 1 en seguimiento,
+    2 en core (búsqueda global + panel cliente).
+  · Diseño unificado: NO hay branch "PDF si existe/formulario si no" porque
+    86% de docs (18/21 al 24-abr) no tienen pdfHistorial.
 
-  Mejoras nuevas de v6.0.2:
-  1. Toggle "Incluir cumplidas" persiste en localStorage (antes se reseteaba).
-  2. Ventas anteriores: 3 filtros nuevos (Este mes / Últ. 3m / Últ. 6m).
-  3. Cortesías (total=0 + entregado) pasan a Ventas anteriores automáticamente.
-     Badge 🎁 Cortesía en drill-down de Entregado.
-  4. Refactor: openDashDetail y openPipelineDetail unificadas en helpers
-     compartidos (_buildDashDocRow + _renderDashGroupedList). Evita regresiones
-     tipo BUG-014 y elimina ~170 líneas de duplicación.
-  5. Pipe-cards: badge 🔴 de urgencia si hay docs con 7+ días sin mover.
-  6. Pipe-cards: sub-línea incluye clientes únicos.
-  7. Drill-down: chip para alternar orden Monto/Antigüedad. Estado por bucket.
-  8. "Entregados con saldo": desglose de antigüedad 0–3d / 4–14d / +15d.
-     Mismo desglose en el KPI "Por cobrar".
-  9. Chip 💬 WhatsApp en cada fila de "Entregados con saldo". Modal editable
-     con template cercano/tú ("saldito", "¿nos cuentas cuándo...?").
- 10. "Entregados con saldo" ordena por antigüedad de entrega por defecto.
- 13. CSS real para .hc-btn-reactivar y .mf-* (antes dependían de style="" inline).
-     Inline styles redundantes removidos de los 2 modales de v5.5.
+  E1-2: Helper h() escape HTML (defensa XSS + apóstrofes/angles)
+  · Aplicado en los 5 renders expuestos: renderHist, renderSegCard,
+    _renderDashGroupedList, doSearch, showClientHistoryPanel.
+  · Campos envueltos: q.client, q.att, q.quoteNumber, q.comentarioCliente,
+    texto de nota de seguimiento. Reemplaza .replace(/[<>]/g,"") dispersos.
+
+  E1-3: Migración alerts informativos a toast
+  · 36 alerts migrados (cotizar:7, propuesta:7, historial:22) a toast()
+    no bloqueante. Toast ahora acepta 3er parámetro duration opcional.
+  · Alerts destructivos (confirm de eliminar/anular) quedan para v6.3.0.
+
+  Sin cambio Firestore schema · Rollback = subir archivos de v6.0.2.
 -->
-<!-- VERSION PREV: 2026-04-23-v6.0.1-fix-pipeline-activo-drilldown (no deployada) -->
-<!-- VERSION PREV²: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
-<!-- VERSION PREV: 2026-04-23-v5.5.0-edicion-pedidos-matriz-permisiva-audit-trail-versionado-hijo -->
+<!-- VERSION PREV: 2026-04-23-v6.0.2-dashboard-enriquecido-whatsapp-saldo-cortesias -->
+<!-- VERSION PREV²: 2026-04-23-v6.0.1-fix-pipeline-activo-drilldown (no deployada) -->
+<!-- VERSION PREV³: 2026-04-23-v6.0.0-ventas-anteriores-canAnular-KPI-desglose -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -519,6 +519,22 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
 .toast-info{background:linear-gradient(135deg,#1976D2,#0D47A1)}
 .toast-out{opacity:0;transform:translateY(20px);transition:all .3s}
 @keyframes toastIn{from{opacity:0;transform:translateY(20px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+/* v6.1.0: Modal preview unificado · reemplaza click→loadQuote directo */
+#doc-preview-modal .modal-box{max-width:540px}
+.dp-notice{padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.45;margin-bottom:12px;border-left:3px solid transparent}
+.dp-notice-ok{background:#E8F5E9;border-left-color:#43A047;color:#1B5E20}
+.dp-notice-warn{background:#FFF3E0;border-left-color:#FB8C00;color:#BF360C}
+.dp-summary{background:#FAFAFA;border:1px solid #ECEFF1;border-radius:8px;padding:10px 12px}
+.dp-row{display:flex;gap:10px;padding:6px 0;font-size:12.5px;line-height:1.4;border-bottom:1px dashed #ECEFF1}
+.dp-row:last-child{border-bottom:none}
+.dp-row .dp-k{flex:0 0 100px;color:#78909C;font-weight:600;font-size:11.5px}
+.dp-row .dp-v{flex:1;min-width:0;color:#263238;word-break:break-word}
+#dp-footer .btn{flex:1 1 auto;min-width:120px;font-size:12.5px;padding:10px 12px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:inherit}
+#dp-footer .btn:active{transform:scale(.97)}
+.dp-btn-verpdf{background:linear-gradient(135deg,#1976D2,#0D47A1);color:#fff}
+.dp-btn-wa{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff}
+.dp-btn-edit{background:linear-gradient(135deg,#FFB300,#EF6C00);color:#fff}
+.dp-btn-genpdf{background:linear-gradient(135deg,#546E7A,#263238);color:#fff}
 /* v4.13.0: Banner de advertencia de fantasmas en dashboard */
 .dash-banner-warn{background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:1.5px solid #FFB74D;border-left:4px solid #FB8C00;border-radius:10px;padding:12px 14px;margin:0 0 14px 0;display:flex;align-items:center;gap:10px;color:#5D4037;font-size:13px;line-height:1.4}
 .dash-banner-warn .dbw-ic{font-size:22px;flex-shrink:0}
@@ -2003,6 +2019,22 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--cl);color:v
       <button class="mclose" onclick="closeCascadeDelModal()">×</button>
     </div>
     <div class="mform" id="cascade-del-body">
+    </div>
+  </div>
+</div>
+
+<!-- v6.1.0: Modal preview unificado · reemplaza flujo click→loadQuote que abría formulario -->
+<!-- Abierto desde openDocument(kind,id) en los 12 sitios (historial, dashboard, seguimiento, búsqueda) -->
+<div id="doc-preview-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeDocPreviewModal()">
+  <div class="modal-box">
+    <div class="modal-head" style="background:linear-gradient(135deg,#455A64,#263238)">
+      <span class="mtitle" id="dp-title">Documento</span>
+      <button class="mclose" onclick="closeDocPreviewModal()">×</button>
+    </div>
+    <div class="mform" style="padding:14px 16px">
+      <div id="dp-subtitle" style="font-size:12.5px;color:#455A64;margin-bottom:12px;line-height:1.5"></div>
+      <div id="dp-body"></div>
+      <div id="dp-footer" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px"></div>
     </div>
   </div>
 </div>

@@ -476,8 +476,8 @@ async function renderHist(){
     if(status==="convertida")cardCls+=" hc-convertida";
     if(status==="anulada")cardCls+=" hc-anulada";
     const cardExtra=(status==="superseded"||q._wrongCollection)?' style="opacity:.65"':"";
-    return '<div class="'+cardCls+'"'+cardExtra+' onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
-      '<div class="hc-top"><div><span class="qnum">'+qNum+'</span> <span class="hc-cli">'+q.client+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+anuladaBadge+followUpBadge+pagadoBadge+prodBadge+comentBadge+syncBadge+'</div>'+
+    return '<div class="'+cardCls+'"'+cardExtra+' onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
+      '<div class="hc-top"><div><span class="qnum">'+h(qNum)+'</span> <span class="hc-cli">'+h(q.client)+'</span><span class="hc-type '+(isProp?"prop":"cot")+'">'+(isProp?"Propuesta":"Cotización")+'</span>'+statusBadge+supersededBadge+wrongCollBadge+origenPfBadge+anuladaBadge+followUpBadge+pagadoBadge+prodBadge+comentBadge+syncBadge+'</div>'+
       '<div><button class="dup-btn" onclick="openDuplicateModal(\''+q.kind+'\',\''+q.id+'\',event)" title="Duplicar">📋</button><button class="del-btn" onclick="delHistItem(\''+q.kind+'\',\''+q.id+'\',event)">×</button></div></div>'+
       '<div class="hc-date">'+ds+'</div>'+summary+actions+
       '</div>';
@@ -535,7 +535,7 @@ async function quickMarkViva(docId,kind,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   if(typeof setFollowUp!=="function"){alert("Función no disponible");return}
   const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
-  if(!q){alert("No se encontró el documento");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró el documento","error");else alert("No se encontró el documento");return}
   const fu=typeof getFollowUp==="function"?getFollowUp(q):"pendiente";
   if(fu==="activa"){
     if(typeof toast==="function")toast("🟢 Ya está marcada como activa","info");
@@ -556,7 +556,7 @@ async function quickMarkViva(docId,kind,ev){
 function openOrderModal(quoteId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const q=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
-  if(!q){alert("No se encontró la cotización");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró la cotización","error");else alert("No se encontró la cotización");return}
   $("om-num").value=q.quoteNumber||q.id;
   $("om-cli").value=q.client||"";
   const hoy=new Date().toISOString().slice(0,10);
@@ -641,7 +641,7 @@ function closeOrderModal(){$("order-modal").classList.add("hidden")}
 async function submitMarkAsOrder(){
   const quoteId=$("om-num").dataset.quoteId;
   if(!quoteId)return;
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión.");return}
   const fecha=$("om-fecha").value;if(!fecha){alert("Ingresa la fecha de aprobación del cliente");return}
   const fechaEntrega=$("om-entrega-fecha").value;
   const horaEntrega=$("om-entrega-hora").value;
@@ -722,7 +722,7 @@ async function submitMarkAsOrder(){
 async function assignDeliveryDate(quoteId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const q=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
-  if(!q){alert("No se encontró el pedido");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró el pedido","error");else alert("No se encontró el pedido");return}
   const hoy=new Date().toISOString().slice(0,10);
   const fecha=prompt("Fecha de entrega (YYYY-MM-DD):",q.eventDate||hoy);
   if(!fecha)return;
@@ -730,7 +730,7 @@ async function assignDeliveryDate(quoteId,ev){
   const hora=prompt("Hora de entrega (HH:MM):",q.horaEntrega||"12:00");
   if(!hora)return;
   if(!/^\d{2}:\d{2}$/.test(hora)){alert("Formato inválido. Usa HH:MM");return}
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   try{
     showLoader("Asignando fecha...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
@@ -751,7 +751,7 @@ async function assignDeliveryDate(quoteId,ev){
 function openApproveModal(propId,kind,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const p=quotesCache.find(x=>x.id===propId&&x.kind===kind);
-  if(!p){alert("No se encontró la propuesta");return}
+  if(!p){if(typeof toast==="function")toast("No se encontró la propuesta","error");else alert("No se encontró la propuesta");return}
   $("am-num").value=p.quoteNumber||p.id;
   $("am-cli").value=p.client||"";
   $("am-fecha").value=new Date().toISOString().slice(0,10);
@@ -785,7 +785,7 @@ async function submitApproveProposal(){
   const propId=$("am-num").dataset.propId;
   const kind=$("am-num").dataset.propKind||"proposal";
   if(!propId)return;
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión.");return}
   const fecha=$("am-fecha").value;if(!fecha){alert("Ingresa la fecha de aprobación");return}
   const anticipo=parseInt($("am-anticipo").value)||0;
   const metodo=$("am-metodo").value;
@@ -825,7 +825,7 @@ let dupSource=null;
 
 function openDuplicateModal(kind,id,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión.");return}
   let coll;
   if(kind==="quote")coll="quotes";
   else if(id&&id.startsWith("GB-PF-"))coll="propfinals";
@@ -834,7 +834,7 @@ function openDuplicateModal(kind,id,ev){
   const {db,doc,getDoc}=window.fb;
   getDoc(doc(db,coll,id)).then(snap=>{
     hideLoader();
-    if(!snap.exists()){alert("No se encontró el documento");return}
+    if(!snap.exists()){if(typeof toast==="function")toast("No se encontró el documento","error");else alert("No se encontró el documento");return}
     dupSource={kind:kind,id:id,coll:coll,data:snap.data()};
     const effKind=coll==="propfinals"?"proposal":kind;
     $("dup-kind-label").textContent=effKind==="quote"?"cotización":"propuesta";
@@ -917,7 +917,7 @@ let saldoSource=null;
 function openSaldoModal(propId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const p=quotesCache.find(x=>x.id===propId);
-  if(!p){alert("No se encontró");return}
+  if(!p){if(typeof toast==="function")toast("No se encontró","error");else alert("No se encontró");return}
   const anticipoProp=p.approvalData?.anticipo;
   const anticipoOrder=p.orderData?.anticipo;
   if(!anticipoProp&&!anticipoOrder){alert("Este documento no tiene anticipo registrado.");return}
@@ -938,7 +938,7 @@ function closeSaldoModal(){$("saldo-modal").classList.add("hidden");saldoSource=
 
 async function submitSaldoCobrado(){
   if(!saldoSource)return;
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión.");return}
   const fecha=$("sm-fecha").value;if(!fecha){alert("Fecha");return}
   const metodo=$("sm-metodo").value;if(!metodo){alert("Método");return}
   const monto=parseInt($("sm-monto").value)||0;if(monto<=0){alert("Monto inválido");return}
@@ -970,7 +970,7 @@ function openPagoModal(docId,kindOrEv,evMaybe){
   let q;
   if(kind)q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
   else q=quotesCache.find(x=>x.id===docId);
-  if(!q){alert("No se encontró");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró","error");else alert("No se encontró");return}
   pagoSrc={id:docId,kind:q.kind,doc:q};
   pagoFotoBase64=null;
   $("pm-foto-preview").innerHTML="";
@@ -1019,7 +1019,7 @@ function previewPagoFoto(ev){
 
 async function submitPago(){
   if(!pagoSrc)return;
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   const fecha=$("pm-fecha").value;if(!fecha){alert("Fecha");return}
   const monto=parseInt($("pm-monto").value)||0;if(monto<=0){alert("Monto inválido");return}
   const metodo=$("pm-metodo").value;if(!metodo){alert("Método");return}
@@ -1144,7 +1144,7 @@ async function toggleProduced(docId,kind,ev){
   const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
   if(!q)return;
   const newVal=!q.produced;
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   try{
     showLoader("Actualizando...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
@@ -1202,7 +1202,7 @@ function previewEntregaFoto(ev){
 
 async function submitDelivery(){
   if(!deliverySrc)return;
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   const fecha=$("dm-fecha").value||new Date().toISOString().slice(0,10);
   let entregadoPor=$("dm-entregado-por").value;
   if(entregadoPor==="Otro"){entregadoPor=$("dm-entregado-otro").value.trim();if(!entregadoPor){alert("Indica quién entregó");return}}
@@ -1294,7 +1294,7 @@ function previewComentFoto(ev){
 
 async function submitComentario(){
   if(!comentSrc)return;
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   const texto=$("cm-texto").value.trim();
   if(!texto&&!comentFotoBase64){alert("Agrega texto o una foto");return}
   const fecha=$("cm-fecha").value||new Date().toISOString().slice(0,10);
@@ -1332,7 +1332,7 @@ async function submitComentario(){
 // ═══════════════════════════════════════════════════════════
 async function deleteWrongDoc(docId,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   if(!docId||!docId.startsWith("GB-PF-")){alert("Solo aplica a docs con prefijo GB-PF-");return}
   if(!confirm("🗑️ Eliminar fantasma\n\n"+docId+" quedó guardado por error en la colección 'proposals/' (pasó antes de v4.12.7 cuando alguien editó una PF directamente).\n\nLa PF real sigue intacta en 'propfinals/'.\n\n¿Confirmar borrado del fantasma?"))return;
   try{
@@ -1351,7 +1351,7 @@ async function deleteWrongDoc(docId,ev){
 // v4.12.7: limpieza masiva de fantasmas — llamar desde consola del navegador
 // Ejemplo: cleanupWrongDocs()
 async function cleanupWrongDocs(){
-  if(!cloudOnline){alert("Sin conexión");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión");return}
   const fantasmas=quotesCache.filter(q=>q._wrongCollection);
   if(!fantasmas.length){toast("🎉 No hay fantasmas. Todo limpio","success");return}
   const lista=fantasmas.map(q=>"• "+q.id+" ("+(q.client||"—")+")").join("\n");
@@ -1392,9 +1392,9 @@ let _anularCtx=null;
 
 function openAnularModal(docId,kind,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
-  if(!cloudOnline){alert("Sin conexión.");return}
+  if(!cloudOnline){if(typeof toast==="function")toast("Sin conexión","error");else alert("Sin conexión.");return}
   const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
-  if(!q){alert("No se encontró el documento.");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró el documento","error");else alert("No se encontró el documento.");return}
   const status=q.status||"enviada";
   if(!["pedido","aprobada","en_produccion"].includes(status)){
     alert("Solo se pueden anular pedidos/eventos en estado Pedido, Aprobada o En producción.\n\nEstado actual: "+(STATUS_META[status]?.label||status));
@@ -1565,7 +1565,7 @@ async function submitAnular(){
 function openPdfHistorialModal(docId,kind,ev){
   if(ev){ev.stopPropagation();ev.preventDefault()}
   const q=quotesCache.find(x=>x.id===docId&&x.kind===kind);
-  if(!q){alert("No se encontró el documento");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró el documento","error");else alert("No se encontró el documento");return}
   const hist=Array.isArray(q.pdfHistorial)?q.pdfHistorial:[];
   if(!hist.length){alert("Este documento no tiene historial de PDFs guardado en Storage.");return}
   $("ph-doc-id").textContent=q.quoteNumber||q.id;
@@ -1719,7 +1719,7 @@ function renderAllPdfsList(){
         const qNum=q.quoteNumber||q.id;
         const err=(q.pdfUploadLastError||"").replace(/[<>]/g,"").slice(0,80);
         const lastAt=(q.pdfUploadLastAttempt||"").slice(0,16).replace("T"," ");
-        return '<div style="padding:7px 9px;background:#fff;border:1px solid #FFCC80;border-radius:6px;margin-bottom:5px;cursor:pointer" onclick="closeAllPdfsModal();loadQuote(\''+q.kind+'\',\''+q.id+'\')">'+
+        return '<div style="padding:7px 9px;background:#fff;border:1px solid #FFCC80;border-radius:6px;margin-bottom:5px;cursor:pointer" onclick="closeAllPdfsModal();openDocument(\''+q.kind+'\',\''+q.id+'\')">'+
           '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px"><span style="font-weight:700;color:#1A1A1A">'+qNum+'</span><span style="color:#BF360C;font-size:10px">↗ Abrir y regenerar</span></div>'+
           '<div style="font-size:10.5px;color:#455A64;margin-top:2px">'+(q.client||"—").replace(/[<>]/g,"")+'</div>'+
           (lastAt?'<div style="font-size:9.5px;color:#888;margin-top:2px">Último intento: '+lastAt+'</div>':'')+
@@ -1762,7 +1762,7 @@ function renderAllPdfsList(){
           '<div style="font-size:11.5px;color:#455A64;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(d.client||"—").replace(/[<>]/g,"")+'</div>'+
           '<div style="font-size:10px;color:#78909C;margin-top:2px">'+kindLabel+' · '+fm(d.total)+' · '+(d.dateISO||"—")+'</div>'+
         '</div>'+
-        '<button onclick="closeAllPdfsModal();loadQuote(\''+d.kind+'\',\''+d.id+'\')" style="font-size:10.5px;background:#ECEFF1;border:1px solid #B0BEC5;color:#455A64;padding:4px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;font-family:inherit">📂 Abrir cotización</button>'+
+        '<button onclick="closeAllPdfsModal();openDocument(\''+d.kind+'\',\''+d.id+'\')" style="font-size:10.5px;background:#ECEFF1;border:1px solid #B0BEC5;color:#455A64;padding:4px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;font-family:inherit">📂 Abrir cotización</button>'+
       '</div>'+
       '<div style="margin-top:8px">'+versionesHtml+'</div>'+
     '</div>';
@@ -1807,7 +1807,7 @@ async function retryAllFailedPdfs(){
 // Muestra modal de advertencia; si el usuario confirma, procede con loadQuote.
 function requestEdit(kind,docId){
   const q=(quotesCache||[]).find(x=>x.id===docId&&x.kind===kind);
-  if(!q){alert("No se encontró el documento");return}
+  if(!q){if(typeof toast==="function")toast("No se encontró el documento","error");else alert("No se encontró el documento");return}
   if(typeof requiresWarning==="function"&&requiresWarning(q)&&typeof openEditWarningModal==="function"){
     openEditWarningModal(q,function(){loadQuote(kind,docId)});
   }else{

@@ -121,14 +121,15 @@ function renderSegCard(q){
   if(Array.isArray(q.notasSeguimiento)&&q.notasSeguimiento.length){
     const ultima=q.notasSeguimiento[q.notasSeguimiento.length-1];
     const fNota=(ultima.fecha||"").slice(0,10);
+    // v6.1.0: h() reemplaza .replace(/[<>]/g,"") con escape completo (defensivo)
     notaHtml='<div class="seg-card-nota"><span class="scn-date">📝 '+fNota+'</span>'+
-      (ultima.texto||"").replace(/[<>]/g,"")+'</div>';
+      h(ultima.texto||"")+'</div>';
   }
   const nContacto=cel||"";
   return '<div class="'+cls+'" data-id="'+q.id+'" data-kind="'+q.kind+'">'+
     '<div class="seg-card-top">'+
-      '<span class="seg-card-num">'+qNum+'</span>'+
-      '<span class="seg-card-cli">'+(q.client||"—")+'</span>'+
+      '<span class="seg-card-num">'+h(qNum)+'</span>'+
+      '<span class="seg-card-cli">'+h(q.client||"—")+'</span>'+
       '<span class="seg-card-total">'+fm(total)+'</span>'+
     '</div>'+
     '<div class="seg-card-meta">'+
@@ -144,7 +145,7 @@ function renderSegCard(q){
       '<button class="seg-btn-action seg-btn-activa" onclick="markFollowUp(\''+q.id+'\',\''+q.kind+'\',\'activa\')">✅ Activa</button>'+
       '<button class="seg-btn-action seg-btn-perdida" onclick="openPerdidaModal(\''+q.id+'\',\''+q.kind+'\')">❌ Perdida</button>'+
       '<button class="seg-btn-action seg-btn-nota" onclick="openNotaSegModal(\''+q.id+'\',\''+q.kind+'\')">📝 Nota</button>'+
-      '<button class="seg-btn-action seg-btn-open" onclick="loadQuote(\''+q.kind+'\',\''+q.id+'\')">👁️ Abrir</button>'+
+      '<button class="seg-btn-action seg-btn-open" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')">👁️ Abrir</button>'+
     '</div>'+
     '</div>';
 }
