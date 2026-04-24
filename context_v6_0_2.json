@@ -1,0 +1,282 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Contexto operativo para continuar el proyecto en un chat nuevo",
+    "proposito": "Cierre sesión 2026-04-23/24 con v6.0.2 ENTREGADA — Salto directo desde v6.0.0. Incluye fix de v6.0.1 + 11 mejoras nuevas.",
+    "generado_el": "2026-04-24",
+    "generado_por": "Claude Opus 4.7 — sesión de v6.0.2 con análisis previo de salto v6.0.0→v6.0.2",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "mantener_al_dia": "OBLIGATORIO — leer sección 'instrucciones_mantenimiento_json' al final",
+    "supersedes": "context_v6_0_1.json y context_v6_0_0.json — este reemplaza a los anteriores",
+    "nota_especial": "Luis decidió saltarse v6.0.1 (no la deployó) porque v6.0.2 incluye su fix + mejoras. Análisis detallado del salto quedó documentado antes de entregar."
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": ["Luis", "Kathy", "JP"]
+    },
+    "version_actual_entregada": "v6.0.2 — ZIP entregado 2026-04-24 (salto directo desde v6.0.0)",
+    "version_siguiente_planeada": "v6.0.3 (banner consolidado de acciones urgentes, item 12) · v6.1 rediseño ERP completo (5 módulos)",
+    "version_en_produccion_hasta_deploy": "v6.0.0 (v6.0.1 nunca se deployó)",
+    "fecha_ultima_actualizacion": "2026-04-24",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos (sin cambios desde v5.0.x)",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers. v6.0.2: BUILD_VERSION v6.0.2 + isCumplido extendido para cortesías + isCortesia(q) nuevo.",
+      "app-cotizar.js": "módulo cotizaciones (sin cambios desde v5.5.0)",
+      "app-propuesta.js": "módulo propuestas (sin cambios desde v5.5.0)",
+      "app-historial.js": "historial + buscador + modal PDFs. v6.0.2: toggle persistente en localStorage + 3 filtros nuevos en Ventas anteriores (Este mes / Últ. 3m / Últ. 6m).",
+      "app-seguimiento.js": "seguimiento comercial (sin cambios desde v5.4.4)",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda. v6.0.2: BUG-014 FIX (del v6.0.1) + refactor unificación + helpers nuevos + pipe-cards enriquecidas + desglose antigüedad + modal WhatsApp + sort chip + badges cortesía."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages (luisrandrade-collab.github.io/GB-Ciclo-de-ventas/)",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze",
+    "firebase_storage_rules": "rules_version 2 · allPaths auth != null"
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": ["enviada", "pedido", "en_produccion", "entregado", "anulada", "superseded"],
+    "propuesta_status": ["enviada", "propfinal", "aprobada", "en_produccion", "entregado", "convertida", "superseded", "anulada"],
+    "follow_up_comercial": {
+      "aplica_a": "cotizaciones status=enviada · propuestas status in [enviada, propfinal]",
+      "expuesto_a_usuario": ["viva", "perdida"]
+    },
+    "archivo_historial": {
+      "vivas": "cotizaciones/propuestas sin cerrar y NO perdidas",
+      "pedidos": "pedido/aprobada/en_produccion/entregado (excluye cumplidos por defecto)",
+      "ventas_anteriores": "v6.0 — entregados Y pagados 100% (cumplidos) · v6.0.2: también incluye cortesías (total=0 + entregado)",
+      "perdidas": "followUp=perdida y status in [enviada, propfinal]",
+      "anuladas": "status=anulada"
+    },
+    "nota_v602": "'cumplido' ahora acepta también total=0. isCortesia(q) nuevo helper para badges visuales. Esto NO toca Firestore — todo es derivado en memoria."
+  },
+  "version_602_ENTREGADA": {
+    "fecha_entrega": "2026-04-24",
+    "tipo": "MINOR — salto directo desde v6.0.0 (Luis no deployó v6.0.1)",
+    "estado": "ZIP gourmet-bites-v6_0_2.zip entregado — pendiente deploy por Luis",
+    "analisis_previo_al_salto": {
+      "realizado": "Sí, antes de entregar el ZIP",
+      "riesgos_identificados": [
+        "SyntaxError en app-dashboard.js:1989 (llave } extra) — ARREGLADO antes de empaquetar",
+        "Falta CSS para 8 clases nuevas (dd-sort-chip, dd-aging, pipe-urgent-badge, etc) — AGREGADO",
+        "Cache-busting en 6.0.1 — SUBIDO a 6.0.2",
+        "BUILD_VERSION en 6.0.1 — SUBIDO a 6.0.2"
+      ],
+      "sin_impacto_firestore": "Confirmado. Ninguno de los 11 items modifica schema de Firestore. Todo es cálculo en memoria + localStorage + DOM. Rollback a v6.0.0 es trivial: solo subir los 4 archivos viejos.",
+      "comportamientos_que_cambian_al_deployar": [
+        "Docs con total=0 + entregado se mueven automáticamente a Ventas anteriores (no es pérdida, cambian de pestaña)",
+        "Toggle 'Incluir cumplidas' ahora persiste entre sesiones",
+        "Pipeline Activo ahora abre drill-down al hacer clic (era el BUG-014)",
+        "Bucket 'Entregados con saldo' ordena por antigüedad por defecto"
+      ]
+    },
+    "fix_incluido_de_v601": {
+      "id": "BUG-014",
+      "detalle": "openPipelineDetail escribía en $('dash-detail-body'), ID inexistente en el DOM. Bug latente desde v5.0.4. En v6.0.2 se resuelve dentro del refactor de unificación (Item 4)."
+    },
+    "items_implementados": {
+      "item_1_toggle_persistente": {
+        "archivo": "app-historial.js",
+        "detalle": "histIncluirCumplidos ahora se guarda en localStorage (clave 'gb_hist_incluir_cumplidos')"
+      },
+      "item_2_filtros_mes_ventas_anteriores": {
+        "archivo": "app-historial.js",
+        "detalle": "3 filtros nuevos: 'Este mes' / 'Últ. 3 meses' / 'Últ. 6 meses'. Lógica en _docEnSubfiltro con fechaEntrega como base."
+      },
+      "item_3_cortesias_cumplidas": {
+        "archivo": "app-core.js",
+        "detalle": "isCumplido(q) ahora retorna true si status=entregado Y total=0 (antes retornaba false). Helper isCortesia(q) nuevo. Badge 🎁 Cortesía agregado al drill-down de Entregado."
+      },
+      "item_4_unificacion_drilldown": {
+        "archivo": "app-dashboard.js",
+        "detalle": "_buildDashDocRow y _renderDashGroupedList son helpers compartidos. openDashDetail y openPipelineDetail delegan ambos en ellos. Elimina ~170 líneas de duplicación. Incluye el fix de BUG-014 porque ambas usan los IDs correctos del modal."
+      },
+      "item_5_urgencia_pipe_cards": {
+        "archivo": "app-dashboard.js",
+        "detalle": "Badge 🔴 en esquina de pipe-card si hay docs con 7+ días sin updatedAt (o fechaEntrega en Entregados con saldo). CSS .pipe-urgent-badge."
+      },
+      "item_6_clientes_unicos_pipe_cards": {
+        "archivo": "app-dashboard.js",
+        "detalle": "Sub-línea de pipe-cards incluye conteo de clientes únicos. Ayuda a identificar concentración."
+      },
+      "item_7_sort_chip": {
+        "archivo": "app-dashboard.js",
+        "detalle": "Chip Monto/Antigüedad en drill-down. Estado por bucket en _dashDetailSortMode. setDashDetailSort reabre el drill-down con el nuevo orden."
+      },
+      "item_8_desglose_antiguedad_saldo": {
+        "archivo": "app-dashboard.js",
+        "detalle": "En bucket 'Entregados con saldo' y KPI 'Por cobrar': barra con 0-3d / 4-14d / +15d. Tag de días en cada fila. Cortes confirmados por Luis."
+      },
+      "item_9_modal_whatsapp": {
+        "archivo": "app-dashboard.js + index.html",
+        "detalle": "Modal #wa-saldo-modal con campos editables (cliente, tel, mensaje). Template cercano/tú con 'saldito'. Al enviar abre wa.me/{tel}?text=... con el mensaje editado. Asume prefijo 57 si tel tiene 10 dígitos."
+      },
+      "item_10_sort_antiguedad_default": {
+        "archivo": "app-dashboard.js",
+        "detalle": "Bucket 'Entregados con saldo' inicializa _dashDetailSortMode['pipeline:entregados_con_saldo'] = 'antiguedad' la primera vez. Luis puede cambiar con el chip del item 7."
+      },
+      "item_13_css_huerfano": {
+        "archivo": "index.html",
+        "detalle": "CSS real para .hc-btn-reactivar, .mf-wrap, .mf-head, .mf-body, .mf-foot, .mf-close. Antes funcionaban por style=\"\" inline. Inline styles redundantes removidos de los 2 modales de v5.5 (edit-history, edit-warning)."
+      }
+    },
+    "items_postpuestos_a_v603": {
+      "item_12_banner_consolidado": "Banner arriba del dashboard que consolide fantasmas + follow-up + entregas hoy + saldos viejos. Luis eligió postponer para v6.0.3."
+    },
+    "archivos_modificados": ["app-core.js", "app-dashboard.js", "app-historial.js", "index.html"],
+    "archivos_sin_cambios": ["app-assets.js", "app-cotizar.js", "app-propuesta.js", "app-seguimiento.js"],
+    "breaking_changes": "Ninguno. Salto directo v6.0.0→v6.0.2 es seguro. Firestore schema intacto. Rollback trivial.",
+    "validacion": "Los 7 JS pasan node -c. HTML balanceado ignorando comentarios CSS (div 477/477, button 123/123, span 102/102, script 10/10). JSON parsea OK. Test de integración con 11 docs mockeados: pasan los 5 chequeos clave (pipeline excluye perdidas/anuladas/cumplidas/cortesías, cortesía va a Ventas anteriores, desglose 4-14d/+15d correcto, template WhatsApp bien armado, orden por antigüedad coloca más viejo primero).",
+    "pendiente_luis": [
+      "Subir los 4 archivos modificados a GitHub Pages (app-core.js, app-dashboard.js, app-historial.js, index.html)",
+      "Hard refresh (Ctrl+F5) para invalidar cache",
+      "Validación rápida post-deploy (5 min):",
+      "  1. Dashboard carga sin errores en consola",
+      "  2. Pipeline Activo: clic en las 3 pipe-cards → drill-down abre (fix BUG-014)",
+      "  3. Pipeline Activo: si hay docs viejos, ver badge 🔴 en esquina de pipe-card",
+      "  4. Toggle 'Incluir cumplidas' en Historial → cambiar, refrescar, debe persistir",
+      "  5. Ventas anteriores: ver 3 filtros nuevos (Este mes / Últ. 3m / Últ. 6m)",
+      "  6. Entregados con saldo: ver chip 💬 WhatsApp, abrirlo, cancelar",
+      "  7. Si hay pedido total=0 entregado en Pedidos→Entregadas: debe aparecer en Ventas anteriores",
+      "  8. Drill-down de Entregado: docs cortesía muestran badge 🎁 Cortesía",
+      "  9. Chip Monto/Antigüedad en drill-down funciona",
+      "Pilotar 2-3 días con Kathy/JP antes de dar v6.0.2 por estable",
+      "Si todo bien: cerrar v6.0.2 como estable y planear v6.0.3 con banner consolidado (item 12)"
+    ]
+  },
+  "issues_conocidos_v602": [
+    "Template WhatsApp asume Colombia (prefijo 57) si tel es 10 dígitos. Si hay clientes extranjeros, Luis debe editar el campo tel con código de país.",
+    "El campo tel puede estar vacío en docs antiguos (antes v5.x). En ese caso el usuario debe pegarlo manualmente en el modal.",
+    "Bucket 'Entregados con saldo' solo ordena por antigüedad por defecto la PRIMERA vez. Si Luis cambia a monto, eso persiste en la sesión.",
+    "El sort chip NO persiste entre recargas (es memoria de sesión). Candidato a localStorage en v6.0.3 si Luis lo pide."
+  ],
+  "bugs_conocidos_abiertos": [],
+  "bugs_resueltos_en_sesiones_previas": [
+    {"id": "BUG-009", "titulo": "Reglas Firebase Storage", "resuelto_en": "v5.4.4 infra"},
+    {"id": "BUG-010", "titulo": "_now scope en catch", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-011", "titulo": "WhatsApp en Seguimiento (campos q.tel/q.mail)", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-012", "titulo": "Descarga PDF por versión", "resuelto_en": "v5.4.4"},
+    {"id": "BUG-013", "titulo": "Botón Anular visible en pedidos pagados 100%", "resuelto_en": "v6.0.0", "detalle": "Reportado por Luis 2026-04-23 con capturas de 0113 Maria Teresa y 0111 Tarkus. Fix: canAnular() chequea cobrado>=total."},
+    {"id": "BUG-014", "titulo": "Pipeline Activo del Dashboard no abría drill-down", "resuelto_en": "v6.0.1 (preparado) / v6.0.2 (entregado)", "detalle": "openPipelineDetail escribía en $('dash-detail-body'), ID inexistente. Bug latente desde v5.0.4. Fix aplicado dentro del refactor de unificación (Item 4)."}
+  ],
+  "roadmap_v6_x_arquitectura_erp": {
+    "contexto": "v6.0 fue el primer paso de rediseño: reorganizar el historial. v6.0.2 mejoró profundamente el dashboard sin tocar Firestore. v6.1 sería el rediseño mayor tipo ERP: 5 módulos + Despachos nuevo + Finanzas expandido.",
+    "orden_de_versiones": {
+      "v6.0.0": "Ventas anteriores + canAnular + KPI desglose — ENTREGADA 2026-04-23 noche anterior",
+      "v6.0.1": "HOTFIX BUG-014 — PREPARADA pero no deployada (Luis saltó directo a v6.0.2)",
+      "v6.0.2": "Dashboard enriquecido + BUG-014 fix + WhatsApp saldo + cortesías + CSS huérfano — ENTREGADA 2026-04-24",
+      "v6.0.3": "Banner consolidado de acciones urgentes (item 12) — pendiente post-estabilización de v6.0.2",
+      "v6.0.x": "Posibles hotfixes o quick wins según feedback",
+      "v6.1.0": "Rediseño ERP completo — cuando haya 2-3 semanas estables"
+    },
+    "propuesta_menu_5_modulos": [
+      {"id": "dashboard", "label": "Dashboard", "contenido": "Pipeline · KPIs · Operación urgente · Agenda"},
+      {"id": "ventas", "label": "Ventas", "contenido": "A. Cotizaciones · B. Seguimiento · C. Propuestas"},
+      {"id": "operaciones", "label": "Operaciones", "contenido": "Pedidos · Producción · Despachos (NUEVO) · Entregas · Historial operativo"},
+      {"id": "finanzas", "label": "Finanzas", "contenido": "Cartera · Pagos · Comprobantes · Reportes · Exportables · Ventas anteriores"},
+      {"id": "herramientas", "label": "Herramientas", "contenido": "Buscar global · PDFs nube · Backup/Restaurar · Mantenimiento · Config plantillas"}
+    ]
+  },
+  "pendientes_v6_1_por_aterrizar": {
+    "despachos_modulo_nuevo": {
+      "estado": "Luis NO tiene claro el alcance — sesión dedicada antes de v6.1",
+      "preguntas_abiertas": [
+        "¿Objeto separado (colección 'despachos') o estado del pedido?",
+        "¿Quién despacha: interno o terceros?",
+        "¿Programación anticipada o reactivos?",
+        "¿Firma/foto receptor obligatoria?",
+        "¿Despacho parcial?",
+        "¿Direcciones recurrentes guardadas?",
+        "¿Costos en total al cliente o internos?"
+      ]
+    },
+    "finanzas_expandido": {
+      "preguntas_abiertas": [
+        "¿Granularidad reportes: cliente/línea/fuente?",
+        "¿Formato DIAN? ¿Facturación electrónica?",
+        "¿Conciliación bancaria manual?",
+        "¿Gastos operativos o solo ingresos?"
+      ]
+    }
+  },
+  "historial_versiones_detallado": [
+    {"version": "v6.0.2", "fecha": "2026-04-24", "tipo": "MINOR", "estado": "ENTREGADA (ZIP) — pendiente deploy", "highlights": ["Salto directo desde v6.0.0 (v6.0.1 preparada pero no deployada)", "BUG-014 resuelto dentro del refactor Item 4", "Toggle persistente en localStorage", "Filtros mes en Ventas anteriores", "Cortesías (total=0) como cumplidas automáticas", "Refactor unificación openDashDetail/openPipelineDetail", "Pipe-cards con badge urgencia + clientes únicos", "Chip sort Monto/Antigüedad", "Desglose antigüedad saldo 0-3/4-14/+15", "Modal WhatsApp editable con template cercano", "Bucket saldo ordena por antigüedad default", "CSS real para .hc-btn-reactivar y .mf-*"]},
+    {"version": "v6.0.1", "fecha": "2026-04-23 tarde", "tipo": "HOTFIX", "estado": "PREPARADA NO DEPLOYADA — superseded por v6.0.2", "highlights": ["BUG-014 Pipeline Activo drill-down"]},
+    {"version": "v6.0.0", "fecha": "2026-04-23 noche", "tipo": "MAJOR", "estado": "EN PRODUCCIÓN hasta que Luis deploye v6.0.2", "highlights": ["5ta pestaña Historial 'Ventas anteriores'", "Toggle 'Incluir cumplidas'", "canAnular bloquea pagados 100%", "KPI Entregado desglose", "Helpers isCumplido, canAnular"]},
+    {"version": "v5.5.0", "fecha": "2026-04-23 mañana", "tipo": "MINOR", "estado": "SUPERSEDED", "highlights": ["Edición de Pedidos matriz permisiva", "Versionado hijo -1/-2", "Audit trail editHistory"]},
+    {"version": "v5.4.4", "fecha": "2026-04-23", "tipo": "HOTFIX", "estado": "SUPERSEDED", "highlights": ["BUG-010, BUG-011, BUG-012 resueltos"]},
+    {"version": "v5.0.x-v5.4.x", "fecha": "2026-04-20 a 2026-04-23", "tipo": "MAJOR + iteraciones", "estado": "SUPERSEDED"}
+  ],
+  "pendientes_operativos_no_de_codigo": {
+    "urgente_post_v602": [
+      "Subir los 4 archivos modificados a GitHub Pages",
+      "Hard refresh + correr los 9 checks de pendiente_luis",
+      "Pilotar con Kathy/JP un par de días antes de dar v6.0.2 por estable"
+    ],
+    "media_prioridad": [
+      "Configurar PITR y/o Scheduled Backups en Firebase Console",
+      "Ejecutar migrarFotosStorage() (pendiente desde v5.0)"
+    ],
+    "post_estabilizacion_v602": [
+      "Recopilar feedback real de 2-3 semanas",
+      "Decidir si se arranca v6.0.3 (banner consolidado item 12) o se pasa directo a v6.1",
+      "Aterrizar preguntas abiertas de Despachos y Finanzas"
+    ]
+  },
+  "memoria_para_proximo_chat": {
+    "arranque_sugerido": "v6.0.2 ENTREGADA 2026-04-24 como salto directo desde v6.0.0. Luis nunca deployó v6.0.1. Próximo chat: esperar 2-3 semanas de uso estable. Si emergen hotfixes → v6.0.2.x. Si Luis quiere seguir con el banner consolidado → v6.0.3. Luego aterrizar Despachos y Finanzas antes de v6.1.",
+    "contexto_critico_no_perder": [
+      "v6.0.2 ZIP entregado 2026-04-24 — Luis debe deployar 4 archivos (core, dashboard, historial, index.html)",
+      "v6.0.1 NUNCA se deployó — Luis saltó directo a v6.0.2 porque v6.0.2 incluye su fix",
+      "'Cumplido' ahora acepta también total=0 (cortesías). Definición derivada, no persiste en Firestore.",
+      "isCortesia(q) es el helper nuevo para badges visuales",
+      "openPipelineDetail y openDashDetail comparten _renderDashGroupedList desde v6.0.2. Si se edita el render unificado, afecta a ambos.",
+      "Template WhatsApp asume prefijo +57 Colombia si tel es 10 dígitos",
+      "Sort chip Monto/Antigüedad NO persiste entre sesiones (candidato a v6.0.3 si Luis lo pide)",
+      "URL producción: GB-Ciclo-de-ventas/",
+      "v6.1 rediseño grande decidido — 5 módulos · Despachos + Finanzas aún sin alcance"
+    ],
+    "decisiones_aprobadas_no_discutir_de_nuevo": [
+      "v6.0 cumplido = entregado + cobrado 100% + total>0 · v6.0.2 extendido: también total=0 + entregado",
+      "v6.0 cumplidos salen de Pedidos → Entregadas por default, toggle los devuelve",
+      "v6.0 canAnular bloquea pagados al 100%",
+      "v6.0 KPI Entregado mantiene cifra agregada, solo agrega sub-línea",
+      "v6.0.2 cortes de antigüedad de saldo: 0-3d / 4-14d / +15d (decidido por Luis)",
+      "v6.0.2 template WhatsApp: cercano/tú con 'saldito' (decidido por Luis)",
+      "v6.0.2 cortesías cuentan en count del KPI Entregado pero no en monto (decidido por Luis)",
+      "v6.0.2 openPipelineDetail y openDashDetail comparten render (refactor item 4)",
+      "v6.0.2 CSS .mf-* definido como modal genérico (Opción B — conservador)",
+      "Bucket 'Entregados con saldo' ordena por antigüedad por defecto",
+      "v5.5 matriz permisiva + modal advertencia (vigente)",
+      "v5.5 versionado con sufijo SOLO pre-confirmación",
+      "v5.5 aviso a Kathy/JP mediante letrero visible en app (NO WhatsApp automático)",
+      "v6.1 rediseño grande, no en fases",
+      "Entrega: ZIP versionado con 9 archivos (8 + JSON) cuando hay código"
+    ],
+    "descubrimientos_sesion_v602": [
+      "Antes de entregar v6.0.2 detectamos SyntaxError en app-dashboard.js (línea 1989, llave } extra residuo del refactor) — corregido. Recordatorio: siempre correr node -c al final del refactor grande.",
+      "Auditoría profunda (7 frentes) sobre v6.0.1 confirmó 0 bugs funcionales. Encontró 1 sistema legacy muerto (openSaldoModal), 33 clases CSS huérfanas (~8KB) y 5 clases usadas sin CSS (las .mf-* corregidas en item 13). Pospuesto: limpieza del legacy muerto — no urgente.",
+      "El análisis pre-despliegue confirmó que v6.0.2 NO toca Firestore schema. Todo es derivado en memoria + localStorage + DOM. Esto hace el rollback trivial (solo subir archivos viejos).",
+      "El refactor de unificación (item 4) eliminó ~170 líneas de código duplicado entre openDashDetail y openPipelineDetail. Además hace que bugs futuros tipo BUG-014 sean imposibles en ese patrón."
+    ]
+  },
+  "instrucciones_mantenimiento_json": {
+    "regla_entrega_archivos": "SIEMPRE entregar los 9 archivos empaquetados en ZIP versionado gourmet-bites-vX_Y_Z.zip. present_files recibe SOLO el ZIP (1 filepath). En el mensaje: qué archivos cambiaron vs cuáles no. Warning: present_files puede renombrar a files.zip.",
+    "excepcion_sesiones_sin_codigo": "Si sesión es puramente planeación/diagnóstico, solo se entrega el JSON actualizado. NO ZIP.",
+    "mantener_al_dia": [
+      "Actualizar version_actual_entregada cada release",
+      "Mover bugs entre abiertos/resueltos según progreso",
+      "Actualizar historial_versiones_detallado cada release",
+      "Limpiar decisiones_aprobadas_no_discutir_de_nuevo cuando se implementen"
+    ]
+  }
+}

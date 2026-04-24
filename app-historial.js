@@ -66,7 +66,12 @@ if(typeof histFilter==="undefined")var histFilter="all";
 if(typeof histSearch==="undefined")var histSearch="";
 // v6.0: toggle para incluir cumplidas en "Pedidos → Entregadas"
 // (normalmente viven solo en "Ventas anteriores").
-if(typeof histIncluirCumplidos==="undefined")var histIncluirCumplidos=false;
+// v6.0.2: persiste en localStorage ("gb_hist_incluir_cumplidos") para que
+// no se resetee en cada refresh. Si no hay nada guardado, default=false.
+if(typeof histIncluirCumplidos==="undefined"){
+  try{var histIncluirCumplidos=localStorage.getItem("gb_hist_incluir_cumplidos")==="1";}
+  catch(_e){var histIncluirCumplidos=false;}
+}
 
 // Normaliza texto: quita tildes, a minúsculas. Para comparar en buscador.
 function _normTxt(s){
@@ -162,8 +167,13 @@ const HIST_SUBFILTERS={
   ],
   // v6.0: Ventas anteriores — pedidos cumplidos (entregado + pagado)
   // Permite filtrar por año para no ahogar la lista cuando haya muchos.
+  // v6.0.2: se añaden 3 filtros de rango corto (mes actual / últ. 3 meses /
+  // últ. 6 meses) para agilizar consultas de corto plazo sin navegar por año.
   ventas_anteriores:[
     {k:"all",label:"Todas"},
+    {k:"month_current",label:"Este mes"},
+    {k:"last_3m",label:"Últ. 3 meses"},
+    {k:"last_6m",label:"Últ. 6 meses"},
     {k:"year_current",label:"Este año"},
     {k:"year_prev",label:"Año anterior"},
     {k:"older",label:"Más antiguas"}
@@ -187,13 +197,30 @@ function _docEnSubfiltro(q,arch,filt){
     return motivo===filt;
   }
   // v6.0: Ventas anteriores — filtro por año basado en fecha de entrega
+  // v6.0.2: nuevos filtros de rango corto (mes actual / últ. 3m / últ. 6m).
   if(arch==="ventas_anteriores"){
     const fEnt=q.fechaEntrega||q.entregaData?.fechaEntrega||q.eventDate||"";
+    if(!fEnt)return false; // sin fecha de entrega no puede evaluarse rango
     const yearDoc=fEnt.slice(0,4);
     const yearNow=new Date().getFullYear();
     if(filt==="year_current")return yearDoc===String(yearNow);
     if(filt==="year_prev")return yearDoc===String(yearNow-1);
     if(filt==="older")return yearDoc!==""&&parseInt(yearDoc,10)<yearNow-1;
+    // v6.0.2: rangos cortos
+    if(filt==="month_current"){
+      const ym=fEnt.slice(0,7);
+      const now=new Date();
+      const ymNow=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+      return ym===ymNow;
+    }
+    if(filt==="last_3m"||filt==="last_6m"){
+      // Comparamos fechas ISO: fEnt >= hace N meses
+      const meses=filt==="last_3m"?3:6;
+      const d=new Date();
+      d.setMonth(d.getMonth()-meses);
+      const cutoff=d.toISOString().slice(0,10);
+      return fEnt>=cutoff;
+    }
   }
   return true;
 }
@@ -384,7 +411,7 @@ async function renderHist(){
       if(!_esPerdida){
         actionBtns.push('<button class="btn hc-btn-order" onclick="openOrderModal(\''+q.id+'\',event)">✅ Marcar como pedido</button>');
       }else{
-        actionBtns.push('<button class="btn hc-btn-reactivar" style="background:linear-gradient(135deg,#66BB6A,#388E3C);color:#fff" onclick="openReactivarModal(\''+q.id+'\',\'quote\',event)">♻️ Reactivar</button>');
+        actionBtns.push('<button class="btn hc-btn-reactivar" onclick="openReactivarModal(\''+q.id+'\',\'quote\',event)">♻️ Reactivar</button>');
       }
     }else if(!isProp&&(status==="pedido"||status==="en_produccion")){
       if(!q.eventDate)actionBtns.push('<button class="btn hc-btn-order" onclick="assignDeliveryDate(\''+q.id+'\',event)">📅 Asignar fecha de entrega</button>');
@@ -398,14 +425,14 @@ async function renderHist(){
         if(hasMulti)actionBtns.push('<button class="btn hc-btn-final" onclick="openPropFinalFlow(\''+q.id+'\',event)">✓ Generar Propuesta Final</button>');
         else actionBtns.push('<button class="btn hc-btn-approve" onclick="openApproveModal(\''+q.id+'\',\'proposal\',event)">✓ Marcar como aprobada</button>');
       }else{
-        actionBtns.push('<button class="btn hc-btn-reactivar" style="background:linear-gradient(135deg,#66BB6A,#388E3C);color:#fff" onclick="openReactivarModal(\''+q.id+'\',\'proposal\',event)">♻️ Reactivar</button>');
+        actionBtns.push('<button class="btn hc-btn-reactivar" onclick="openReactivarModal(\''+q.id+'\',\'proposal\',event)">♻️ Reactivar</button>');
       }
     }else if(isProp&&status==="propfinal"){
       // v5.0.5: bloquear aprobada si es perdida; ofrecer Reactivar
       if(!_esPerdida){
         actionBtns.push('<button class="btn hc-btn-approve" onclick="openApproveModal(\''+q.id+'\',\'proposal\',event)">✓ Marcar como aprobada</button>');
       }else{
-        actionBtns.push('<button class="btn hc-btn-reactivar" style="background:linear-gradient(135deg,#66BB6A,#388E3C);color:#fff" onclick="openReactivarModal(\''+q.id+'\',\'proposal\',event)">♻️ Reactivar</button>');
+        actionBtns.push('<button class="btn hc-btn-reactivar" onclick="openReactivarModal(\''+q.id+'\',\'proposal\',event)">♻️ Reactivar</button>');
       }
     }else if(isProp&&(status==="aprobada"||status==="en_produccion")){
       if(!q.produced)actionBtns.push('<button class="btn hc-btn-edit" onclick="toggleProduced(\''+q.id+'\',\'proposal\',event)">🔪 Marcar producido</button>');
@@ -484,6 +511,8 @@ function setHistFilter(k){histFilter=k;renderHist()}
 // no aparecen mezclados con los entregados con saldo pendiente.
 function toggleIncluirCumplidos(){
   histIncluirCumplidos=!histIncluirCumplidos;
+  // v6.0.2: persistir selección en localStorage
+  try{localStorage.setItem("gb_hist_incluir_cumplidos",histIncluirCumplidos?"1":"0");}catch(_e){}
   renderHist();
 }
 
