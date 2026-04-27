@@ -1,0 +1,336 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF PARCIAL — Bloque D v7.0-α (D2/D3/D4/D5/D7/D8 cerradas + D1.1 cerrada; D1.2-7 y D6 pendientes)",
+    "version": "v7.0-α / Bloque D parcial — 6 de 8 subfases cerradas + D1 al 14% (D1.1 de 7)",
+    "fecha": "2026-04-26 noche",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade",
+    "documento_padre": "Plan_de_accion_v7_0_alpha_bloqueB_completado.json",
+    "documentos_relacionados": [
+      "Plan_de_accion_v7_0_alpha_bloqueA_completado.json",
+      "Plan_de_accion_v7_0_alpha_bloqueC_completado.json"
+    ],
+    "proposito": "Documentar el estado intermedio del Bloque D v7.0-α al cerrar la sesión del 2026-04-26 (noche). Permitir retomar D1 (Rediseño Dashboard) y D6 (FAB Crear) en sesión nueva sin reconstrucción de contexto."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion_original": "32-38h en 5 bloques",
+    "horas_consumidas_acumuladas_aprox": "~19-23h (A + C + B + D parcial)",
+    "bloques": {
+      "A_cascaron_visual":      { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "6-8h" },
+      "B_navegacion":           { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "4-6h", "horas_reales": "~1h" },
+      "C_5_fixes_operativos":   { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "10-12h" },
+      "D_dashboard_y_nav":      { "estado": "PARCIAL — 6 de 8 subfases cerradas (~75%)", "horas_estimadas": "8-10h", "horas_reales_acumuladas_parcial": "~1h 45min" },
+      "E_cierre":               { "estado": "PENDIENTE",            "horas_estimadas": "4-6h" }
+    }
+  },
+
+  "bloque_D_subfases": {
+
+    "D2_migracion_variables_CSS": {
+      "estado": "COMPLETADO Y VERIFICADO",
+      "duracion_real": "~30min (estimado: 2-3h)",
+      "objetivo": "Migrar las 17 variables CSS legacy v6.4 (--bk, --dk, --ch, --mid, --soft, --lt, --cl, --wh, --gr, --grd, --grl, --gd, --gdl, --rd, --bl, --bll, --r, --sh) a tokens v7 de gb-tokens.css.",
+      "decisiones": {
+        "Q1_cream":    "Agregar --gb-cream: #f4f3f1 a gb-tokens.css (preservar identidad de marca catering, no migrar a --gb-bg blanco)",
+        "Q2_gold":     "Agregar --gb-gold-50/500/700 a gb-tokens.css (gold catering es semántico, no transitorio)",
+        "Q3_radius":   "--r 10px → --gb-radius-md 8px (compromiso entre 6px y 12px, sutil)"
+      },
+      "implementacion": [
+        "D2.1 — Tokens nuevos en gb-tokens.css: --gb-cream, --gb-gold-50, --gb-gold-500, --gb-gold-700",
+        "D2.2 — Reemplazar bloque :root{--bk:#1a1a1a;...} en index.html línea 104 por aliases temporales que redirigen a tokens v7",
+        "D2.3 — Find/replace mecánico de 466 ocurrencias var(--legacy) → var(--gb-*) en index.html (376) + app-core.js (13) + app-cotizar.js (7) + app-propuesta.js (7) + app-dashboard.js (3)",
+        "D2.4 — Eliminar el bloque :root legacy de aliases (ya no referenciado por nada)"
+      ],
+      "verificado_navegador": [
+        "Desktop ≥1024px: dashboard, KPIs, cards, badges QR gold, modal heads, sidebar, header slim — sin regresiones visibles",
+        "Móvil 400px: header v6.4.0 oscuro, drawer móvil, formularios — sin regresiones"
+      ]
+    },
+
+    "D3_tipografia_inter_fraunces": {
+      "estado": "COMPLETADO Y VERIFICADO",
+      "duracion_real": "~10min (estimado: 1-2h)",
+      "objetivo": "Activar tipografía v7 (Inter body + Fraunces display) global on-screen, sin tocar PDFs entregables.",
+      "decisiones": {
+        "Q1_cormorant": "Migración total a Fraunces (no conviven Cormorant + Fraunces en módulos viejos)",
+        "Q2_dm_sans":   "Reemplazar en pantalla pero conservar en PDF — confirmado: PDFs usan jsPDF nativo (controla fonts vía doc.setFont), no leen CSS, así que la regla se cumple automáticamente"
+      },
+      "implementacion": [
+        "D3.1 — Cargar Inter (400-700) + Fraunces (400-700, opsz 9..144) en <link> Google Fonts del <head>; mantener DM Sans + Cormorant cargadas por compatibilidad",
+        "D3.2 — Find/replace de 80 ocurrencias en index.html: 67×'DM Sans',sans-serif + 1×'DM Sans',-apple-system,sans-serif → var(--gb-font-body); 12×'Cormorant Garamond',serif → var(--gb-font-display)"
+      ],
+      "verificado_navegador": [
+        "Body en Inter: textos generales más limpios y técnicos vs. DM Sans",
+        "Títulos en Fraunces: 'Dashboard', 'Historial de Cotizaciones', 'Datos del Cliente' con detalles serif moderno vs. Cormorant",
+        "PDFs sin cambio (jsPDF nativo, no afectados)"
+      ]
+    },
+
+    "D4_max_width_responsive": {
+      "estado": "COMPLETADO Y VERIFICADO",
+      "duracion_real": "~5min (estimado: 30min)",
+      "objetivo": "Quitar la limitación de 600px del .sec en desktop sin tocar móvil.",
+      "decisiones": {
+        "opcion_elegida": "C — responsive: 600px en móvil (validado en piloto) / 1280px en desktop ≥1024px (alineado con wireframe .page) + padding 24px 32px en desktop"
+      },
+      "implementacion": [
+        "Una sola regla CSS añadida después de .sec original en index.html línea 315: @media (min-width:1024px){.sec{max-width:1280px;padding:24px 32px}}"
+      ],
+      "verificado_navegador": [
+        "Desktop: contenido aprovecha hasta 1280px de ancho",
+        "Móvil <1024px: sin cambio (sigue 600px max-width)"
+      ]
+    },
+
+    "D5_reagrupacion_sidebar": {
+      "estado": "COMPLETADO Y VERIFICADO",
+      "duracion_real": "~50min (estimado: 3-4h)",
+      "objetivo": "Reagrupar sidebar de 7 items planos a 6 módulos con submenú según wireframe 01c-mapa-modulos, sin tocar setMode() interno.",
+      "decisiones": {
+        "arquitectura": "Capa de traducción submódulo↔legacy (NO tocar claves internas de setMode). Mantiene el motor de modos validado.",
+        "Q1_soon":      "Submódulos no implementados (Pipeline, ops×4, compras×3, clientes×3, herramientas×3) van como .is-soon visibles con toast 'Próximamente · v7.1'",
+        "Q2_buscar":    "Item 'Buscar' eliminado del sidebar (acceso futuro vía ⌘K en v7.1)"
+      },
+      "implementacion": [
+        "D5.1+D5.2 — Markup nuevo en aside.gb-shell-sidebar (líneas ~1438-1525): 3 secciones (Tu día / Operación / Maestros) + 6 módulos + 22 submódulos + iconos emoji por módulo",
+        "D5.3 — Bloque CSS nuevo style#gb-shell-v7-nav: clases .sb-module, .sb-module__btn, .sb-submenu, .sb-section-label, .is-soon, .sub-soon (badge 'Pronto'). NO toca style#gb-shell-v7 (cascarón A intacto)",
+        "D5.4 — Hook D5 reemplaza al hook A2 original: shim SUB_TO_LEGACY/LEGACY_TO_SUB, syncActiveState(legacyMode), wireSidebarNav (delegación de eventos), soonToast() integrado, setMode wrapper inalterado en su comportamiento legacy",
+        "D5.5 — Drawer móvil B1 ampliado: handler de cierre acepta ahora .sb-submenu a:not(.is-soon) además de .gb-shell-sidebar__item del foot"
+      ],
+      "fixes_iterativos": [
+        "Bug 1 reportado: 'Inicio no vuelve al inicio' — click en módulo padre solo expandía submenu sin navegar. Fix: click en módulo siempre intenta navegar al primer submódulo no-soon; si todos son SOON → toast",
+        "Bug 2 reportado: drawer móvil mostraba solo iconos sin labels — heredaba data-collapsed=true de localStorage del desktop. Fix: agregar overrides .gb-shell-sidebar[data-collapsed='true'] .sb-module__label/.sb-section-label/.sb-module__btn al bloque mobile B"
+      ],
+      "tabla_traduccion": {
+        "SUB_TO_LEGACY": {
+          "inicio/dashboard":  "dash",
+          "inicio/tareas":     "seg",
+          "inicio/agenda":     "cal",
+          "ventas/cotizar":    "cot",
+          "ventas/propuesta":  "prop",
+          "ventas/historico":  "hist"
+        },
+        "LEGACY_TO_SUB_incluyendo_search": {
+          "dash":   "inicio/dashboard",
+          "seg":    "inicio/tareas",
+          "cal":    "inicio/agenda",
+          "cot":    "ventas/cotizar",
+          "prop":   "ventas/propuesta",
+          "hist":   "ventas/historico",
+          "search": "ventas/cotizar"
+        }
+      },
+      "submodulos_soon_deshabilitados": [
+        "ventas/pipeline",
+        "ops/produccion", "ops/despacho", "ops/historico-hojas", "ops/cobro",
+        "compras/pendientes", "compras/historico", "compras/catalogo",
+        "clientes/directorio", "clientes/ventas-anteriores", "clientes/perdidas",
+        "herr/catalogo-productos", "herr/backup", "herr/configuracion"
+      ],
+      "verificado_navegador": [
+        "Desktop: 6 módulos visibles, módulo activo con barrita morada, click en módulo navega al primer submódulo activo",
+        "Desktop: click en submódulo SOON muestra toast 'Próximamente · v7.1'",
+        "Móvil drawer: labels completos visibles, secciones, submenu del activo desplegado",
+        "Click en cualquier item navegable cierra drawer móvil",
+        "setMode interno intacto: cot/prop/hist/seg/cal/dash siguen funcionando idénticamente"
+      ]
+    },
+
+    "D7_crumb_dinamico_estructurado": {
+      "estado": "COMPLETADO Y VERIFICADO",
+      "duracion_real": "~5min (estimado: 1h)",
+      "objetivo": "Refinar el crumb del header con jerarquía visual módulo · separador · submódulo según wireframe.",
+      "implementacion": [
+        "gbShellSetCrumb() en hook D5: construye innerHTML con 3 spans estructurados <span class='crumb-mod'>Módulo</span><span class='crumb-sep'>·</span><span class='crumb-current'>Submódulo</span>",
+        "CSS nuevo en style#gb-shell-v7-nav (sección @media min-width:1024px): .crumb-mod (Inter 14px peso 500 muted) · .crumb-sep (border-strong) · .crumb-current (Fraunces 17px peso 600 letter-spacing -0.01em)"
+      ],
+      "labels_actuales": {
+        "inicio/dashboard":  ["Inicio", "Dashboard"],
+        "inicio/tareas":     ["Inicio", "Tareas y follow-ups"],
+        "inicio/agenda":     ["Inicio", "Agenda"],
+        "ventas/cotizar":    ["Ventas", "Nueva cotización"],
+        "ventas/propuesta":  ["Ventas", "Nueva propuesta"],
+        "ventas/historico":  ["Ventas", "Histórico comercial"]
+      }
+    },
+
+    "D8_header_movil_slim": {
+      "estado": "COMPLETADO — pendiente verificación final del usuario",
+      "duracion_real": "~5min (estimado: 1h)",
+      "objetivo": "Reemplazar el header v6.4.0 oscuro (~120px verticales con logo + wordmark + sub + build) por header slim 48px equivalente al desktop, según wireframe.",
+      "implementacion": [
+        "Bloque CSS nuevo style#gb-shell-v7-mobile-header insertado después de style#gb-shell-v7-mobile (cascarón B intacto)",
+        "@media (max-width: 1023px): .hdr → height 48px, fondo --gb-surface, padding 0 16px 0 56px (reserva left para burger), sin gradient ni ::after gold",
+        "Ocultados: .hdr img, .hdr-brand, .hdr-sub, .hdr-logout, .hdr-build",
+        "Crumb visible: .crumb-mod 12px Inter muted, .crumb-current 15px Fraunces 600",
+        "Burger color: blanco → --gb-text (oscuro) porque header ahora es claro",
+        "cloud-ind: top 10px → 56px (no choca con crumb)",
+        "PIN overlay (.pin-overlay) intacto: no usa .hdr"
+      ]
+    }
+  },
+
+  "subfases_pendientes": {
+
+    "D1_rediseño_dashboard": {
+      "estado": "EN PROGRESO — D1.1 cerrada, D1.2-7 pendientes para sesión nueva",
+      "horas_estimadas_restantes": "3-5h (D1.2-7)",
+      "wireframe_target": "wireframes/02-inicio-dashboard.html",
+      "hallazgo_clave": "El dashboard actual ya tiene CASI toda la estructura del wireframe (pipeline activo, KPIs, urgentes, análisis colapsable, banner novedades). D1 es REFACTOR VISUAL + COMPLETAR GAPS, no reescritura. Sub-fases ajustadas al estado real:",
+      "D1_1_dash_head_CERRADA": {
+        "estado": "COMPLETADO 2026-04-26 noche",
+        "duracion_real": "~15min (estimado: 30min)",
+        "implementacion": [
+          "Markup .dash-head reemplazado por .dash-head-v7 con .dash-head__left (.dash-title + .dash-head__sub + .dash-head__greeting) y .dash-period",
+          "Período 'today' agregado al period-switch (Hoy/Semana/Mes/Año/Todo)",
+          "CSS nuevo en index.html: .dash-head-v7 .dash-head__sub (12px Inter muted capitalize) + .dash-head__greeting (18px Fraunces 600)",
+          "@media (min-width:1024px): .dash-title 32px, sub 13px, greeting 22px",
+          "JS app-dashboard.js: nueva función renderDashHead() llena saludo dinámico (Buenos días/tardes/noches por hora) + nombre del usuario + sub con día/fecha/semana ISO",
+          "getDashRange() ampliada: dashPeriod==='today' → start=end=todayIso, label='Hoy (YYYY-MM-DD)'",
+          "_safe(renderDashHead,'dash-head') agregado al inicio de renderDashboard()"
+        ],
+        "snapshots": [
+          "_legacy/index.v70a-preBLOQUE-D-1.bak.html",
+          "_legacy/app-dashboard.v70a-preBLOQUE-D-1.bak.js",
+          "_legacy/index.v70a-postBLOQUE-D-1-1.bak.html",
+          "_legacy/app-dashboard.v70a-postBLOQUE-D-1-1.bak.js"
+        ]
+      },
+      "scope_propuesto_4_zonas": [
+      "scope_propuesto_4_zonas": [
+        "ZONA 1 — 'Lo que pasa hoy': lista accionable con cobros vencidos / producir / entregar / tareas, ordenado por urgencia",
+        "ZONA 2 — KPIs del período: Cotizado / Vendido / Recaudado / Por cobrar con Δ% vs período anterior",
+        "ZONA 3 — Análisis comercial: funnel conversión + tendencia 6 meses (SVG)",
+        "ZONA 4 — Próximas entregas (lista 7 días) + accesos rápidos (Nueva cotización, Imprimir hoja, Registrar compra, Ver clientes)"
+      ],
+      "elementos_adicionales": [
+        "Dashboard head: saludo dinámico ('Buenos días, Luis') + period-switch (Hoy/Semana/Mes/Año/Todo)",
+        "Banner novedades descartable: 'X pedidos nuevos · Y entregas registradas desde tu última visita'"
+      ],
+      "archivos_a_tocar": [
+        "index.html (markup del modo 'dash')",
+        "app-dashboard.js (renderDashboard() actual + agregar lógica nueva: zonas, accesos rápidos, banner novedades)"
+      ],
+      "decisiones_resueltas_2026_04_26_noche": {
+        "Q1_banner_novedades": "OPT-IN con localStorage 'gbDashLastVisit' + Q1.A: el banner debe ser DELTA REAL (revisar lo que ya existe y solo mostrar lo NUEVO/MODIFICADO desde última visita, no contador desde cero)",
+        "Q2_funnel": "DATOS REALES desde el inicio (no mock). Si el piloto no tiene aún algún estado, mostrar el funnel parcial honesto",
+        "Q3_tendencia_6m": "DATOS REALES con placeholder honesto en meses sin datos (ej. '—' para nov/dic/ene/feb/mar 2026 cuando el piloto arrancó en abril)",
+        "Q4_estrategia": "REEMPLAZO DIRECTO (no feature flag). Snapshots pre-D1 en _legacy/ permiten rollback en 30s"
+      },
+      "subfases_D1_pendientes_priorizadas_para_proxima_sesion": {
+        "D1_2_banner_novedades": "30min — Revisar renderBannerNovedades() actual (v5.2.0 ya existe), refinar para que sea DELTA REAL contra localStorage 'gbDashLastVisit' (Q1.A confirmado por Luis)",
+        "D1_3_zona_lo_que_pasa_hoy": "1-1.5h — Ampliar urgent-card actual (Por producir / Por entregar) con 4 categorías del wireframe: cobros vencidos + producir hoy + entregar hoy + tareas pendientes. La complejidad mayor está en agregar cobros vencidos (lookup por fecha pactada vs hoy) y tareas (módulo Tareas no existe aún, hacerlo placeholder)",
+        "D1_4_KPIs_delta": "30min — Agregar Δ% vs período anterior a los 4 KPIs principales (Cotizado/Vendido/Recaudado/Por cobrar). Computar período anterior con la misma duración",
+        "D1_5_tendencia_6m": "45min — Agregar SVG con polilínea de cotizado/vendido/recaudado por mes, últimos 6. Usar datos reales del piloto (abril 2026) y placeholder '—' para meses sin datos",
+        "D1_6_accesos_rapidos": "20min — 4 botones (Nueva cot · Imprimir hoja · Registrar compra · Ver clientes). Los SOON van con toast 'Próximamente · v7.1'",
+        "D1_7_verificacion": "15min — Probar todos los cambios con datos reales del piloto en navegador (desktop + móvil)"
+      },
+      "orden_recomendado_proxima_sesion": [
+        "Si querés priorizar UX/visible: D1.6 (accesos rápidos) → D1.2 (banner) → D1.4 (KPIs Δ) → D1.5 (tendencia) → D1.3 (zona hoy) → D1.7",
+        "Si querés priorizar lógica de datos: D1.2 (banner delta) → D1.3 (zona hoy) → D1.4 (KPIs Δ) → D1.5 (tendencia) → D1.6 (accesos) → D1.7",
+        "Recomendado: empezar por D1.2 (cierra el feature de Q1.A pedido por Luis) y luego D1.6 (alto impacto/bajo esfuerzo)"
+      ],
+      "riesgos": [
+        "Dashboard renderiza con datos reales del piloto en producción — error de cómputo puede mostrar números incorrectos a Luis",
+        "Funcionalidades nuevas (drill-down de KPI, click en item de Lo que pasa hoy → abrir doc) pueden duplicar lógica que ya vive en otros módulos",
+        "El period-switch (Hoy/Semana/Mes/Año/Todo) puede romper agregaciones existentes; verificar que renderDashboard ya soporte filtros de período"
+      ]
+    },
+
+    "D6_fab_crear_bottom_sheet": {
+      "estado": "PENDIENTE — al final del bloque D",
+      "horas_estimadas": "1-2h",
+      "wireframe_target": "wireframes/02-inicio-dashboard.html (ver .sb-create__menu en sidebar v7) + wireframes/01c-mapa-modulos.html (mención de FAB en footer-note)",
+      "scope_propuesto": [
+        "Botón flotante FAB 56×56px posición fixed bottom-right en móvil <1024px",
+        "Click → abre bottom-sheet desde abajo con menú de creación rápida",
+        "Items: Nueva cotización · Nueva propuesta de evento · Registrar pedido directo (SOON) · Registrar compra (SOON) · Agregar cliente (SOON) · Nueva tarea (SOON)",
+        "En desktop ≥1024px no se ve el FAB (botón Crear vive en el sidebar nuevo, futuro D6 desktop)"
+      ],
+      "decisiones_pendientes": [
+        "¿FAB también en desktop o solo móvil? (recomendar solo móvil; desktop usa el ⌘N del wireframe que se implementará en v7.1)",
+        "¿Atajo ⌘N en móvil? (no, móvil no tiene teclado físico)",
+        "¿El FAB está siempre visible o solo en módulos donde tiene sentido (Inicio, Ventas)? (recomendar siempre visible para consistencia)"
+      ]
+    }
+  },
+
+  "deuda_tecnica_acumulada": [
+    "DT-D-01 (NUEVA esta sesión) — Tab bar 'Productos | Cotización' con position: sticky queda flotando en el medio cuando se hace scroll en sección Condiciones. Pre-existente al Bloque D. Resolver en E o sesión dedicada.",
+    "DT-A-01 — DM Sans + Cormorant siguen cargadas en Google Fonts pese a no usarse en pantalla. Razón: jsPDF puede referenciarlas para PDFs y el browser-cache de los clientes piloto ya las tiene. Limpiar en v7.1 después de validar PDFs.",
+    "DT-B-01 — El style#gb-shell-v7-mobile sigue activo en móvil; D8 lo extiende sin tocarlo. Si E necesita simplificar, consolidar mobile en un solo bloque CSS.",
+    "FIX-05 (heredado de C) sigue en modo AUDIT — activar window.__GB_V7_ENFORCE_FSM=true después de 1-2 semanas de logs",
+    "FIX-01-Q9 (heredado de C) sigue sin job retroactivo — reconciliación orgánica al abrir cada doc viejo"
+  ],
+
+  "snapshots_creados_esta_sesion": [
+    "_legacy/index.v70a-preBLOQUE-D-2.bak.html",
+    "_legacy/gb-tokens.v70a-preBLOQUE-D-2.bak.css",
+    "_legacy/app-core.v70a-preBLOQUE-D-2.bak.js",
+    "_legacy/app-cotizar.v70a-preBLOQUE-D-2.bak.js",
+    "_legacy/app-propuesta.v70a-preBLOQUE-D-2.bak.js",
+    "_legacy/app-dashboard.v70a-preBLOQUE-D-2.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-2.bak.html",
+    "_legacy/gb-tokens.v70a-postBLOQUE-D-2.bak.css",
+    "_legacy/app-core.v70a-postBLOQUE-D-2.bak.js",
+    "_legacy/app-cotizar.v70a-postBLOQUE-D-2.bak.js",
+    "_legacy/app-propuesta.v70a-postBLOQUE-D-2.bak.js",
+    "_legacy/app-dashboard.v70a-postBLOQUE-D-2.bak.js",
+    "_legacy/index.v70a-preBLOQUE-D-3.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-3.bak.html",
+    "_legacy/index.v70a-preBLOQUE-D-4.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-4.bak.html",
+    "_legacy/index.v70a-preBLOQUE-D-5.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-5.bak.html",
+    "_legacy/index.v70a-preBLOQUE-D-7.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-7.bak.html",
+    "_legacy/index.v70a-preBLOQUE-D-8.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-8.bak.html"
+  ],
+
+  "estructura_bloques_CSS_post_D8": {
+    "style_id_gb-shell-v7":          "Cascarón visual desktop (Bloque A) — INTOCADO",
+    "style_id_gb-shell-v7-nav":      "Sidebar reagrupado + crumb estructurado (D5 + D7)",
+    "style_id_gb-shell-v7-mobile":   "Drawer móvil (Bloque B) — INTOCADO salvo overrides de labels nuevos en D5",
+    "style_id_gb-shell-v7-mobile-header": "Header móvil slim (D8) — NUEVO"
+  },
+
+  "ambiente": {
+    "primary_working_directory": "C:\\Proyectos\\gourmet-bites-v7",
+    "es_git_repo": false,
+    "platform": "win32",
+    "snapshots_path": "_legacy/",
+    "rollback_estados_clave": {
+      "fin_Bloque_A":  "_legacy/index.v70a-postA.bak.html",
+      "fin_Bloque_B":  "_legacy/index.v70a-postBLOQUE-B.bak.html",
+      "fin_Bloque_C":  "(archivos en raíz al 2026-04-26 17:30, snapshots app-*.v70a-postFIX-*)",
+      "fin_D8_actual": "_legacy/index.v70a-postBLOQUE-D-8.bak.html"
+    }
+  },
+
+  "instrucciones_para_proxima_sesion": {
+    "lectura_obligatoria_en_orden": [
+      "1. Plan_de_accion_v7_0_alpha_bloqueD_parcial.json (este documento — handoff parcial D)",
+      "2. Plan_de_accion_v7_0_alpha_bloqueB_completado.json (cierre B)",
+      "3. Plan_de_accion_v7_0_alpha_bloqueC_completado.json (cierre C)",
+      "4. Plan_de_accion_v7_0_alpha_bloqueA_completado.json (cierre A — para entender el cascarón visual)",
+      "5. wireframes/02-inicio-dashboard.html (target de D1 — leer las 4 zonas + dash-head + banner novedades)",
+      "6. app-dashboard.js (estado actual del dashboard v6.4 — base sobre la cual reescribir)"
+    ],
+    "primer_paso_proxima_sesion": "Resolver las 4 decisiones de diseño pendientes de D1 (banner novedades opt-in/always-on, funnel real/mock, tendencia 6 meses real/placeholder, dashboard v6.4 paralelo o reemplazo directo) ANTES de tocar código. Mi recomendación pre-cargada en la sesión nueva: opt-in / mock inicial / placeholder con datos reales que se van llenando / reemplazo directo con snapshot de rollback.",
+    "reglas_persistentes": [
+      "No tocar cascarón visual del Bloque A (style#gb-shell-v7 + aside.gb-shell-sidebar): D5 ya cambió el markup del aside (autorizado por handoff B), pero NO tocar style#gb-shell-v7",
+      "Los bloques style#gb-shell-v7-mobile (B), style#gb-shell-v7-nav (D5+D7), style#gb-shell-v7-mobile-header (D8) SÍ pueden ajustarse si D1/D6 lo requieren — pero con cuidado",
+      "Snapshot intermedio en _legacy/ antes de cada subfase (formato app-X.v70a-pre/postBLOQUE-D-N.bak)",
+      "Verificación en navegador con datos reales antes de cerrar fase",
+      "Sin feature flags (solo window.__GB_V7_DEBUG y window.__GB_V7_ENFORCE_FSM ya existentes)",
+      "Una tarea a la vez, plan antes de código, pedir confirmación",
+      "Backup Firestore: Backups/gourmet-bites-backup-2026-04-26-ANTES-DE-FIX.json"
+    ],
+    "feedback_persistente_de_Luis": [
+      "SIEMPRE entregar mi recomendación explícita en cada pregunta (incluyendo binarias yes/no). Cerrar con 'Mi recomendación: X porque Y'. Esto está guardado en memoria persistente del usuario."
+    ]
+  },
+
+  "estado_general": "Bloque D v7.0-α al 75% (6 de 8 subfases cerradas). D2 (variables) + D3 (tipografía) + D4 (max-width) + D5 (sidebar reagrupado con shim de retrocompat) + D7 (crumb estructurado) + D8 (header móvil slim). UX-06 sigue cerrado, cascarón A intacto, setMode interno intacto, drawer móvil B operativo. Próximo paso: D1 (Rediseño Dashboard, 4-6h) y D6 (FAB Crear bottom-sheet, 1-2h) en sesión nueva. Bloque E (cierre) sigue pendiente después de D."
+}

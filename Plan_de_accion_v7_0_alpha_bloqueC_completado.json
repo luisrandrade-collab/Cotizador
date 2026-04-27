@@ -1,0 +1,264 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF — Cierre Bloque C (5 fixes operativos) v7.0-α",
+    "version": "v7.0-α / Bloque C completado",
+    "fecha": "2026-04-26",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade",
+    "documento_padre": "Plan_de_accion_v7_0_alpha_bloqueA_completado.json",
+    "documento_abuelo": "Plan_de_accion_v7_0_fase0_completada.json",
+    "proposito": "Documentar el cierre del Bloque C (5 fixes operativos) de Fase 1 v7.0-α y dejar listo el arranque de Bloque D (rediseño Dashboard) o Bloque B (navegación). Ambos diferidos del Bloque A — Luis decide cuál primero."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion_original": "32-38h en 5 bloques",
+    "horas_consumidas_C": "~10-12h",
+    "bloques": {
+      "A_cascaron_visual":      { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "6-8h" },
+      "B_navegacion":           { "estado": "DIFERIDO post-C",       "horas_estimadas": "4-6h" },
+      "C_5_fixes_operativos":   { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "10-12h" },
+      "D_dashboard":            { "estado": "DIFERIDO post-C",       "horas_estimadas": "8-10h" },
+      "E_cierre":               { "estado": "PENDIENTE",             "horas_estimadas": "4-6h" }
+    }
+  },
+
+  "bloque_C_completado": {
+    "objetivo": "Resolver 5 bugs operativos reportados en producción que afectaban a Kathy/JP en el piloto. Tocan lógica de negocio (no UI del cascarón A).",
+    "estrategia_aplicada": "Fix por fix, snapshot intermedio en _legacy/ entre cada uno (formato pre/postFIX-NN), verificación en navegador con datos reales antes de cerrar cada fix. Sin feature flags (solo window.__GB_V7_DEBUG para logging y window.__GB_V7_ENFORCE_FSM para enforce de FIX-05).",
+
+    "orden_ejecutado": [
+      "1º FIX-03 Revertir entrega — desbloqueó arreglar GB-2026-0123/0122 cruzados",
+      "2º FIX-04 Confirmación multi-pedido — preventivo del incidente Luz Miryam Sánchez",
+      "3º FIX-02 Gate entregar-sin-producir — expandido a 02a (gate) + 02b (feedback producido) + 02c (toggle recibido conforme)",
+      "4º FIX-01-Q9 Migración silenciosa orderData — reconcilia fechas duplicadas",
+      "5º FIX-05 Máquina de estados (audit mode) — grafo formal con logs sin enforce"
+    ],
+
+    "fixes_implementados": {
+
+      "FIX-03_REVERTIR_ENTREGA": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "objetivo": "Botón 'Revertir entrega' desde modal de pedido entregado, con confirmación typing 'REVERTIR' y guard rail de cobros mismo día.",
+        "archivos_modificados": ["app-core.js"],
+        "implementacion": [
+          "Helper revertDelivery(quoteId,kind,opts) atómico vía runTransaction (app-core.js:2068)",
+          "Botón ↩️ Revertir entrega en footer del modal preview (app-core.js:2253-2256), solo visible si status==='entregado'",
+          "Sub-modal dinámico DOM-injected con typing REVERTIR + textarea razón opcional (app-core.js:2347)",
+          "Prefijo de clases .gb-revert-modal-* (cero colisiones con cascarón A o legacy)"
+        ],
+        "comportamiento_clave": [
+          "Status: entregado → en_produccion",
+          "entregaData: deleteField()",
+          "auditTrail: arrayUnion {type:'reverted_delivery', ts, user, prevFechaEntrega, reason}",
+          "q.fechaEntrega del raíz NO se borra (también es fecha del evento programado)",
+          "Guard rail: aborta si pago.fecha === entregaData.fechaEntrega",
+          "Sincroniza quotesCache local"
+        ],
+        "verificado_navegador": [
+          "GB-2026-0123 revertido exitosamente: badge ENTREGADO → EN PRODUCCIÓN",
+          "Filtros del historial actualizados (Entregadas 2→1, En producción 1→2)",
+          "Sync ✓ confirmado",
+          "Log [FIX-03] revertDelivery OK con quoteId, kind, reason, entry"
+        ]
+      },
+
+      "FIX-04_CONFIRM_MULTI_PEDIDO": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "objetivo": "Antes de marcar entregado, si el cliente tiene 2+ pedidos abiertos, mostrar modal con resumen del target + lista de hermanos abiertos.",
+        "archivos_modificados": ["app-historial.js"],
+        "implementacion": [
+          "Constante _OPEN_STATUSES_FIX04 = ['pedido','aprobada','en_produccion'] (app-historial.js:1177)",
+          "Helper _normClientName (lowercase + trim + collapse spaces) para tolerar variaciones",
+          "Helper _findOpenSiblingsByClient(targetId,kind,clientName) lee quotesCache",
+          "Refactor de openDeliveryModal: chequea hermanos antes de abrir; si hay ≥1, llama _openMultiPedidoConfirmModal",
+          "_doOpenDeliveryModal() — lógica original extraída intacta",
+          "Sub-modal dinámico .gb-multipedido-* con banner azul, caja verde target, lista gris hermanos"
+        ],
+        "decision_diseno": "NO destructivo — botón directo 'Sí, continuar', sin typing requerido (a diferencia de FIX-03)",
+        "verificado_navegador": [
+          "Test no-regresión: Ximena Corso (1 pedido) abre directo el delivery-modal sin sub-modal",
+          "Test sub-modal sintético en consola con 3 pedidos: render perfecto",
+          "Helper _findOpenSiblingsByClient devuelve [] correctamente para clientes con 1 solo abierto"
+        ]
+      },
+
+      "FIX-02_GATE_ENTREGA_AMPLIADO": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "scope_original": "Gate 'no marcar entregado sin producir' en UI + lógica.",
+        "scope_ampliado_2026_04_26": "Por hallazgo del usuario: el botón 'Marcar producido' no daba feedback ni permitía desmarcar. El checkbox 'Recibido conforme' era checkbox plano del navegador, poco claro. Subdividido en 02a/02b/02c.",
+        "subfixes": {
+          "FIX-02a_GATE_FUNCIONAL": {
+            "archivos": ["app-historial.js"],
+            "implementacion": [
+              "Card historial: botón 🎉 Marcar como entregado solo se renderiza si q.produced===true (app-historial.js:419, 440)",
+              "openDeliveryModal aborta con toast '⚠️ Falta marcar como producido antes de entregar' si !q.produced (defensa profunda)",
+              "submitDelivery aborta con mismo toast (defensa última antes de Firestore)"
+            ],
+            "verificado": [
+              "Cards no-producidos muestran solo 🔪 Marcar producido, sin 🎉",
+              "openDeliveryModal('GB-2026-0123','quote') desde consola → toast naranja, no abre modal"
+            ]
+          },
+          "FIX-02b_FEEDBACK_PRODUCIDO": {
+            "archivos": ["app-historial.js"],
+            "implementacion": [
+              "Toast verde 3s '🔪 Marcado como producido' al activar (toggleProduced)",
+              "Toast info 5s '↩️ Desmarcado producido — el pedido vuelve a pendiente de producir' al desactivar",
+              "Card muestra '🔪 Producido ✓' verde clickeable cuando q.produced===true (en lugar de ocultar el botón)",
+              "Función confirmUnproduced(docId,kind,ev) con confirm() nativo antes de desmarcar"
+            ],
+            "verificado": "Click → toast verde aparece, botón cambia a 'Producido ✓', desmarcar pide confirm y muestra toast info"
+          },
+          "FIX-02c_TOGGLE_RECIBIDO_CONFORME": {
+            "archivos": ["index.html", "app-historial.js"],
+            "implementacion": [
+              "index.html:2120-2132 — checkbox plano reemplazado por dos botones pill: '✅ Sí, recibió conforme' / '⏳ Aún no / pendiente'",
+              "Checkbox dm-recibido-conforme se mantiene como hidden (compatibilidad con .checked en submitDelivery)",
+              "Helper _setRecibidoConforme(val) sincroniza el checkbox + pinta los pills + muestra/oculta el campo nombreReceptor",
+              "_doOpenDeliveryModal llama _setRecibidoConforme(!!q.entregaData?.recibidoConforme) al abrir"
+            ],
+            "decision_diseno": "B1 (toca index.html) — cascarón A no afectado porque delivery-modal no usa .gb-shell-*",
+            "verificado": "Pills se ven claros, toggle funciona, campo receptor se oculta en estado 'No / pendiente'"
+          }
+        }
+      },
+
+      "FIX-01-Q9_RECONCILIACION_ORDERDATA": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "objetivo": "Resolver duplicación de campos q.eventDate/q.horaEntrega vs q.orderData.fechaEntrega/horaEntrega — la app escribía en uno y leía del otro, se desincronizaban.",
+        "archivos_modificados": ["app-cotizar.js", "app-core.js"],
+        "implementacion": [
+          "app-cotizar.js saveCurrentQuote: removida la línea `if(prevOrderData)qObj.orderData=prevOrderData;` (preservación intacta) — reemplazada por reconciliación post-form",
+          "Nuevo bloque después de qObj.eventDate/horaEntrega seteados: orderData se construye con los valores del form como autoritativos (fechaEntrega, horaEntrega, productionDate)",
+          "app-core.js loadQuote: migración silenciosa al cargar — si q.orderData existe pero le faltan campos, copia del raíz (en memoria, sin doble write)",
+          "Logs condicionados a window.__GB_V7_DEBUG"
+        ],
+        "scope_NO_incluido": [
+          "app-propuesta.js no tocado: propuestas usan approvalData (no orderData), bug no aplica directamente",
+          "Campos en raíz NO se borran: q.eventDate/q.horaEntrega siguen ahí porque hay decenas de call sites que los leen",
+          "q.fechaEntrega del raíz NO se toca: solo lo escribe submitDelivery con la fecha REAL de entrega (uso correcto)",
+          "Sin job retroactivo de limpieza: la migración silenciosa va corrigiendo docs viejos al abrirlos"
+        ],
+        "verificado_navegador": [
+          "Log [FIX-01-Q9] orderData reconciliado en load (migración silenciosa) en docs viejos",
+          "Editado GB-2026-0121: cambio 12:30→12:31 → log [FIX-01-Q9] orderData reconciliado en save con fechaEntrega 2026-05-12, horaEntrega actualizada",
+          "Síntoma operativo resuelto: fecha y hora ahora viajan juntas raíz↔orderData"
+        ]
+      },
+
+      "FIX-05_MAQUINA_DE_ESTADOS_AUDIT": {
+        "estado": "COMPLETADO Y VERIFICADO en modo AUDIT",
+        "objetivo": "Definir formalmente el grafo de transiciones de estado. Modo audit: loguea sin bloquear (datos para activar enforce después).",
+        "archivos_modificados": ["app-core.js", "app-historial.js"],
+        "implementacion": [
+          "Constante STATE_TRANSITIONS en app-core.js (después de STATUS_META) — grafo formal con 10 estados: enviada, propfinal, aprobada, pedido, en_produccion, entregado, perdida + 3 terminales (anulada, convertida, superseded)",
+          "Helper auditTransition(from, to, context) — devuelve true por default (no bloquea). console.warn siempre si transición ilegal. Logs OK con __GB_V7_DEBUG",
+          "Toggle enforce: window.__GB_V7_ENFORCE_FSM = true → bloquea con toast",
+          "Invocaciones del helper en 4 puntos clave:",
+          "  • submitMarkAsOrder (cotización → pedido/en_produccion) — app-historial.js:706",
+          "  • submitApproveProposal (propuesta → aprobada) — app-historial.js:818",
+          "  • submitDelivery (→ entregado) — app-historial.js:1374",
+          "  • revertDelivery (entregado → en_produccion) — app-core.js:2099 dentro de runTransaction"
+        ],
+        "transiciones_permitidas": {
+          "enviada":      ["pedido","aprobada","propfinal","perdida","anulada","convertida","superseded"],
+          "propfinal":    ["aprobada","superseded","anulada"],
+          "aprobada":     ["en_produccion","entregado","anulada"],
+          "pedido":       ["en_produccion","entregado","anulada"],
+          "en_produccion":["entregado","anulada"],
+          "entregado":    ["en_produccion"],
+          "perdida":      ["enviada"],
+          "anulada":      [],
+          "convertida":   [],
+          "superseded":   []
+        },
+        "verificado_navegador": [
+          "Log real con GB-2026-0128: [FIX-05] transición OK {from: 'enviada', to: 'pedido', context: 'submitMarkAsOrder GB-2026-0128'} desde app-core.js:429",
+          "Pedidos pasó de 4 a 5 confirmando creación real"
+        ]
+      }
+    },
+
+    "snapshots_creados_bloque_C": [
+      "_legacy/app-historial.v70a-preFIX-03.bak.js",
+      "_legacy/app-core.v70a-preFIX-03.bak.js",
+      "_legacy/app-historial.v70a-postFIX-03.bak.js",
+      "_legacy/app-core.v70a-postFIX-03.bak.js",
+      "_legacy/app-historial.v70a-preFIX-04.bak.js",
+      "_legacy/app-historial.v70a-postFIX-04.bak.js",
+      "_legacy/app-core.v70a-postFIX-04.bak.js",
+      "_legacy/app-historial.v70a-preFIX-02a.bak.js",
+      "_legacy/index.v70a-preFIX-02a.bak.html",
+      "_legacy/app-historial.v70a-postFIX-02a.bak.js",
+      "_legacy/app-historial.v70a-postFIX-02b.bak.js",
+      "_legacy/app-historial.v70a-postFIX-02.bak.js",
+      "_legacy/index.v70a-postFIX-02.bak.html",
+      "_legacy/app-cotizar.v70a-preFIX-01.bak.js",
+      "_legacy/app-core.v70a-preFIX-01.bak.js",
+      "_legacy/app-cotizar.v70a-postFIX-01.bak.js",
+      "_legacy/app-core.v70a-postFIX-01.bak.js",
+      "_legacy/app-core.v70a-preFIX-05.bak.js",
+      "_legacy/app-core.v70a-postFIX-05.bak.js",
+      "_legacy/app-historial.v70a-postFIX-05.bak.js"
+    ]
+  },
+
+  "deuda_tecnica_post_bloque_C": [
+    "FIX-05 sigue en modo AUDIT — activar window.__GB_V7_ENFORCE_FSM=true después de 1-2 semanas de logs sin transiciones sospechosas",
+    "FIX-01-Q9 NO toca app-propuesta.js — si aparece bug similar para propuestas, fix separado",
+    "FIX-01-Q9 NO ejecuta job retroactivo — docs viejos se reconcilian orgánicamente al abrirlos. Si después de 4-6 semanas hay docs no reconciliados (porque nunca se abrieron), correr job manual",
+    "Cuando llegue FIX-05 a enforce, ampliar STATE_TRANSITIONS si aparece producto_producido como status separado (hoy es flag boolean q.produced)",
+    "Deuda heredada de Bloque A (max-width 600px en .sec, dos sistemas de variables CSS, tipografía DM Sans + Cormorant) — sin cambios"
+  ],
+
+  "datos_reales_tocados_durante_bloque_C": [
+    "GB-2026-0123 (Luz Miryam Sánchez) — entregado por error → revertido a en_produccion vía FIX-03 → re-entregado correctamente por Luis",
+    "GB-2026-0122 (Luz Miryam Sánchez) — su contraparte cruzada, ya pagado y entregado",
+    "GB-2026-0121 (Sergio Ibarnegaray) — fecha editada 2026-05-10 12:30 → 2026-05-12 12:31 para verificar FIX-01-Q9",
+    "GB-2026-0128 (cliente nuevo) — creado durante verificación FIX-05 (cotización→pedido)"
+  ],
+
+  "ambiente": {
+    "primary_working_directory": "C:\\Proyectos\\gourmet-bites-v7",
+    "es_git_repo": false,
+    "platform": "win32",
+    "snapshots_path": "_legacy/",
+    "rollback_estados_clave": {
+      "fin_Bloque_A": "_legacy/index.v70a-postA.bak.html",
+      "fin_Bloque_C": "[archivos actuales en raíz al 2026-04-26 17:30]"
+    }
+  },
+
+  "proximo_bloque": {
+    "decision_pendiente_de_Luis": "B (navegación) o D (rediseño Dashboard)",
+    "B_navegacion": {
+      "horas_estimadas": "4-6h",
+      "scope": "Pulido de navegación entre módulos. Detalle exacto en handoff de Bloque A líneas 14-15 (estado original 'DIFERIDO post-C')",
+      "razon_diferimiento_original_2026_04_26": "Resuelve dolor menor — Luis prefirió arrancar Bloque C primero"
+    },
+    "D_dashboard": {
+      "horas_estimadas": "8-10h",
+      "scope": "Rediseño Dashboard completo según wireframe 02-inicio-dashboard. Tipografía Inter+Fraunces sobre body, max-width 600 fuera, migración variables --bk/--dk → --gb-neutral-*",
+      "razon_diferimiento_original": "Es el bloque más invasivo, conviene hacerlo con cabeza fresca"
+    },
+    "recomendacion_Claude": "B primero (más liviano, prepara terreno UX). D después con sesión dedicada larga."
+  },
+
+  "instrucciones_para_proxima_sesion": {
+    "lectura_obligatoria_en_orden": [
+      "1. Plan_de_accion_v7_0_alpha_bloqueC_completado.json (este documento)",
+      "2. Plan_de_accion_v7_0_alpha_bloqueA_completado.json (cierre Bloque A — para entender el cascarón visual y lo que NO se debe tocar)",
+      "3. Plan_de_accion_v7_0_fase0_completada.json — solo si necesita contexto histórico"
+    ],
+    "reglas_persistentes": [
+      "No tocar el cascarón visual del Bloque A (style id='gb-shell-v7' + aside.gb-shell-sidebar en index.html)",
+      "Snapshot intermedio en _legacy/ antes de cada cambio de fase (formato app-X.v70a-pre/postBLOQUE-N.bak)",
+      "Verificación en navegador con datos reales antes de cerrar fase",
+      "Sin feature flags (solo window.__GB_V7_DEBUG y window.__GB_V7_ENFORCE_FSM como toggles existentes)",
+      "Backup Firestore disponible: Backups/gourmet-bites-backup-2026-04-26-ANTES-DE-FIX.json.json",
+      "Modo de trabajo: una tarea a la vez, presentar plan antes de tocar código, pedir confirmación"
+    ],
+    "estado_de_los_5_fixes_para_referencia_rapida": "TODOS COMPLETADOS Y VERIFICADOS. No re-implementar. Si encuentras bugs en el comportamiento, snapshot pre-fix y abordar como FIX nuevo."
+  },
+
+  "estado_general": "Bloque C v7.0-α COMPLETADO. 5 fixes operativos cerrados con verificación en datos reales del piloto. 20 snapshots disponibles para rollback. Pedidos cruzados GB-2026-0123/0122 resueltos. Próximo paso: Luis decide arranque de Bloque B o D en sesión nueva."
+}

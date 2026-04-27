@@ -1,0 +1,1041 @@
+{
+  "_meta": {
+    "tipo_documento": "HANDOFF — Fase 0 v7.0 completada (Bloques 1-3 wireframes) + decisiones absorbidas v6.4.1/v6.5.0/v7.0",
+    "proposito": "Arrancar Fase 1 (programación) de v7.0 con todos los wireframes Bloques 1-3 aprobados, identidad de marca cerrada, decisiones UX cerradas, y 4 fixes operativos absorbidos (Q9, gate entregar-sin-producir, botón revertir entrega, confirmación 2+ pedidos cliente). NO existe v6.4.1 ni v6.5.0 separadas — todo va en v7.0.",
+    "generado_el": "2026-04-26",
+    "generado_por": "Claude Opus 4.7 — sesión Fase 0 (diseño UX v7.0)",
+    "usuario": "Luis Andrade (La Calera / Bogotá, Colombia)",
+    "supersedes": "Plan_de_accion_v6_4_0_entregada.json (versión 2026-04-26 anterior) — este reemplaza al anterior agregando: (a) Fase 0 v7.0 ejecutada con Bloques 1-3 entregados, (b) decisiones de identidad visual cerradas (Q13 refresh, Q14 densidad adaptable, Q15 plataforma equilibrada), (c) 4 decisiones de navegación cerradas (sidebar oscuro, submodulos visibles, badges rojos, botón Crear global), (d) 4 decisiones de Dashboard cerradas (banner único urgencias, KPIs sin sparklines, banner novedades descartable, conversión + tendencia), (e) 4 fixes operativos absorbidos a v7.0 (descubrimiento bug 26 abril 2026), (f) eliminación de v6.4.1 y v6.5.0 como versiones separadas — todo unificado en v7.0",
+    "como_usar_en_nuevo_chat": "ESTE ES UN HANDOFF PARA ARRANCAR FASE 1 (PROGRAMACIÓN). Subir: (1) los 7 archivos JS + index.html de v6.4.0 ya deployada, (2) scripts/check.sh, (3) backup gourmet-bites-backup-2026-04-26-ANTES-DE-FIX.json, (4) este JSON, (5) wireframes Fase 0 ZIP completo (gourmet-bites-v7-fase0-completa.zip), (6) brand kit (4 PNG: cuchillo + wordmark, en negro y blanco). Primer mensaje sugerido: 'Arranca Fase 1 v7.0. Lee este JSON, los wireframes de Fase 0, y entrégame el plan de implementación dividido en sub-entregas v7.0-α, β, γ, δ. NO toques código todavía hasta que aprobemos plan de implementación.' Para arreglar dato cruzado de pedidos GB-2026-0123/0122 que está pendiente: ver seccion 'pendiente_arreglo_dato_manual' de este JSON.",
+    "fase_actual": "Fase 0 v7.0 COMPLETADA — pendiente arrancar Fase 1 (implementación)"
+  },
+  "proyecto": {
+    "nombre": "Gourmet Bites Cotizador / ERP",
+    "owner": {
+      "nombre": "Luis Andrade",
+      "esposa": "Katherine (Kathy)",
+      "hijo": "Juan Pablo (JP)",
+      "ubicacion": "La Calera / Bogotá, Colombia",
+      "negocio": "Gourmet Bites - catering familiar (libanés, cocinas del mundo, pastelería, congelados)",
+      "usuarios_app": [
+        "Luis",
+        "Kathy",
+        "JP"
+      ]
+    },
+    "version_actual_en_produccion": "v6.4.0",
+    "siguiente_version_a_entregar": "v7.0 (rediseño ERP completo) — absorbe los fixes que iban a v6.4.1 y las mejoras que iban a v6.5.0. Ya no hay versiones intermedias.",
+    "fecha_ultima_actualizacion": "2026-04-26",
+    "url_produccion": "https://luisrandrade-collab.github.io/GB-Ciclo-de-ventas/"
+  },
+  "stack_tecnico": {
+    "frontend": "HTML + JS modular (7 archivos JS) + CSS embebido en index.html",
+    "archivos_js": {
+      "app-assets.js": "catálogo de productos + LOGO_IW (sin cambios desde v5.0.x).",
+      "app-core.js": "Firebase, Auth, Storage, estado global, helpers, loadQuote (v6.4.0 carga horaEntrega), savePdf, búsqueda global, helper h(), toast(), confirmModal(), isAnulada()/noSumaEnKpis() (v6.4.0 P1). BUILD_VERSION en línea 112.",
+      "app-cotizar.js": "módulo cotizaciones. runTransaction atómico (v6.3.0 E3-1) en saveCurrentQuote. v6.4.0 P2: respeta eventDate y horaEntrega del form en lugar de sobreescribir con valores previos. NOTA v6.4.1: el fix P2 NO funciona completamente para dirección y fecha — revisar.",
+      "app-propuesta.js": "módulo propuestas. runTransaction atómico (v6.3.0 E3-1) en saveCurrentProp. v6.4.0 P2: idem para horaEntrega + carga en loadPropQuote. NOTA v6.4.1: el fix P2 NO funciona completamente para dirección y fecha — revisar.",
+      "app-historial.js": "historial + buscador + modal PDFs + delivery modal. v6.4.0 P6: soporta hasta 2 fotos de entrega + flujo WhatsApp post-entrega hacia Kathy + botón reabrir desde historial.",
+      "app-seguimiento.js": "seguimiento comercial. CANDIDATO A REDISEÑO COMPLETO en v7.0 — Luis confirmó 0/21 docs con followUp marcado, opción C (Tareas y Follow-ups) aprobada.",
+      "app-dashboard.js": "dashboard + pipeline + KPIs + agenda + Hoja de Entregas. v6.4.0 P1: usa noSumaEnKpis() en loop principal. v6.4.0 P5: Hoja con botones rápidos Hoy/Mañana/+3días/Rango (heQuickRange)."
+    },
+    "scripts_build": {
+      "scripts/check.sh": "Pre-deploy check con 6 validaciones. v6.4.0: agregado entrega-wa-modal a REQUIRED_MODALS (ahora son 6 modales críticos)."
+    },
+    "backend": "Firebase Firestore + Auth + Storage + IndexedDB",
+    "deploy": "GitHub Pages",
+    "pdf": "jsPDF + jspdf-autotable",
+    "auth": "Firebase Authentication · 3 usuarios",
+    "firebase_plan": "Blaze",
+    "config_runtime": {
+      "KATHY_WA_TEL": "Número de WhatsApp Business de Gourmet Bites (Kathy). Configurado en app-historial.js como '573104441588'. Override runtime: window.__GB_KATHY_WA antes de cargar el módulo.",
+      "DEBUG_FLAGS": {
+        "window.__GB_DEBUG_ANULADAS": "Si =true, loguea en consola cualquier doc que intente colarse en KPIs siendo anulada (helper noSumaEnKpis). Luis confirmó 2026-04-26: nunca activó warns, todo OK.",
+        "window.__GB_DEBUG_EDIT": "Si =true, loguea cuando saveCurrentQuote/Prop preservan eventDate o horaEntrega previos por venir el form vacío (defensa contra borrado accidental)."
+      }
+    }
+  },
+  "ciclo_de_vida_negocio": {
+    "cotizacion_status": [
+      "enviada",
+      "pedido",
+      "en_produccion",
+      "entregado",
+      "anulada",
+      "superseded"
+    ],
+    "propuesta_status": [
+      "enviada",
+      "propfinal",
+      "aprobada",
+      "en_produccion",
+      "entregado",
+      "convertida",
+      "superseded",
+      "anulada"
+    ],
+    "archivo_historial": {
+      "vivas": "cotizaciones/propuestas sin cerrar y NO perdidas",
+      "pedidos": "pedido/aprobada/en_produccion/entregado (excluye cumplidos por defecto)",
+      "ventas_anteriores": "entregados Y pagados 100% (cumplidos) + cortesías (total=0 + entregado)",
+      "perdidas": "followUp=perdida y status in [enviada, propfinal]",
+      "anuladas": "status=anulada"
+    }
+  },
+  "feedback_piloto_v640_y_estado_ux_actual": {
+    "fecha_feedback": "2026-04-26",
+    "tests_funcionales_v640": {
+      "Q9_edicion_pedido": {
+        "estado": "FALLA — bug crítico no resuelto",
+        "detalle": "El fix P2 de v6.4.0 sobre saveCurrentQuote/saveCurrentProp NO funciona para cambiar dirección y fecha de un pedido. Sigue creando versión nueva o no persistiendo cambios. Reabrir y revisar en detalle el flujo completo: loadQuote/loadPropQuote → form → saveCurrentQuote/saveCurrentProp.",
+        "destino": "v6.4.1 hotfix"
+      },
+      "Q10_anuladas": {
+        "estado": "OK — sin warns, helpers funcionando correctamente",
+        "destino": "Sin acción"
+      },
+      "Q6_fallback_transaction": {
+        "estado": "OK — fallback nunca se activó en piloto",
+        "destino": "Limpiar código defensivo en v7.0"
+      }
+    },
+    "problemas_ux_identificados": [
+      {
+        "id": "UX-01",
+        "severidad": "ALTA",
+        "titulo": "Header desperdiciado",
+        "detalle": "Logo y 'Gourmet Bites BY ANDRADE MATUK' ocupan ~180px verticales en desktop y celular. ~25% del fold inicial sin aportar valor funcional. En un ERP el header debe ser delgado (40-50px) con logo pequeño + estado app + usuario."
+      },
+      {
+        "id": "UX-02",
+        "severidad": "MEDIA",
+        "titulo": "Botones sueltos sin jerarquía",
+        "detalle": "'Imprimir hoja del día' flota sobre Operación urgente sin agrupación. 'Todos los PDFs' aparece en Historial sin contexto. No hay patrón consistente de 'acciones del módulo'."
+      },
+      {
+        "id": "UX-03",
+        "severidad": "ALTA",
+        "titulo": "Dashboard sobrecargado",
+        "detalle": "Banner novedades + entrega HOY + pipeline activo + métricas período + operación urgente + análisis comercial + conversión + por entregar — todo en scroll vertical sin priorización visual. El usuario debe escanear todo para encontrar lo relevante."
+      },
+      {
+        "id": "UX-04",
+        "severidad": "ALTA",
+        "titulo": "Historial es la 'tienda de todo'",
+        "detalle": "Cotizaciones y propuestas de evento se gestionan ambas desde Historial. Conceptualmente son flujos distintos: cotización pequeña vs. propuesta de evento (5 secciones · 35 personas) son objetos diferentes y deberían tener vistas/flujos diferentes."
+      },
+      {
+        "id": "UX-05",
+        "severidad": "CRÍTICA",
+        "titulo": "No hay flujo lógico de negocio",
+        "detalle": "App organizada por OBJETO (Cotización, Evento, Historial) en vez de por PROCESO DE NEGOCIO (Captar lead → Cotizar → Confirmar pedido → Producir → Entregar → Cobrar). El usuario arma mentalmente el flujo cada vez. Esta es la justificación principal del rediseño v7.0."
+      },
+      {
+        "id": "UX-06",
+        "severidad": "ALTA",
+        "titulo": "Móvil con tabs cortados",
+        "detalle": "En capturas móvil se ve 'DASHBC', 'COTIZA', 'HISTORI', 'SEGUIM', 'AGENDA' — nombres truncados porque no caben. La navegación no fue diseñada mobile-first."
+      },
+      {
+        "id": "UX-07",
+        "severidad": "MEDIA",
+        "titulo": "Estados vacíos sin pensar",
+        "detalle": "Agenda mensual aparece literalmente vacía (solo números) cuando no hay eventos. Debería mostrar resumen del mes, próximos eventos, botón crear, etc."
+      },
+      {
+        "id": "UX-08",
+        "severidad": "MEDIA",
+        "titulo": "Densidad inconsistente",
+        "detalle": "Cards del pipeline con mucho aire, cards del historial compactas, KPIs intermedios. Sin sistema de espaciado consistente."
+      }
+    ],
+    "capturas_disponibles": "9 capturas tomadas el 2026-04-26 (6 desktop: dashboard, historial, agenda semana, agenda mes, cotización, evento; 3 móvil: dashboard, historial, KPIs). Subir al chat de Fase 0."
+  },
+  "items_nuevos_reportados_2026_04_26": [
+    {
+      "id": "NEW-01",
+      "tema": "Hoja de Despacho — casilla de cliente enriquecida",
+      "detalle": "Persona natural: nombre + celular debajo en la misma casilla. Persona jurídica: razón social + persona de contacto + celular del contacto. Hoy solo aparece nombre, falta el contacto directo para resolver problemas en entrega.",
+      "destino_propuesto": "v6.5.0",
+      "esfuerzo_h": "1-2"
+    },
+    {
+      "id": "NEW-02",
+      "tema": "Hoja de Despacho — historial de hojas generadas",
+      "detalle": "Cada vez que se imprime/genera una hoja, debe quedar registro en Firestore: fecha generación, rango cubierto, quién la generó, cuántos pedidos incluía, link al PDF guardado en Storage. Vista de histórico en el módulo de Despacho.",
+      "destino_propuesto": "v6.5.0",
+      "esfuerzo_h": "3-4"
+    },
+    {
+      "id": "NEW-03",
+      "tema": "Botón 'Imprimir' debe usar diálogo nativo del navegador",
+      "detalle": "Hoy genera PDF con opciones de envío. Debe lanzar window.print() del navegador. La generación de PDF queda como acción separada explícita ('Generar PDF') si se requiere.",
+      "destino_propuesto": "v6.5.0",
+      "esfuerzo_h": "1"
+    },
+    {
+      "id": "NEW-04",
+      "tema": "Hoja de Despacho — casilla de empaque verificado por pedido",
+      "detalle": "Checkbox '✓ Empaque verificado' + línea para firma de quien empaca, una casilla POR CADA PEDIDO en la hoja (no una sola al pie del lote). Asegura que cada pedido tiene confirmación individual de empaque completo.",
+      "destino_propuesto": "v6.5.0",
+      "esfuerzo_h": "1-2"
+    }
+  ],
+  "decisiones_diseno_2026_04_26": {
+    "Q1_seguimiento_rediseño": {
+      "decision": "OPCIÓN C — Convertir Seguimiento en módulo 'Tareas y Follow-ups'",
+      "detalle": "Recordatorios programados ('llamar a Juan en 3 días'), notas de llamadas, próxima acción con fecha. Más CRM clásico. Justificación: el módulo actual de Seguimiento tiene 0/21 docs con followUp marcado, no se usa. Rediseñarlo como gestor de tareas le da utilidad real.",
+      "esfuerzo_h": "8-10",
+      "destino": "v7.0"
+    },
+    "Q4_hoja_despacho_empaque": {
+      "decision": "OPCIÓN B — Checkbox + línea de firma POR CADA PEDIDO",
+      "detalle": "Una casilla individual por pedido en la hoja, no una sola al pie. Ver NEW-04.",
+      "destino": "v6.5.0"
+    },
+    "Q5_seccion_recibe": {
+      "decision": "VACÍO — sin precarga de q.att",
+      "detalle": "La sección 'RECIBE' de la Hoja de Entregas debe quedar vacía para firma manual del cliente al recibir.",
+      "destino": "v6.5.0"
+    },
+    "Q11_modulo_compras": {
+      "alcance_v70": "REDUCIDO — solo lo prioritario para producción y pedidos",
+      "categorias_v70": [
+        "Insumos de producción (van a recetas)",
+        "Empaques (van al costo del pedido)",
+        "Combustibles, peajes y transporte de terceros (van al costo logístico del pedido)",
+        "Otros"
+      ],
+      "categorias_descartadas_para_backlog": "Gastos de operación (servicios, arriendos, mantenimiento, marketing, tech, impuestos, capacitación, aseo, dotación, alquileres, personal externo) — Luis confirmó 2026-04-26 que esto NO es Compras conceptualmente sino Gastos de Operación, va a backlog para módulo separado posterior.",
+      "lista_compartida": "ÚNICA compartida entre Luis/Kathy/JP",
+      "estructura_datos": {
+        "compras_pendientes": "Lista de lo que falta comprar. Campos: id, nombre, categoria, cantidadEstimada, unidad, prioridad, notas, agregadoPor, fechaAgregado, estado (pendiente/comprado/cancelado).",
+        "insumos_canonicos": "Catálogo de insumos únicos que alimenta el dropdown. Campos: id, nombreCanonico, categoria, unidadEstandar, ultimoPrecio, ultimoProveedor, ultimaFechaCompra, totalCompras (contador), creadoPor, creadoEn.",
+        "compras_realizadas": "Histórico de cada transacción. Campos: id, insumoCanonicoId (link), nombreEnTiquete, categoria, cantidad, unidad, precioUnitario, precioTotal, proveedor, fecha, compradoPor, notas, fotoTiqueteUrl (opcional para v7.1+)."
+      },
+      "decision_agrupacion": "OPCIÓN A — Nombre canónico manual con dropdown",
+      "decision_flujo_canonico": "FLUJO (b) — el insumo canónico se asigna al MARCAR COMO COMPRADO (no al agregar a la lista pendiente). Justificación: la persona que detecta que falta algo puede escribir rápido ('polllo'), la persona que compra tiene el tiquete en mano y clasifica con precisión.",
+      "decision_vincular_a_pedido": "NO POR AHORA — la vinculación compra ↔ pedido específico se pospone. Lo prioritario es construir el catálogo de precios.",
+      "vista_principal_aprobada": "CATÁLOGO DE PRECIOS estilo tabla con: insumo, categoría, último precio, proveedor último, fecha, variación (↑/=/↓), histórico expandible. Buscador rápido arriba, filtro por categoría, click en fila despliega panel lateral con histórico completo + comparativo de proveedores + gráfico simple de evolución de precio.",
+      "tres_vistas_modulo": [
+        "Lista pendiente (lo que falta comprar)",
+        "Histórico de compras (cronológico, todo lo comprado)",
+        "Catálogo de precios (tabla viva por insumo único)"
+      ],
+      "ocr_tiquetes": "POSPUESTO al backlog. Decisión: empezar v7.0 con foto de tiquete opcional + formulario manual rápido (Opción B). Evolucionar a Tesseract.js o Google Vision (free tier) en v7.1+ si la captura manual se vuelve cuello de botella. NO construir OCR antes de saber el patrón de uso real.",
+      "notificaciones": "PENDIENTE — Luis no respondió P3 explícitamente. Asumir (a) marcado en rojo en lista, sin notificación activa, hasta confirmación.",
+      "proposito_estrategico": "Construir base de datos de precios viva que se actualiza con cada compra. Servirá para: costear recetas con último precio, detectar inflación de proveedores, comparar proveedores por insumo, alimentar costeo por evento en versiones futuras."
+    },
+    "rediseño_navegacion_erp": {
+      "decision": "OPCIÓN 2 — Sidebar lateral colapsable (estilo Notion/Linear/Odoo 17)",
+      "detalle": "Menú vertical a la izquierda, se colapsa a iconos. Cada módulo expande sus secciones. En móvil se convierte en hamburguesa. Razón: sweet spot entre esfuerzo y escalabilidad — necesario porque v7.0 suma Compras y posiblemente Finanzas/Tareas, los tabs horizontales actuales ya no caben (en móvil ya se cortan a 'DASHBC', 'COTIZA', 'HISTORI', 'SEGUIM').",
+      "esfuerzo_h": "10-12",
+      "destino": "v7.0"
+    },
+    "fase_0_diseño_ux": {
+      "decision": "FASE 0 OBLIGATORIA antes de codificar v7.0",
+      "detalle": "Diseñar wireframes navegables en HTML estático ANTES de tocar JS de producción. Justificación: v7.0 toca todo (navegación + módulo nuevo + rediseño Seguimiento + mejoras Despacho). Sin wireframe claro, vamos a reescribir dos veces.",
+      "entregables_fase_0": [
+        "Mapa de navegación completo (qué módulos, qué hay dentro de cada uno, cómo se llega)",
+        "Wireframes navegables en HTML de pantallas clave (móvil + desktop)",
+        "Sistema de diseño (colores, tipografía, espaciados, componentes: botones/cards/modales/tablas)",
+        "Validación móvil y desktop por pantalla"
+      ],
+      "preguntas_pendientes_fase_0": [
+        "Identidad visual: ¿conservar línea actual GB / refresh completo / híbrido (logo+color principal pero modernizar el resto)? — Recomendación: HÍBRIDO",
+        "Densidad información: ¿compacta / cómoda / adaptable con toggle? — Recomendación: ADAPTABLE",
+        "Prioridad plataforma: ¿mobile-first / desktop-first / equilibrado? — Recomendación: EQUILIBRADO (pantalla por pantalla según uso real)",
+        "Modo trabajo Fase 0: ¿wireframes navegables HTML / mockups SVG / módulo por módulo empezando por Compras? — Recomendación: WIREFRAMES NAVEGABLES HTML (a)"
+      ]
+    }
+  },
+  "estructura_navegacion_propuesta_v70": {
+    "principio_organizativo": "POR PROCESO DE NEGOCIO (no por objeto). Resuelve UX-05.",
+    "modulos_propuestos": [
+      {
+        "modulo": "Inicio",
+        "icono": "🏠",
+        "submodulos": [
+          "Dashboard",
+          "Tareas y Follow-ups (heredado de Seguimiento rediseñado)",
+          "Agenda"
+        ]
+      },
+      {
+        "modulo": "Ventas",
+        "icono": "💰",
+        "submodulos": [
+          "Nueva Cotización",
+          "Nueva Propuesta de Evento",
+          "Pipeline (cotizaciones vivas)",
+          "Histórico Comercial"
+        ]
+      },
+      {
+        "modulo": "Operaciones",
+        "icono": "📦",
+        "submodulos": [
+          "Pedidos en Producción",
+          "Hoja de Despacho",
+          "Histórico de Hojas (NEW-02)",
+          "Entregados Pendientes de Cobro"
+        ]
+      },
+      {
+        "modulo": "Compras",
+        "icono": "🛒",
+        "submodulos": [
+          "Lista pendiente",
+          "Histórico de compras",
+          "Catálogo de precios"
+        ]
+      },
+      {
+        "modulo": "Clientes",
+        "icono": "👥",
+        "submodulos": [
+          "Directorio",
+          "Ventas anteriores",
+          "Perdidas"
+        ]
+      },
+      {
+        "modulo": "Herramientas",
+        "icono": "⚙️",
+        "submodulos": [
+          "Catálogo de productos (app-assets)",
+          "Backup",
+          "Configuración"
+        ]
+      }
+    ],
+    "nota": "Esta estructura es PROPUESTA INICIAL para Fase 0. Se valida con Luis en wireframes navegables antes de implementar.",
+    "modulos_futuros_backlog": [
+      "Finanzas (DIAN, IVA, conciliación bancaria)",
+      "Gastos de Operación (lo descartado de Compras)",
+      "Reportes avanzados",
+      "RRHH personal externo"
+    ]
+  },
+  "estado_actual_sistema_datos_reales": {
+    "fuente": "backup gourmet-bites-backup-2026-04-23_21h36.json (v5.5.0, sin cambio schema en v6.2/v6.3/v6.4)",
+    "nota": "Schema NO cambió entre v5.5.0 → v6.4.0. v6.4.0 SOLO añade campos OPCIONALES en entregaData: foto2Url, foto2Base64. v6.5.0 añadirá campos para casilla empaque + historial hojas (no rompe schema). v7.0 añade colecciones nuevas (compras_pendientes, insumos_canonicos, compras_realizadas, tareas_followup) sin tocar las existentes. Datos del backup siguen válidos.",
+    "stats_criticas_para_diseno": {
+      "total_docs_actuales": "~21 (margen 4x antes de necesitar paginación)",
+      "docs_seguimiento_marcados": "0/21 — confirmación de que módulo Seguimiento no se usa, justifica rediseño",
+      "implicacion_v640": "Schema 100% compatible. Rollback = subir archivos v6.3.0.",
+      "implicacion_v70": "Schema retrocompatible. Las colecciones nuevas no tocan las existentes."
+    }
+  },
+  "roadmap_aprobado": {
+    "principios": [
+      "Cada entrega deployable independiente",
+      "Rollback trivial entre entregas",
+      "Sin cambio de Firestore schema en versiones menores; v7.0 SÍ agrega colecciones nuevas (compras_pendientes, insumos_canonicos, compras_realizadas, tareas_followup, hojas_despacho_historial) sin tocar las existentes",
+      "Piloto antes de cada sub-entrega de v7.0",
+      "Sub-entrega siguiente NO arranca hasta confirmar estabilidad de la anterior",
+      "v7.0 OBLIGATORIO Fase 0 (diseño UX) antes de Fase 1 (implementación) — Fase 0 ya completada al nivel de Bloques 1-3, Bloques 4-9 opcionales antes de Fase 1"
+    ],
+    "estado": "v6.4.0 en producción y en piloto. Fase 0 v7.0 completada (Bloques 1-3). v6.4.1 y v6.5.0 ELIMINADAS como versiones intermedias — todos sus contenidos absorbidos en v7.0. Próximo paso: arrancar Fase 1 v7.0 en chat dedicado.",
+    "secuencia_eliminada": {
+      "v641_v650_eliminadas": "Decisión 2026-04-26: Luis decidió que el costo de fragmentar en 3 releases (v6.4.1 hotfix + v6.5.0 minor + v7.0 major) es mayor que el beneficio. Todo va unificado en v7.0. Trade-off aceptado: convivir con bugs operativos durante 3-5 semanas hasta v7.0-α."
+    },
+    "secuencia_v70_aprobada": [
+      {
+        "subversion": "v7.0-α",
+        "tipo": "ALPHA — base estructural",
+        "alcance": [
+          "Sistema de diseño implementado (gb-tokens.css extraído de wireframe Bloque 1)",
+          "Cascarón de navegación nuevo (sidebar oscuro + header delgado + drawer móvil + FAB)",
+          "Header de v6.4.0 ELIMINADO (de 180px a 48px)",
+          "Migración silenciosa de campos duplicados (FIX-01-Q9): unificar fechas en orderData",
+          "Máquina de estados estricta (FIX-05): grafo de transiciones permitidas",
+          "Gate entregar-sin-producir (FIX-02): bloqueo en UI y lógica",
+          "Botón Revertir entrega (FIX-03): CRÍTICO para arreglar pedidos cruzados de Luis",
+          "Confirmación multi-pedido cliente (FIX-04)",
+          "Funcionalidad de v6.4.0 preservada en cascarón nuevo (cotizar, propuesta, historial, dashboard)",
+          "Inicio / Dashboard rediseñado (Bloque 3)",
+          "Migración de submódulos heredados al nuevo árbol de navegación"
+        ],
+        "esfuerzo_h": "30-40",
+        "prioridad": "CRÍTICA — incluye los fixes que Luis necesita en operación diaria",
+        "post_alpha": "Luis ejecuta arreglo manual desde la UI de los pedidos cruzados GB-2026-0123/0122 usando FIX-03 botón Revertir entrega. Ver pendiente_arreglo_dato_manual_2026_04_26 en este JSON."
+      },
+      {
+        "subversion": "v7.0-β",
+        "tipo": "BETA — operaciones expandidas",
+        "alcance": [
+          "Módulo Operaciones rediseñado completo: Pedidos en producción, Hoja de Despacho mejorada, Histórico de hojas, Pendientes de cobro",
+          "FIX-06 NEW-01 (cliente enriquecido en hoja)",
+          "FIX-07 NEW-02 (historial de hojas en Firestore + Storage)",
+          "FIX-08 NEW-03 (window.print nativo)",
+          "FIX-09 NEW-04 (casilla empaque por pedido)",
+          "FIX-10 (RECIBE vacío)",
+          "Módulo Compras completo: Lista pendiente, Histórico de compras, Catálogo de precios",
+          "Estructura de datos Compras: compras_pendientes, insumos_canonicos, compras_realizadas",
+          "Vista principal de Compras = Catálogo de precios estilo tabla",
+          "Q11 alcance reducido: 4 categorías, sin OCR, sin vinculación a pedido"
+        ],
+        "esfuerzo_h": "20-30",
+        "prioridad": "ALTA"
+      },
+      {
+        "subversion": "v7.0-γ",
+        "tipo": "GAMMA — CRM y tareas",
+        "alcance": [
+          "Módulo Tareas y Follow-ups (rediseño total del Seguimiento — Q1 Opción C)",
+          "Módulo Clientes rediseñado: Directorio + Ventas anteriores",
+          "Submódulo Histórico comercial (en Ventas) — solo perdidas/anuladas/superseded",
+          "Decisión final pendiente: ¿submódulo Perdidas en Clientes existe o se elimina por redundancia con Histórico comercial?"
+        ],
+        "esfuerzo_h": "10-15",
+        "prioridad": "MEDIA"
+      },
+      {
+        "subversion": "v7.0-δ",
+        "tipo": "DELTA — limpieza y herramientas",
+        "alcance": [
+          "Módulo Herramientas: Catálogo de productos con UI propia, Backup, Configuración",
+          "Limpieza de fallback defensivo runTransaction de v6.3.0 (Q6 cerrada — nunca se activó)",
+          "Migración de los 5 confirms destructivos pendientes a modal con campo 'escribe ELIMINAR' (heredado de Bloque 1)",
+          "Limpieza de patrones defensivos alert() de v6.1.0",
+          "Pulido general, performance, accesibilidad"
+        ],
+        "esfuerzo_h": "8-12",
+        "prioridad": "BAJA"
+      },
+      {
+        "subversion": "v7.0 final",
+        "tipo": "RELEASE",
+        "alcance": [
+          "Pulido final basado en feedback piloto de α/β/γ/δ",
+          "Testing completo",
+          "Deploy a producción",
+          "Cache-buster ?v=7.0.0"
+        ],
+        "esfuerzo_h": "5-8"
+      }
+    ],
+    "esfuerzo_total_v70_h": "75-110 (incluyendo Fase 0 ya hecha y los 18-26h de fixes absorbidos)",
+    "fuera_de_alcance_v70_a_v71_o_posterior": {
+      "items": [
+        {
+          "tema": "Módulo Gastos de Operación separado",
+          "trigger": "v7.1 o v8.0 según uso de Compras"
+        },
+        {
+          "tema": "OCR de tiquetes de compra",
+          "trigger": "Si tras 2-3 meses de uso de Compras la captura manual se vuelve cuello de botella"
+        },
+        {
+          "tema": "Vincular compra ↔ pedido específico (margen real por evento)",
+          "trigger": "v7.1 una vez catálogo de precios maduro"
+        },
+        {
+          "tema": "Buscar global ⌘K",
+          "trigger": "v7.1 — solo trigger visual en v7.0"
+        },
+        {
+          "tema": "Paginación real Firestore (cursor startAfter)",
+          "trigger": "total_docs >= 80 (hoy ~25)"
+        },
+        {
+          "tema": "Event delegation para eliminar onclick inline",
+          "esfuerzo_h": "8-12"
+        },
+        {
+          "tema": "Split de app-dashboard.js en 4 archivos",
+          "esfuerzo_h": "6-8"
+        },
+        {
+          "tema": "Tests unitarios para funciones puras",
+          "esfuerzo_h": "5-6"
+        },
+        {
+          "tema": "Reportes avanzados módulo Compras",
+          "trigger": "Cuando histórico tenga >=3 meses de datos"
+        },
+        {
+          "tema": "Notificaciones internas (banner urgentes en dashboard, alertas push)"
+        },
+        {
+          "tema": "Submódulo Tareas y follow-ups con recordatorios programados (parte de v7.0-γ)"
+        }
+      ]
+    }
+  },
+  "decisiones_aprobadas_no_discutir": [
+    "Roadmap v6.x = entregas secuenciales (v6.1.0 → v6.2.0 → v6.3.0 → v6.4.0), todas COMPLETADAS",
+    "Piloto entre entregas, siguiente NO arranca hasta confirmar estabilidad",
+    "Ninguna entrega v6.x cambia Firestore schema (v6.4.0 solo agrega campos OPCIONALES en entregaData)",
+    "Rollback entre versiones = subir archivos de versión anterior",
+    "v6.1.0: openDocument usa MODAL PREVIEW UNIFICADO",
+    "v6.1.0: h() aplicado en 5 renders expuestos",
+    "v6.2.0: Hoja de Entregas con rango de fechas, toggle 'Solo pendientes' default ON, orden por hora",
+    "v6.2.0: PDF landscape carta con 7 columnas, 5 filas vacías al final",
+    "v6.3.0 E3-1: runTransaction atómico en versión hija (cotizar + propuesta) + fallback defensivo",
+    "v6.3.0 E3-2: scripts/check.sh automatizado con 6 validaciones",
+    "v6.3.0 E3-3: migración de alerts informativos + confirms NO destructivos",
+    "v6.4.0 P1: anuladas visibles en búsqueda global pero NO suman en KPIs/pipeline/gráficos. Helpers isAnulada()/noSumaEnKpis() centralizados. CONFIRMADO 2026-04-26: funciona OK, ningún warn en piloto.",
+    "v6.4.0 P2: edición de pedido respeta logísticos del form sin crear versión nueva. PARCIAL: hora SÍ funciona, dirección y fecha NO funcionan completamente — requiere v6.4.1 hotfix.",
+    "v6.4.0 P5: Hoja de Despacho con botones rápidos Hoy/Mañana/+3días/Rango.",
+    "v6.4.0 P6: Hasta 2 fotos por entrega + flujo WhatsApp asíncrono via Storage + link a Kathy. KATHY_WA_TEL = '573104441588'.",
+    "Versionado: MAJOR.MINOR.PATCH (v6.4.0 fue MINOR, hotfix futuro v6.4.1, mejoras Despacho v6.5.0, rediseño grande v7.0)",
+    "Entrega de código: ZIP gourmet-bites-vX_Y_Z.zip con TODOS los archivos del proyecto",
+    "ZIP puede ser renombrado a files.zip por present_files — siempre advertirlo",
+    "Paginación Firestore POSPUESTA hasta total_docs >= 80",
+    "DECISIÓN 2026-04-26 — Q1 Seguimiento: rediseñar a 'Tareas y Follow-ups' (Opción C) en v7.0",
+    "DECISIÓN 2026-04-26 — Q4 Hoja Despacho casilla empaque: Opción B (checkbox + firma POR CADA PEDIDO)",
+    "DECISIÓN 2026-04-26 — Q5 Hoja Despacho RECIBE: vacío para firma manual del cliente",
+    "DECISIÓN 2026-04-26 — Q6 fallback runTransaction E3-1: nunca se activó en piloto, limpiar en v7.0",
+    "DECISIÓN 2026-04-26 — Q9 edición pedido: BUG CRÍTICO no resuelto, va a v6.4.1 hotfix",
+    "DECISIÓN 2026-04-26 — Q10 anuladas: piloto OK, ningún warn, sin acción",
+    "DECISIÓN 2026-04-26 — Q11 Compras alcance v7.0: 4 categorías (Insumos producción, Empaques, Combustibles+peajes+transporte, Otros). Lista única compartida. Sin OCR. Sin vinculación a pedido. CON catálogo de precios estilo tabla. Opción A (canónico manual). Flujo (b) (canónico al marcar como comprado).",
+    "DECISIÓN 2026-04-26 — Gastos de Operación: NO entran a Compras v7.0, van a backlog como módulo separado de Finanzas/Contabilidad",
+    "DECISIÓN 2026-04-26 — Rediseño navegación: Opción 2 (sidebar lateral colapsable estilo Notion/Linear/Odoo) en v7.0",
+    "DECISIÓN 2026-04-26 — v7.0 obligatorio Fase 0 de diseño UX (wireframes navegables HTML) antes de Fase 1 implementación",
+    "DECISIÓN 2026-04-26 — Estructura propuesta navegación v7.0 organizada por proceso de negocio (Inicio / Ventas / Operaciones / Compras / Clientes / Herramientas), no por objeto. Validar en Fase 0.",
+    "DECISIÓN 2026-04-26 — Q13 identidad visual v7.0: REFRESH COMPLETO. Logo intocable + todo lo demás nuevo (paleta, tipografía, layout, header). Ver Bloque 1.",
+    "DECISIÓN 2026-04-26 — Q14 densidad: ADAPTABLE con toggle Compacta/Cómoda en header. Default Compacta desktop / Cómoda móvil. Persiste en localStorage por usuario.",
+    "DECISIÓN 2026-04-26 — Q15 plataforma: EQUILIBRADO pantalla por pantalla. Cada pantalla declara su prioridad (mobile/desktop/equilibrada).",
+    "DECISIÓN 2026-04-26 — Tipografía v7.0: Fraunces (display) + Inter (cuerpo) + JetBrains Mono (numerales/metadatos). NO Brush Script ni cursivas decorativas en chrome.",
+    "DECISIÓN 2026-04-26 — Paleta v7.0: neutros fríos + azul-violeta primary 600 #4853D4 como acento ÚNICO + 3 semánticos. NO dorado en chrome.",
+    "DECISIÓN 2026-04-26 — Logo en chrome: cuchillo aislado en header (24-36px) + wordmark completo en sidebar expandido (200-220px). Cuando sidebar colapsa, solo cuchillo. En sidebar oscuro, versiones blancas.",
+    "DECISIÓN 2026-04-26 — Sidebar oscuro fijo (neutral 900) con cuchillo blanco arriba. Ancho 248px expandido / 64px colapsado.",
+    "DECISIÓN 2026-04-26 — Submódulos siempre visibles cuando módulo activo (no accordion).",
+    "DECISIÓN 2026-04-26 — Badges rojos numerados en módulos urgentes y submódulos urgentes.",
+    "DECISIÓN 2026-04-26 — Botón Crear global arriba del sidebar con menú de 6 acciones (atajo ⌘N): Nueva cotización, Nueva propuesta de evento, Registrar pedido directo, Registrar compra realizada, Agregar cliente, Nueva tarea o follow-up.",
+    "DECISIÓN 2026-04-26 — Header delgado 48px: breadcrumb + búsqueda global ⌘K (solo trigger visual hasta v7.1) + toggle densidad + indicador estado sync.",
+    "DECISIÓN 2026-04-26 — Móvil: hamburguesa (con dot rojo de urgencias) + drawer accordion + FAB de Crear (azul-violeta) con bottom sheet.",
+    "DECISIÓN 2026-04-26 — 6 módulos en 3 secciones: Tu día (Inicio) / Operación (Ventas, Operaciones, Compras) / Maestros (Clientes, Herramientas). 22 submódulos. Estructura por proceso de negocio, no por objeto.",
+    "DECISIÓN 2026-04-26 — Q-D1 dashboard: banner único 'Lo que pasa hoy' consolida entregas + producción + cobros + tareas (no dos bloques separados).",
+    "DECISIÓN 2026-04-26 — Q-D2 KPIs: solo cifras grandes Fraunces, sin sparklines (con ~25 docs activos los sparklines hacen ruido).",
+    "DECISIÓN 2026-04-26 — Q-D3 banner novedades descartable (azul tenue, peso bajo, '2 pedidos nuevos · 1 pago recibido desde tu última visita').",
+    "DECISIÓN 2026-04-26 — Q-D4 análisis comercial = funnel conversión + gráfico tendencia 6 meses (no las 3 secciones colapsables del v6.4.0).",
+    "DECISIÓN 2026-04-26 — Dashboard 4 zonas con jerarquía: Banner novedades → Lo que pasa hoy → KPIs período → Análisis comercial + Próximas entregas + Accesos rápidos.",
+    "DECISIÓN 2026-04-26 — Items urgentes codificados: rojo=vencido, ámbar=hoy, azul=próximo. Tag de tipo (COBRO/PRODUCCIÓN/ENTREGA/TAREA).",
+    "DECISIÓN 2026-04-26 — 4 KPIs solo: Cotizado / Vendido / Recaudado / Por cobrar. NO 5 ni 8. 'Por cobrar' destacado en azul-violeta.",
+    "DECISIÓN 2026-04-26 — v6.4.1 ELIMINADA. Sus fixes (Q9 + 3 fixes operativos descubiertos) absorbidos en v7.0-α.",
+    "DECISIÓN 2026-04-26 — v6.5.0 ELIMINADA. Sus mejoras (NEW-01 a NEW-04 + Q5) absorbidas en v7.0-β.",
+    "DECISIÓN 2026-04-26 — Causa raíz Q9 descubierta: duplicación de campos q.fechaEntrega vs q.orderData.fechaEntrega. Solución: q.orderData única fuente de verdad. Eliminar duplicados en root.",
+    "DECISIÓN 2026-04-26 — Máquina de estados estricta v7.0: Cotización → Pedido → En producción (o Producto producido como atajo) → Entregado. Pagos permitidos desde Pedido en adelante. Reversibilidad solo de Entregado a En producción si no hay cobros del día de la entrega.",
+    "DECISIÓN 2026-04-26 — Pedidos GB-2026-0123 y GB-2026-0122 NO se arreglan manualmente en Firestore. Se arreglan desde la UI usando botón Revertir entrega cuando v7.0-α esté deployada. Mientras tanto, mitigación manual con nota a Kathy/JP.",
+    "DECISIÓN 2026-04-26 — Brand kit oficial: 4 PNG transparentes (cuchillo negro/blanco + wordmark negro/blanco) extraídos del logo HD entregado por Luis. Incluidos en gourmet-bites-v7-fase0-completa.zip."
+  ],
+  "preguntas_abiertas_para_luis": [
+    {
+      "id": "Q16_COMPRAS_NOTIFS",
+      "pregunta": "Compras urgentes: ¿(a) solo marcado en rojo en lista, (b) banner en dashboard cuando hay urgentes, (c) sin nada especial?",
+      "recomendacion": "(a) o (b) según presupuesto de complejidad. (a) es default seguro.",
+      "responder_en": "Antes de implementar Compras en v7.0-β"
+    },
+    {
+      "id": "Q1_legacy",
+      "pregunta": "¿Usas activamente la pestaña Seguimiento? Backup sigue mostrando 0/21 docs con followUp marcado.",
+      "estado": "RESPONDIDO 2026-04-26 — confirmado 0/21, justifica rediseño Opción C",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q4_legacy",
+      "pregunta": "Tras piloto v6.2.0: ¿la hoja impresa en móvil cabe bien? ¿Alguna columna se corta?",
+      "estado": "RESPONDIDO 2026-04-26 — Luis no sabe aún. Pregunta más relevante: agregar casilla empaque firmada por pedido (NEW-04).",
+      "responder_en": "Tras 3-5 entregas reales con v6.5.0"
+    },
+    {
+      "id": "Q6_legacy",
+      "pregunta": "¿El fallback defensivo de runTransaction se ha activado alguna vez?",
+      "estado": "RESPONDIDO 2026-04-26 — nunca, eliminar en v7.0",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q9_legacy",
+      "pregunta": "Tras piloto v6.4.0: ¿la edición de pedido funciona OK al cambiar fecha/hora/dirección?",
+      "estado": "RESPONDIDO 2026-04-26 — NO funciona para dirección y fecha. BUG CRÍTICO → v6.4.1 hotfix",
+      "responder_en": "(cerrado, escalado a hotfix)"
+    },
+    {
+      "id": "Q10_legacy",
+      "pregunta": "Tras piloto v6.4.0: ¿activaste __GB_DEBUG_ANULADAS?",
+      "estado": "RESPONDIDO 2026-04-26 — todo OK",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q11_legacy",
+      "pregunta": "Módulo de COMPRAS para v7.0: lista compartida, histórico costos, vinculación a pedidos.",
+      "estado": "RESPONDIDO 2026-04-26 — ver decisiones_diseno_2026_04_26.Q11_modulo_compras",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q12_legacy",
+      "pregunta": "Secuencia de entregas: v6.4.1 → v6.5.0 → v7.0 vs salto directo a v7.0",
+      "estado": "RESPONDIDO 2026-04-26 — TODO ABSORBIDO EN v7.0. v6.4.1 y v6.5.0 eliminadas como versiones separadas.",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q13_legacy",
+      "pregunta": "Identidad visual v7.0: conservar / refresh / híbrido",
+      "estado": "RESPONDIDO 2026-04-26 — REFRESH COMPLETO. Logo intocable, todo lo demás nuevo. Ver Bloque 1.",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q14_legacy",
+      "pregunta": "Densidad información: compacta / cómoda / adaptable",
+      "estado": "RESPONDIDO 2026-04-26 — ADAPTABLE con toggle en header.",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q15_legacy",
+      "pregunta": "Plataforma: mobile-first / desktop-first / equilibrado",
+      "estado": "RESPONDIDO 2026-04-26 — EQUILIBRADO pantalla por pantalla.",
+      "responder_en": "(cerrado)"
+    },
+    {
+      "id": "Q17_PENDIENTES_COBRO_UBICACION",
+      "pregunta": "¿Submódulo 'Pendientes de cobro' vive en Operaciones o en Ventas?",
+      "default_actual": "Operaciones (ya implementado así en wireframes)",
+      "no_bloquea_fase_1": true,
+      "responder_en": "Antes de v7.0-β"
+    },
+    {
+      "id": "Q18_NOMBRE_INICIO",
+      "pregunta": "¿Renombrar 'Inicio' a 'Hoy'?",
+      "default_actual": "Inicio (en wireframes)",
+      "no_bloquea_fase_1": true,
+      "responder_en": "Antes de v7.0-α"
+    },
+    {
+      "id": "Q19_HISTORICO_VS_PERDIDAS",
+      "pregunta": "¿Histórico comercial (Ventas) y Perdidas (Clientes) son redundantes? ¿Eliminar Perdidas en Clientes?",
+      "recomendacion": "Sí, eliminar Perdidas en Clientes. Mantener solo Histórico comercial en Ventas (incluye perdidas/anuladas/superseded).",
+      "no_bloquea_fase_1": true,
+      "responder_en": "Antes de v7.0-γ"
+    },
+    {
+      "id": "Q20_BLOQUES_RESTANTES_FASE0",
+      "pregunta": "¿Hacer Bloques 4-9 de Fase 0 (wireframes restantes) antes de Fase 1, o saltar directo a programación?",
+      "recomendacion": "Hacer Bloques 4-6 (Ventas, Operaciones, Compras) por ser los más complejos. Saltar 7-9.",
+      "no_bloquea_fase_1": false,
+      "responder_en": "Inicio del próximo chat"
+    },
+    {
+      "id": "Q16_legacy",
+      "pregunta": "Compras urgentes: marcado rojo / banner dashboard / nada",
+      "estado": "PENDIENTE — sin cambios desde sesión anterior. Recomendación: (a) marcado rojo en lista, sin notificación activa.",
+      "responder_en": "Antes de v7.0-β"
+    }
+  ],
+  "historial_versiones_detallado": [
+    {
+      "version": "v6.4.0",
+      "tipo": "MINOR",
+      "estado": "EN PRODUCCIÓN — piloto en curso",
+      "fecha": "2026-04-25",
+      "naturaleza": "Bugs operativos críticos + features de campo (Entrega 4 del roadmap v6.x)",
+      "feedback_piloto": {
+        "fecha_feedback": "2026-04-26",
+        "P1_anuladas": "OK",
+        "P2_edicion_pedido": "PARCIAL — hora funciona, dirección y fecha NO. Escalar a v6.4.1.",
+        "P5_hoja_botones_rapidos": "(sin feedback aún)",
+        "P6_fotos_whatsapp": "(sin feedback aún)",
+        "ux_general": "Múltiples problemas identificados (UX-01 a UX-08). Justifica v7.0 rediseño grande."
+      },
+      "highlights": [
+        "P1: Defensa centralizada anuladas — helpers isAnulada() y noSumaEnKpis() en app-core.js",
+        "P2: Edición de pedido respeta logísticos del form (PARCIAL, ver feedback)",
+        "P5: Hoja de Despacho con botones rápidos Hoy/Mañana/+3días/Rango",
+        "P6: Foto de entrega + WhatsApp a Kathy con flujo asíncrono via Storage",
+        "Cache-buster ?v=6.3.0 → ?v=6.4.0",
+        "scripts/check.sh: REQUIRED_MODALS ahora 6 modales críticos",
+        "Sin cambio Firestore schema · Rollback = subir archivos v6.3.0"
+      ],
+      "archivos_entregados": [
+        "app-assets.js (sin cambios)",
+        "app-core.js (BUILD_VERSION v6.4.0 + isAnulada/noSumaEnKpis + loadQuote carga horaEntrega)",
+        "app-cotizar.js (P2 fix eventDate/horaEntrega del form)",
+        "app-propuesta.js (P2 fix horaEntrega del form + loadPropQuote)",
+        "app-historial.js (P6 modal WhatsApp + foto2 + reopenEntregaWhatsApp)",
+        "app-seguimiento.js (sin cambios)",
+        "app-dashboard.js (P1 noSumaEnKpis + P5 heQuickRange)",
+        "index.html (VERSION + ?v=6.4.0 + inputs hora-entrega + foto2 + entrega-wa-modal + botones rápidos hoja)",
+        "scripts/check.sh (REQUIRED_MODALS 6 entradas)"
+      ]
+    },
+    {
+      "version": "v6.3.0",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "E3-1: runTransaction atómico al crear versión hija",
+        "E3-2: scripts/check.sh con 6 validaciones",
+        "E3-3: 33 alerts + 17 confirms no destructivos migrados a confirmModal/toast"
+      ]
+    },
+    {
+      "version": "v6.2.0",
+      "tipo": "FEATURE",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "Hoja de Entregas del Día imprimible PDF landscape carta 7 columnas"
+      ]
+    },
+    {
+      "version": "v6.1.0",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "fecha": "2026-04-24",
+      "highlights": [
+        "openDocument modal preview unificado · helper h() · 36 alerts → toast"
+      ]
+    },
+    {
+      "version": "v6.0.2",
+      "fecha": "2026-04-24",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "BUG-014 fix · Toggle persistente · Filtros mes Ventas · Cortesías"
+      ]
+    },
+    {
+      "version": "v6.0.0",
+      "fecha": "2026-04-23",
+      "tipo": "MAJOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "Pestaña Ventas anteriores · canAnular · KPI Entregado desglose"
+      ]
+    },
+    {
+      "version": "v5.5.0",
+      "fecha": "2026-04-23",
+      "tipo": "MINOR",
+      "estado": "SUPERSEDED",
+      "highlights": [
+        "Matriz edición permisiva · Versionado hijo · Audit trail"
+      ]
+    }
+  ],
+  "instrucciones_mantenimiento_json": {
+    "al_entregar_v641_o_siguiente": "ZIP gourmet-bites-vX_Y_Z.zip con TODOS los archivos del proyecto + JSON actualizado (mover versión a historial, actualizar version_actual_en_produccion). El JSON SIEMPRE refleja la última versión entregada — nombre del archivo y _meta.supersedes deben coincidir.",
+    "sesion_sin_codigo": "Solo JSON actualizado. No ZIP.",
+    "registrar_respuestas_a_preguntas_abiertas": "Cuando Luis responda Q12/Q13/Q14/Q15/Q16, mover la respuesta a decisiones_aprobadas_no_discutir y eliminar de preguntas_abiertas",
+    "regla_critica_naming_json": "El nombre del archivo JSON SIEMPRE debe coincidir con la versión actual en producción. Hoy es v6.4.0 → Plan_de_accion_v6_4_0_entregada.json. NUNCA dejar versiones viejas (v4.x, v5.x) en el ZIP."
+  },
+  "notas_sesion_planificacion_2026_04_26": {
+    "fecha": "2026-04-26",
+    "facilitada_por": "Claude Opus 4.7",
+    "duracion_estimada_chat": "~2-3 horas de discusión iterativa",
+    "objetivos_logrados": [
+      "Cierre de 6 preguntas abiertas (Q1, Q4, Q5, Q6, Q9, Q10, Q11)",
+      "Definición completa de alcance Compras v7.0 (4 categorías, catálogo de precios, estructura de datos)",
+      "Identificación de bug crítico Q9 → v6.4.1 hotfix",
+      "Captura de 4 ítems nuevos para Hoja de Despacho (NEW-01 a NEW-04) → v6.5.0",
+      "Documentación de 8 problemas UX (UX-01 a UX-08) con base en 9 capturas reales",
+      "Decisión de Opción 2 (sidebar) para rediseño navegación v7.0",
+      "Decisión de Fase 0 obligatoria (diseño UX) antes de Fase 1 (implementación) en v7.0",
+      "Propuesta inicial de estructura de navegación por proceso de negocio (Inicio/Ventas/Operaciones/Compras/Clientes/Herramientas)"
+    ],
+    "decisiones_pendientes_proximo_chat": [
+      "Q12: secuencia v6.4.1 → v6.5.0 → v7.0 vs salto directo a v7.0",
+      "Q13/Q14/Q15: parámetros Fase 0 (identidad, densidad, plataforma)",
+      "Q16: notificaciones de urgentes en Compras"
+    ]
+  },
+  "pendiente_arreglo_dato_manual_2026_04_26": {
+    "fecha_descubrimiento": "2026-04-26",
+    "contexto": "Luis intentó marcar como entregado un pedido del cliente Luz Miryam Sánchez. Tenía 2 pedidos abiertos del mismo cliente en estados distintos. La app v6.4.0 NO bloquea marcar entregado un pedido que no está producido, y NO ofrece confirmación visual cuando hay 2+ pedidos del mismo cliente. Luis seleccionó por error el pedido equivocado.",
+    "pedidos_afectados": {
+      "GB-2026-0123": {
+        "cliente": "Luz Miryam Sánchez",
+        "fecha_real_entrega": "2026-05-10",
+        "total": 796000,
+        "estado_real": "NO ENTREGADO, sin abono, sin producir",
+        "estado_en_app": "ENTREGADO (incorrecto)",
+        "tiene_pago": false,
+        "tiene_foto_entrega": false,
+        "campos_a_corregir_en_firestore": {
+          "status": "cambiar de 'entregado' a 'en_produccion'",
+          "fechaEntrega": "cambiar de '2026-04-26' a '2026-05-10'",
+          "entregaData": "BORRAR el campo entero (objeto con nombreReceptor, fotoTipo, marcadoEn, entregadoPor, notasEntrega, fechaEntrega, recibidoConforme)"
+        }
+      },
+      "GB-2026-0122": {
+        "cliente": "Luz Miryam Sánchez",
+        "fecha_real_entrega": "2026-04-26",
+        "total": 687500,
+        "estado_real": "ENTREGADO HOY, pagado 100%",
+        "estado_en_app": "EN PRODUCCIÓN (incorrecto)",
+        "tiene_pago": true,
+        "tiene_foto_entrega": false,
+        "campos_a_corregir_en_firestore": {
+          "status": "cambiar de 'en_produccion' a 'entregado'",
+          "fechaEntrega": "cambiar de null a '2026-04-26'",
+          "entregaData": "OPCIONAL — crear si Luis quiere registro formal; o dejar sin entregaData (la app lo muestra entregado igual)"
+        }
+      }
+    },
+    "decision_resolucion": "Luis decidió 2026-04-26 NO tocar Firestore manualmente. El arreglo se hará desde la UI cuando v7.0-α esté deployado, usando el botón 'Revertir entrega' que es uno de los fixes absorbidos. Mientras tanto Luis lleva nota mental + advertencia a Kathy y JP de que GB-2026-0123 NO está entregado a pesar de lo que dice la app.",
+    "instruccion_post_v70_alpha": "Una vez v7.0-α esté deployada con los 4 fixes operativos absorbidos: (1) Abrir GB-2026-0123 → click 'Revertir entrega' → escribir REVERTIR → confirmar. (2) Abrir GB-2026-0122 → click 'Marcar producido' → click 'Marcar entregado'. (3) Verificar en KPIs que 'Entregado' del mes de abril ya no infla $796.000. (4) Verificar que GB-2026-0123 aparece en agenda del 10 de mayo.",
+    "impacto_temporal_durante_espera": [
+      "KPI 'Entregado' del mes de abril 2026 inflado en $796.000 (real: $2.165.200; app dice: $2.961.200)",
+      "Pedido fantasma en 'Entregadas' que NO se ha entregado (GB-2026-0123)",
+      "Pedido NO visible en 'En producción' que está pendiente de producir para 10 mayo (GB-2026-0123)",
+      "Hoja de Despacho del 10 mayo NO va a incluir GB-2026-0123 hasta que se revierta",
+      "Cliente Luz Miryam aparece con 2 pedidos en estados confusos al buscarla"
+    ],
+    "riesgo_principal": "Que Kathy o JP olviden producir el pedido del 10 de mayo asumiendo que ya está hecho. Mitigación manual: nota visible en cocina, recordatorio en calendario externo (Google Calendar) hasta que v7.0-α esté lista."
+  },
+  "fase_0_v70_completada": {
+    "fecha": "2026-04-26",
+    "duracion_chat": "~3-4 horas iterativas",
+    "facilitador": "Claude Opus 4.7",
+    "entregables": {
+      "bloque_1_sistema_diseno": {
+        "archivo": "00-sistema.html",
+        "estado": "APROBADO",
+        "contenido": "14 secciones: dirección, header antes/después, marca (cuchillo + wordmark), paleta, tipografía, espaciado, densidad, botones, campos, cards/KPIs, tags, tabla, toasts, modal",
+        "decisiones_cerradas": [
+          "Q13: Refresh completo de identidad visual (logo intocable, todo lo demás nuevo)",
+          "Q14: Densidad adaptable Compacta/Cómoda con toggle en header (default Compacta desktop / Cómoda móvil)",
+          "Q15: Equilibrado pantalla por pantalla (cada pantalla declara su prioridad mobile/desktop)",
+          "Tipografía: Fraunces (display) + Inter (cuerpo) + JetBrains Mono (numerales/metadatos)",
+          "Paleta: neutros fríos + azul-violeta primary 600 #4853D4 como acento único + 3 semánticos (success/warning/danger)",
+          "Espaciado: escala 4px estricta",
+          "Logo: Opción A (cuchillo en header chico + wordmark completo en sidebar expandido), B&N puro, primary nunca toca el logo",
+          "Botones: 6 variantes × 3 tamaños, una sola acción primaria por contexto",
+          "Confirms destructivos: modal con campo 'escribe ELIMINAR' estilo GitHub (heredado v6.3.0)"
+        ]
+      },
+      "bloque_2_navegacion": {
+        "archivos": [
+          "01-navegacion-desktop.html",
+          "01b-navegacion-movil.html",
+          "01c-mapa-modulos.html",
+          "gb-tokens.css"
+        ],
+        "estado": "APROBADO con 4 pendientes de validar (no bloqueantes para Fase 1)",
+        "decisiones_cerradas": [
+          "Sidebar oscuro (neutral 900) fijo · ancho 248px expandido / 64px colapsado",
+          "Submodulos siempre visibles cuando el módulo está activo (no accordion)",
+          "Badges rojos numerados en módulos urgentes (Ventas, Operaciones) y submódulos urgentes",
+          "Botón Crear global arriba del sidebar con menú de 6 acciones (atajo ⌘N)",
+          "Header delgado 48px: breadcrumb + búsqueda global (⌘K) + toggle densidad + estado sync",
+          "Móvil: hamburguesa con dot de urgencias + drawer accordion + FAB de Crear con bottom sheet",
+          "6 módulos en 3 secciones: Tu día (Inicio) / Operación (Ventas, Operaciones, Compras) / Maestros (Clientes, Herramientas)",
+          "22 submódulos totales — ver mapa completo en 01c-mapa-modulos.html"
+        ],
+        "pendientes_validar_pre_fase1": [
+          "¿'Pendientes de cobro' vive en Operaciones o en Ventas? (default actual: Operaciones)",
+          "¿Renombrar 'Inicio' a 'Hoy'? (default actual: Inicio)",
+          "¿Histórico comercial (Ventas) y Perdidas (Clientes) son redundantes? (recomendación: dejar Histórico comercial en Ventas, eliminar Perdidas en Clientes)",
+          "¿Buscar global ⌘K se construye en Bloque 4 o se posterga a v7.1? (recomendación: postergar)"
+        ]
+      },
+      "bloque_3_inicio_dashboard": {
+        "archivo": "02-inicio-dashboard.html",
+        "estado": "APROBADO",
+        "decisiones_cerradas": [
+          "Q-D1: Banner único 'Lo que pasa hoy' consolida entregas + producción + cobros + tareas",
+          "Q-D2: KPIs sin sparklines (cifras grandes Fraunces + delta vs mes anterior)",
+          "Q-D3: Banner 'Novedades desde última visita' descartable (azul tenue, peso bajo)",
+          "Q-D4: Análisis comercial = funnel de conversión + gráfico tendencia 6 meses",
+          "Estructura del dashboard: 4 zonas con jerarquía descendente (Banner novedades → Lo que pasa hoy → KPIs período → Análisis + Próximas entregas)",
+          "Period switcher Hoy/Semana/Mes/Año/Todo arriba a la derecha del título",
+          "Items urgentes codificados por color de barra lateral: rojo=vencido, ámbar=hoy, azul=próximo",
+          "Cada urgente tiene: hora/estado, título + sub-info, tag de tipo (COBRO/PRODUCCIÓN/ENTREGA/TAREA), monto, chevron",
+          "4 KPIs (no 5 ni 8): Cotizado / Vendido / Recaudado / Por cobrar — el último destacado en azul-violeta",
+          "Accesos rápidos: Nueva cotización / Imprimir hoja del día / Registrar compra / Ver clientes"
+        ],
+        "soluciona_problemas_ux": [
+          "UX-01 (header desperdiciado)",
+          "UX-02 (botones sueltos)",
+          "UX-03 (dashboard sobrecargado)"
+        ]
+      }
+    },
+    "bloques_pendientes_fase_0": {
+      "estado": "DECISIÓN PENDIENTE — Luis decidió absorber todos los fixes en v7.0. Los wireframes restantes pueden hacerse antes de Fase 1, o saltar directo a programación con los wireframes que ya hay como referencia y diseñar pantallas restantes durante implementación.",
+      "bloques_no_hechos": [
+        {
+          "bloque": "04",
+          "modulo": "Ventas — Pipeline + Cotizar + Propuesta evento + Histórico",
+          "estimado_h": "2"
+        },
+        {
+          "bloque": "05",
+          "modulo": "Operaciones — Pedidos producción + Hoja despacho + Histórico hojas + Pendientes cobro",
+          "estimado_h": "2-3"
+        },
+        {
+          "bloque": "06",
+          "modulo": "Compras — Lista pendiente + Histórico + Catálogo de precios",
+          "estimado_h": "2"
+        },
+        {
+          "bloque": "07",
+          "modulo": "Clientes — Directorio + Ventas anteriores",
+          "estimado_h": "1"
+        },
+        {
+          "bloque": "08",
+          "modulo": "Tareas y follow-ups (ex Seguimiento)",
+          "estimado_h": "1"
+        },
+        {
+          "bloque": "09",
+          "modulo": "Herramientas — Catálogo productos + Backup + Configuración",
+          "estimado_h": "1"
+        }
+      ],
+      "recomendacion": "Hacer Bloques 4-6 antes de Fase 1 (lo más complejo). Bloques 7-9 pueden saltarse — el sistema de diseño y el cascarón ya están suficientemente robustos para diseñar inline durante codificación."
+    }
+  },
+  "fixes_operativos_absorbidos_v70": {
+    "decision_2026_04_26": "Luis decidió incorporar TODOS los fixes operativos pendientes (originalmente planeados para v6.4.1 hotfix y v6.5.0 minor) DENTRO del rediseño v7.0. Ya no existen las versiones v6.4.1 ni v6.5.0 separadas. v7.0 absorbe todo.",
+    "trade_off_aceptado": "Luis acepta vivir con los bugs activos durante 3-5 semanas hasta que v7.0-α esté lista, a cambio de no fragmentar releases ni hacer trabajo intermedio que se reescribiría en v7.0.",
+    "fixes_absorbidos": [
+      {
+        "id": "FIX-01-Q9",
+        "origen": "v6.4.1 (planeada, no ejecutada)",
+        "tema": "Edición de pedido respeta dirección y fecha",
+        "causa_raiz_descubierta_2026_04_26": "Duplicación de campos: q.fechaEntrega vs q.orderData.fechaEntrega — la app escribe en uno, lee del otro, se desincronizan",
+        "solucion_v70": "Consolidar fechas en q.orderData como única fuente de verdad. Eliminar campos duplicados en root del documento (q.fechaEntrega, q.dir, q.horaEntrega, q.productionDate). Migración silenciosa al cargar quote: si hay duplicado en root, copiar a orderData y borrar root. Aplica también a propuestas.",
+        "archivos_a_tocar": [
+          "app-cotizar.js (saveCurrentQuote, loadQuote)",
+          "app-propuesta.js (saveCurrentProp, loadPropQuote)",
+          "app-core.js (helper de migración silenciosa)"
+        ],
+        "esfuerzo_h": "3-4",
+        "destino_subentrega": "v7.0-α (parte del cascarón nuevo)"
+      },
+      {
+        "id": "FIX-02-GATE-ENTREGA",
+        "origen": "Bug nuevo descubierto 2026-04-26",
+        "tema": "Gate 'no marcar entregado un pedido sin producir'",
+        "detalle": "El botón 'Marcar como entregado' solo es accesible si status === 'en_produccion' o status === 'producto_producido'. Si no, muestra paso intermedio 'Marcar producido' o toast 'Falta marcar como producido antes de entregar'.",
+        "implementacion": "Estricto en UI (botón oculto/disabled) + estricto en lógica (saveCurrentQuote rechaza transición ilegal con toast).",
+        "archivos_a_tocar": [
+          "app-historial.js (estructura del card y modal de detalle)",
+          "app-cotizar.js / app-propuesta.js (validación de transición)"
+        ],
+        "esfuerzo_h": "2-3",
+        "destino_subentrega": "v7.0-α"
+      },
+      {
+        "id": "FIX-03-REVERTIR-ENTREGA",
+        "origen": "Bug nuevo descubierto 2026-04-26",
+        "tema": "Botón 'Revertir entrega' desde pedido entregado",
+        "detalle": "Modal de detalle de pedido entregado muestra botón 'Revertir entrega' con confirmación tipo 'escribe REVERTIR'. Acción: status → 'en_produccion', borra entregaData, agrega entrada en auditTrail tipo 'reverted_delivery' con timestamp + usuario + razón opcional. NO permitido si el pedido tiene cobros con fecha exactamente igual al día de la entrega registrada (porque implicaría que también hay que revertir el cobro, lo cual es más complejo).",
+        "archivos_a_tocar": [
+          "app-historial.js (modal de detalle + flujo de reversión)",
+          "app-core.js (transacción atómica de reversión)"
+        ],
+        "esfuerzo_h": "3-4",
+        "destino_subentrega": "v7.0-α (CRÍTICO — Luis lo necesita para arreglar pedidos GB-2026-0123/0122 cruzados)"
+      },
+      {
+        "id": "FIX-04-CONFIRM-MULTI-PEDIDO",
+        "origen": "Bug nuevo descubierto 2026-04-26",
+        "tema": "Confirmación visual al marcar entregado cuando cliente tiene 2+ pedidos abiertos",
+        "detalle": "Antes de confirmar 'Marcar entregado', si el cliente tiene 2+ pedidos en estados {aprobada, en_produccion, producto_producido, pedido}, mostrar modal con resumen: 'Estás marcando entregado el pedido del [fecha], total $X, productos: [lista corta]. ¿Es correcto?' + lista de los OTROS pedidos abiertos del mismo cliente para que Luis vea el contexto completo y no se confunda.",
+        "archivos_a_tocar": [
+          "app-historial.js (modal de confirmación pre-entrega)"
+        ],
+        "esfuerzo_h": "2-3",
+        "destino_subentrega": "v7.0-α"
+      },
+      {
+        "id": "FIX-05-MAQUINA-ESTADOS",
+        "origen": "Decisión de diseño 2026-04-26",
+        "tema": "Máquina de estados estricta documentada",
+        "detalle": "Definir formalmente las transiciones permitidas: Cotización → Pedido → En producción → Entregado. Atajo: 'Producto producido' (estado intermedio para pedidos rápidos). Pagos permitidos en cualquier estado posterior a Pedido. Reversibilidad documentada (FIX-03). Validar transición tanto en UI (botones) como en lógica (saves).",
+        "archivos_a_tocar": [
+          "app-core.js (constante con grafo de transiciones permitidas)",
+          "app-cotizar.js / app-propuesta.js / app-historial.js (uso del grafo)"
+        ],
+        "esfuerzo_h": "2",
+        "destino_subentrega": "v7.0-α"
+      },
+      {
+        "id": "FIX-06-NEW-01",
+        "origen": "v6.5.0 (planeada, no ejecutada)",
+        "tema": "Hoja de Despacho — casilla cliente enriquecida",
+        "detalle": "Persona natural: nombre + celular debajo. Persona jurídica: razón social + persona contacto + celular contacto. Hoy solo aparece nombre.",
+        "esfuerzo_h": "1-2",
+        "destino_subentrega": "v7.0-β (módulo Operaciones)"
+      },
+      {
+        "id": "FIX-07-NEW-02",
+        "origen": "v6.5.0",
+        "tema": "Hoja de Despacho — historial de hojas generadas",
+        "detalle": "Cada hoja generada queda en Firestore: fecha generación, rango cubierto, quién la generó, cuántos pedidos, link al PDF en Storage. Vista de histórico en módulo Operaciones / Histórico de hojas.",
+        "esfuerzo_h": "3-4",
+        "destino_subentrega": "v7.0-β"
+      },
+      {
+        "id": "FIX-08-NEW-03",
+        "origen": "v6.5.0",
+        "tema": "Botón 'Imprimir' usa diálogo nativo del navegador",
+        "detalle": "window.print() en lugar de generar PDF con opciones. La generación de PDF queda como acción separada explícita 'Generar PDF' si se requiere.",
+        "esfuerzo_h": "1",
+        "destino_subentrega": "v7.0-β"
+      },
+      {
+        "id": "FIX-09-NEW-04",
+        "origen": "v6.5.0",
+        "tema": "Hoja de Despacho — casilla empaque verificado por pedido",
+        "detalle": "Checkbox '✓ Empaque verificado' + línea para firma de quien empaca, una casilla POR CADA PEDIDO en la hoja (no una sola al pie del lote).",
+        "esfuerzo_h": "1-2",
+        "destino_subentrega": "v7.0-β"
+      },
+      {
+        "id": "FIX-10-RECIBE-VACIO",
+        "origen": "Q5 cerrada 2026-04-26 (legacy)",
+        "tema": "Sección 'RECIBE' de Hoja vacía para firma manual",
+        "detalle": "No precargar q.att en RECIBE. Dejar línea vacía para firma del cliente al recibir.",
+        "esfuerzo_h": "0.5",
+        "destino_subentrega": "v7.0-β"
+      }
+    ],
+    "esfuerzo_total_fixes_absorbidos_h": "18-26"
+  },
+  "notas_sesion_diseno_2026_04_26": {
+    "fecha": "2026-04-26",
+    "facilitada_por": "Claude Opus 4.7",
+    "tipo": "Sesión Fase 0 v7.0 — diseño UX",
+    "duracion_estimada_chat": "~3-4 horas iterativas",
+    "objetivos_logrados": [
+      "Bloque 1 entregado y aprobado: sistema de diseño completo (paleta, tipografía, espaciado, componentes)",
+      "Brand kit oficial extraído del logo HD entregado por Luis (4 PNG transparentes)",
+      "Bloque 2 entregado y aprobado: cascarón de navegación desktop + móvil + mapa de módulos",
+      "Bloque 3 entregado y aprobado: Inicio / Dashboard rediseñado completo",
+      "Cierre de 4 preguntas Q12/Q13/Q14/Q15",
+      "Cierre de 4 preguntas de navegación (sidebar oscuro, submodulos visibles, badges, botón Crear)",
+      "Cierre de 4 preguntas de Dashboard (Q-D1 a Q-D4)",
+      "Identificación de bug operativo nuevo (cruce de pedidos GB-2026-0123/0122 cliente Luz Miryam Sánchez)",
+      "Análisis técnico del backup que reveló causa raíz de Q9 (duplicación de campos)",
+      "Decisión arquitectónica: máquina de estados estricta + botón revertir entrega + gate entregar-sin-producir + confirmación multi-pedido",
+      "Decisión de absorber v6.4.1 y v6.5.0 dentro de v7.0 (eliminadas como versiones separadas)",
+      "Roadmap v7.0 detallado en sub-entregas α, β, γ, δ con esfuerzo estimado y prioridades"
+    ],
+    "decisiones_pendientes_proximo_chat": [
+      "Q17: ¿Pendientes de cobro en Operaciones o Ventas?",
+      "Q18: ¿Renombrar Inicio a Hoy?",
+      "Q19: ¿Eliminar Perdidas en Clientes (redundante con Histórico comercial)?",
+      "Q20: ¿Hacer Bloques 4-9 de Fase 0 antes de Fase 1, o saltar?",
+      "Q16: notificaciones de urgentes en Compras"
+    ],
+    "archivos_entregados_en_esta_sesion": [
+      "00-sistema.html (Bloque 1)",
+      "01-navegacion-desktop.html (Bloque 2)",
+      "01b-navegacion-movil.html (Bloque 2)",
+      "01c-mapa-modulos.html (Bloque 2)",
+      "02-inicio-dashboard.html (Bloque 3)",
+      "gb-tokens.css (tokens compartidos)",
+      "brand/cuchillo-negro.png + cuchillo-blanco.png + wordmark-negro.png + wordmark-blanco.png (4 PNG)",
+      "Plan_de_accion_v7_0_fase0_completada.json (este archivo)"
+    ]
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF — Bloque D v7.0-α COMPLETADO (8 de 8 subfases). Listo para arrancar Bloque E (cierre).",
+    "version": "v7.0-α / Bloque D completo",
+    "fecha": "2026-04-26 noche",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade (sesión continuación de _parcial.json)",
+    "documento_padre": "Plan_de_accion_v7_0_alpha_bloqueD_parcial.json",
+    "documentos_relacionados": [
+      "Plan_de_accion_v7_0_alpha_bloqueA_completado.json",
+      "Plan_de_accion_v7_0_alpha_bloqueB_completado.json",
+      "Plan_de_accion_v7_0_alpha_bloqueC_completado.json"
+    ],
+    "proposito": "Cerrar el Bloque D entero (Dashboard rediseñado + FAB Crear). Permitir arrancar Bloque E (cierre v7.0-α) en sesión nueva sin reconstrucción de contexto."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion_original": "32-38h en 5 bloques",
+    "horas_consumidas_acumuladas_aprox": "~23-27h (A + B + C + D)",
+    "bloques": {
+      "A_cascaron_visual":      { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "6-8h" },
+      "B_navegacion":           { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "4-6h", "horas_reales": "~1h" },
+      "C_5_fixes_operativos":   { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "10-12h" },
+      "D_dashboard_y_nav":      { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "8-10h", "horas_reales_acumuladas": "~4h 15min" },
+      "E_cierre":               { "estado": "PENDIENTE",            "horas_estimadas": "4-6h" }
+    }
+  },
+
+  "subfases_D_cerradas_esta_sesion": {
+    "D1_2_banner_novedades": {
+      "estado": "CERRADO",
+      "duracion_real": "~25min",
+      "decisiones_aplicadas": {
+        "Q1_anchor_strategy": "OPCIÓN A — anchor congelado por sesión-dash, solo se actualiza al dismiss explícito (estilo Slack/notificaciones). Razón: protege contra falsos negativos (Luis no ve un pago entrante porque pasó por dash de paso)"
+      },
+      "implementacion": [
+        "CSS reemplazado: bloque v5.2.0 azul material → news-banner v7 sutil (info-50 bg, mono since muted, SVG icons, hover close translúcido)",
+        "Markup: clase 'news-banner' (id 'dash-banner-novedades' estable)",
+        "JS app-dashboard.js: variable módulo _dashVisitAnchor congelada al primer render con getLastVisit(); renderBannerNovedades() la usa en vez de releer; saveLastVisit() solo en dismissNovedades()",
+        "BUG ARREGLADO: saveLastVisit() en línea 284 (final renderDashboard) destruía el delta cada render. Removido.",
+        "Animación dismiss tipo wireframe (opacity → maxHeight 0)",
+        "user-select:text en .news-banner__body para permitir copiar el texto del banner"
+      ],
+      "snapshots": ["_legacy/{index,app-dashboard}.v70a-pre/postBLOQUE-D-1-2.bak.*"]
+    },
+
+    "D1_6_accesos_rapidos": {
+      "estado": "CERRADO",
+      "duracion_real": "~15min",
+      "decisiones_aplicadas": {
+        "Q1_ubicacion": "OPCIÓN A — entre 'Operación urgente' y 'Análisis comercial' (visible sin scroll, no al fondo)",
+        "Q2_imprimir_hoja_duplicado": "OPCIÓN A — dejar el botón actual + agregar quick-action (doble exposición, cero riesgo)",
+        "Q3_descripciones": "OPCIÓN A — estáticas en MVP (no contar entregas/clientes hoy dinámicamente)"
+      },
+      "implementacion": [
+        "CSS '.quick-actions' + 4 variantes color icono + badge 'PRONTO' is-soon (~12 líneas)",
+        "Markup <section class='quick-actions'> con 4 anchors después de dash-urgent-split",
+        "Handlers onclick inline directos (no delegación). Items: setMode('cot'), openHojaEntregasModal(), 2× soonToast()",
+        "FIX: window.soonToast = soonToast expuesto al global (la IIFE del shim D5 lo tenía privado)"
+      ],
+      "snapshots": ["_legacy/index.v70a-pre/postBLOQUE-D-1-6.bak.html"]
+    },
+
+    "D1_4_KPIs_delta": {
+      "estado": "CERRADO",
+      "duracion_real": "~12min",
+      "decisiones_aplicadas": {
+        "Q1_por_cobrar": "OPCIÓN A — NO mostrar Δ% en Por Cobrar (es snapshot, no período-dependiente). Quedan 4 KPIs con Δ%: Cotizado/Vendido/Entregado/Recaudado",
+        "Q2_label_comparativo": "OPCIÓN B — específico según dashPeriod (vs ayer/vs semana anterior/vs mes anterior/vs año anterior/vs rango anterior)",
+        "Q3_previo_cero": "OPCIÓN A — mostrar '—' (placeholder honesto, no '+nuevo' ni '+100%' arbitrario)"
+      },
+      "implementacion": [
+        "Helper getDashRangePrev() devuelve {start,end,label} con misma duración del rango actual desplazada hacia atrás. 'all' devuelve null",
+        "Helper _deltaSpan(actual, previo, label) → HTML con clases is-up/is-down/is-flat",
+        "Loop existente extendido con inRangePrev → acumula cotMontoPrev/venMontoPrev/entMontoPrev/recaudoPrev en mismo pase",
+        "Cards inyectan span Δ% antes del _hint (excepto cobrar)",
+        "CSS '.dash-card-delta' con verde/rojo/muted"
+      ],
+      "snapshots": ["_legacy/{index,app-dashboard}.v70a-pre/postBLOQUE-D-1-4.bak.*"]
+    },
+
+    "D1_5_tendencia_6m": {
+      "estado": "CERRADO",
+      "duracion_real": "~25min",
+      "decisiones_aplicadas": {
+        "Q1_ubicacion": "OPCIÓN A — al inicio del colapsable 'Análisis comercial' (arriba de Conversión/Pérdidas)",
+        "Q2_formato_Y": "Formato $X.XXM con 2 decimales (decisión de Luis: 'Q2 $5.XXM /10.50M' en vez de A/B propuestos)",
+        "Q3_meses_sin_datos": "OPCIÓN A — no se dibuja punto en meses sin datos en NINGUNA serie. Polilínea conecta solo puntos válidos. Si solo 1 mes con datos → solo dots (sin línea). Footer informativo 'X meses sin datos (piloto reciente)'"
+      },
+      "implementacion": [
+        "computeTrend6m() loop por quotesCache, agrupa por YYYY-MM (mes actual + 5 anteriores). cot por fCre, ven por fVen, rec por suma de pagos",
+        "renderTrend6m() genera SVG dinámico 600×200 con grid, eje Y nice ceil (1/2/5/10), eje X meses abrev (mes actual fill #21252f bold), polilíneas + dots, línea vertical punteada en mes actual",
+        "_trendNiceCeil(max) redondea max a múltiplo bonito (1,2,5,10) × exp10",
+        "_trendFmt(n) formato '$X.XXM'",
+        "Empty state si dataValid.length===0",
+        "Llamado en renderDashboard antes de renderReporteConversion (solo si range&&inRange)"
+      ],
+      "snapshots": ["_legacy/{index,app-dashboard}.v70a-pre/postBLOQUE-D-1-5.bak.*"]
+    },
+
+    "D1_3_zona_lo_que_pasa_hoy": {
+      "estado": "CERRADO",
+      "duracion_real": "~20min",
+      "decisiones_aplicadas": {
+        "Q1_estrategia_vs_urgente_3d": "OPCIÓN A — agregar 'Lo que pasa hoy' ARRIBA, dejar 'Operación urgente · próximos 3 días' intacta abajo. Doble exposición OK (lo nuevo es vista focalizada en hoy con todas las categorías; lo antiguo sigue mostrando próximos 3 días con chip 'Producido' inline). Pendiente E: evaluar si limpiar duplicación",
+        "Q2_cobros_vencidos": "OPCIÓN B — saldoPendiente>0 con fechaEntrega < hoy-7 días. Heurística simple (no existe fechaPactadaPago). 7 días = gracia operativa razonable",
+        "Q3_tareas": "OPCIÓN A — NO mostrar la categoría tareas (módulo no existe aún, mejor omitir que poner placeholder estático que ensucia). Cuando se construya v7.1 se incorpora real"
+      },
+      "implementacion": [
+        "computeTodayZone() → 3 categorías reales: cobros vencidos (urgency 0, sortKey=días desc), producir hoy (urgency 1, sortKey=hora asc), entregar hoy (urgency 2, sortKey=hora asc). Producir = pedido/aprobada con !q.produced. Entregar = en_produccion. Sin solapamiento",
+        "renderTodayZone() → contador 'X items · Y vencidos', empty state 'Nada urgente hoy ✓', items con barra lateral color (rojo/naranja), when, type-tag (COBRO/PRODUCCIÓN/ENTREGA), title, sub, monto, chevron",
+        "Markup <section class='today-zone'> arriba de '.dash-urgent-title'",
+        "CSS '.today-zone' + '.today-pulse' (animación pulse), variantes vencido/hoy",
+        "Llamado en renderDashboard antes de renderUrgent3d"
+      ],
+      "snapshots": ["_legacy/{index,app-dashboard}.v70a-pre/postBLOQUE-D-1-3.bak.*"]
+    },
+
+    "D1_7_verificacion_y_fixes_finales": {
+      "estado": "CERRADO",
+      "duracion_real": "~10min",
+      "fixes_aplicados": [
+        "MOBILE FIX (regresión D1.1): .dash-head-v7 partía el sub palabra a palabra en móvil porque .dash-period (5 botones) tomaba la mayoría del ancho. Solución: @media (max-width:1023px){.dash-head-v7{flex-direction:column;align-items:stretch;gap:12px}.dash-head-v7 .dash-period{align-self:flex-start;flex-wrap:wrap}}",
+        "SALUDO POR EMAIL: agregado mapa NOMBRE_POR_EMAIL en renderDashHead() de app-dashboard.js para identificar miembros del equipo: juanpanadrade2005@gmail.com → Juan Pablo · kathy.matuk@gmail.com → Kathy · luisrandrade@gmail.com → Luis R. Si email no está en el mapa, fallback a displayName / split del email"
+      ],
+      "memoria_actualizada": [
+        "user_equipo.md (nuevo) — equipo Gourmet Bites + regla: si aparece email nuevo, preguntar a Luis cómo saludarlo (no inferir del split del email)",
+        "MEMORY.md ampliado con entry"
+      ],
+      "snapshot_final_D1_completo": ["_legacy/{index,app-dashboard}.v70a-postBLOQUE-D-1.bak.*"]
+    },
+
+    "D6_fab_crear_bottom_sheet": {
+      "estado": "CERRADO",
+      "duracion_real": "~25min",
+      "decisiones_aplicadas": {
+        "Q1_movil_o_desktop": "Inicialmente Luis dijo B (móvil + desktop). Después de probar y ver que en desktop no quedaba bien (handoff original ya proponía A — desktop usa botón 'Crear' en sidebar v7.1), CONFIRMÓ A — solo móvil. Aplicado @media (min-width:1024px){.m-fab,.sheet,.sheet-backdrop{display:none!important}}",
+        "Q2_visibilidad": "OPCIÓN A — siempre visible en cualquier modo (consistencia móvil)",
+        "Q3_items": "OPCIÓN A — los 6 items del wireframe (2 reales + 4 SOON con badge PRONTO + toast)"
+      },
+      "implementacion": [
+        "Bloque CSS nuevo style#gb-shell-v7-fab insertado antes de los <script> de la app",
+        "Markup: <button class='m-fab'> + <div class='sheet-backdrop'> + <div class='sheet'> con 6 items en 3 grupos (Ventas / Operaciones y compras / Otros)",
+        "JS inline IIFE: openSheet/closeSheet, ESC cierra, click backdrop cierra, click item cierra y ejecuta acción con setTimeout 200ms (espera animación)",
+        "Acciones: data-action='cot' → setMode('cot'), data-action='prop' → setMode('prop'), data-action='soon' → soonToast('Próximamente · v7.1')",
+        "Padding-bottom global 84px en móvil para que FAB no tape contenido al final del scroll",
+        "@media (min-width:768px) {sheet} muestra como popup esquina (420px ancho con border-radius completo) en tablet/desktop, pero @media ≥1024px lo oculta totalmente"
+      ],
+      "snapshots": ["_legacy/index.v70a-pre/postBLOQUE-D-6.bak.html"],
+      "deuda_tecnica_v7_1": "FAB desktop con botón 'Crear' en sidebar (donde está la sección create del wireframe). El CSS del sheet en tablet/desktop quedó preparado por si se quiere extender, pero hoy oculto por display:none con !important"
+    }
+  },
+
+  "subfases_D_ya_cerradas_sesion_anterior": {
+    "D1_1_dash_head_v7": "✅ — Dash head con saludo dinámico + period switch ampliado (Hoy/Semana/Mes/Año/Todo)",
+    "D2_migracion_variables_CSS": "✅ — 17 variables legacy → tokens v7 (466 ocurrencias)",
+    "D3_tipografia_inter_fraunces": "✅ — Inter body + Fraunces display en pantalla; PDFs intactos",
+    "D4_max_width_responsive": "✅ — Desktop 1280px / Móvil 600px",
+    "D5_reagrupacion_sidebar": "✅ — 6 módulos + 22 submódulos con shim SUB_TO_LEGACY",
+    "D7_crumb_dinamico": "✅ — Crumb estructurado con módulo·sep·submódulo",
+    "D8_header_movil_slim": "✅ — Header móvil 48px"
+  },
+
+  "estado_archivos_post_bloque_D": {
+    "index.html": "Tamaño ~249KB. Contiene 4 bloques style id'd: gb-shell-v7 (cascarón A INTOCADO), gb-shell-v7-mobile (B), gb-shell-v7-nav (D5+D7), gb-shell-v7-mobile-header (D8), gb-shell-v7-fab (D6 NUEVO).",
+    "app-dashboard.js": "Tamaño ~160KB. Funciones nuevas D1: renderDashHead, getDashRangePrev, _deltaSpan, computeTrend6m, _trendFmt, _trendNiceCeil, renderTrend6m, computeTodayZone, renderTodayZone. Bug saveLastVisit en render arreglado.",
+    "otros_archivos_app_*": "INTACTOS — D1/D6 no tocó app-core, app-cotizar, app-propuesta, app-historial, app-seguimiento."
+  },
+
+  "deuda_tecnica_acumulada": [
+    "DT-D-01 (heredada) — Tab bar 'Productos | Cotización' con position: sticky queda flotando en el medio cuando se hace scroll en sección Condiciones. Pre-existente al Bloque D. Resolver en E o sesión dedicada.",
+    "DT-D-02 (heredada del parcial) — renderCalendar debe sincronizar deltas, no recrear desde cero (post-D1).",
+    "DT-D-03 (NUEVA) — Doble exposición de 'Imprimir hoja del día' (botón en zona Operación urgente + quick-action). Decisión consciente A/Q2 en D1.6 para cero riesgo. Evaluar limpieza en E.",
+    "DT-D-04 (NUEVA) — Doble exposición de items urgentes: 'Lo que pasa hoy' (D1.3) + 'Operación urgente · próximos 3 días' (preexistente). Evaluar en E si simplificar.",
+    "DT-D-05 (NUEVA) — D6 FAB desktop pendiente para v7.1: botón 'Crear' en sidebar nuevo (zona create del wireframe) con keyboard shortcut ⌘N.",
+    "DT-D-06 (NUEVA) — Categoría 'Tareas pendientes' omitida en D1.3 porque módulo Tareas no existe. Cuando se construya en v7.1, ampliar computeTodayZone().",
+    "DT-D-07 (NUEVA) — Cobros vencidos en D1.3 usan heurística saldo>0 + fechaEntrega < hoy-7d. Cuando se modele fechaPactadaPago, usar ese campo en lugar de la heurística.",
+    "DT-A-01 (heredada) — DM Sans + Cormorant siguen cargadas en Google Fonts pese a no usarse. Razón: jsPDF puede referenciarlas. Limpiar en v7.1 después de validar PDFs.",
+    "DT-B-01 (heredada) — style#gb-shell-v7-mobile sigue activo; D8 lo extiende. Si E necesita simplificar, consolidar mobile en un solo bloque CSS.",
+    "FIX-05 (heredado de C) — sigue en modo AUDIT — activar window.__GB_V7_ENFORCE_FSM=true después de 1-2 semanas de logs",
+    "FIX-01-Q9 (heredado de C) — sigue sin job retroactivo — reconciliación orgánica al abrir cada doc viejo"
+  ],
+
+  "snapshots_creados_esta_sesion": [
+    "_legacy/index.v70a-preBLOQUE-D-1-2.bak.html / app-dashboard.v70a-preBLOQUE-D-1-2.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-1-2.bak.html / app-dashboard.v70a-postBLOQUE-D-1-2.bak.js",
+    "_legacy/index.v70a-preBLOQUE-D-1-6.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-1-6.bak.html",
+    "_legacy/index.v70a-preBLOQUE-D-1-4.bak.html / app-dashboard.v70a-preBLOQUE-D-1-4.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-1-4.bak.html / app-dashboard.v70a-postBLOQUE-D-1-4.bak.js",
+    "_legacy/index.v70a-preBLOQUE-D-1-5.bak.html / app-dashboard.v70a-preBLOQUE-D-1-5.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-1-5.bak.html / app-dashboard.v70a-postBLOQUE-D-1-5.bak.js",
+    "_legacy/index.v70a-preBLOQUE-D-1-3.bak.html / app-dashboard.v70a-preBLOQUE-D-1-3.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-1-3.bak.html / app-dashboard.v70a-postBLOQUE-D-1-3.bak.js",
+    "_legacy/index.v70a-postBLOQUE-D-1.bak.html / app-dashboard.v70a-postBLOQUE-D-1.bak.js (snapshot final D1 entero, incluye fixes D1.7)",
+    "_legacy/index.v70a-preBLOQUE-D-6.bak.html",
+    "_legacy/index.v70a-postBLOQUE-D-6.bak.html"
+  ],
+
+  "ambiente": {
+    "primary_working_directory": "C:\\Proyectos\\gourmet-bites-v7",
+    "es_git_repo": false,
+    "platform": "win32",
+    "snapshots_path": "_legacy/",
+    "rollback_estados_clave": {
+      "fin_Bloque_A":  "_legacy/index.v70a-postA.bak.html",
+      "fin_Bloque_B":  "_legacy/index.v70a-postBLOQUE-B.bak.html",
+      "fin_Bloque_C":  "(archivos en raíz al 2026-04-26 17:30, snapshots app-*.v70a-postFIX-*)",
+      "fin_D1_completo": "_legacy/index.v70a-postBLOQUE-D-1.bak.html / app-dashboard.v70a-postBLOQUE-D-1.bak.js",
+      "fin_D6_actual":   "_legacy/index.v70a-postBLOQUE-D-6.bak.html (estado vivo del proyecto)"
+    }
+  },
+
+  "bloque_E_propuesto": {
+    "objetivo": "Cierre v7.0-α: limpieza, regression test integral, documentación final, decidir activación de FSM enforce, evaluar deudas técnicas D-03 a D-07, preparar para piloto productivo.",
+    "horas_estimadas": "4-6h",
+    "tareas_propuestas": [
+      "E1 — Regression test integral en navegador (desktop + móvil): los 6 modos (dash/cot/prop/hist/seg/cal) + flow completo de cotización → propuesta → pedido → entrega → pago. 1-1.5h",
+      "E2 — Decidir activar window.__GB_V7_ENFORCE_FSM=true (FIX-05). Recopilar logs de los últimos días para validar que no hay cases de FSM violation pendientes. 30min",
+      "E3 — Evaluar deudas DT-D-03 (Imprimir hoja duplicado) y DT-D-04 (Lo que pasa hoy vs Op. urgente 3d). Decidir si limpiar ahora o dejar para v7.1. 30min",
+      "E4 — Limpieza CSS: identificar selectors v6.4 ya no referenciados, decidir si eliminar o dejar. Ej. .dash-banner-novedades viejo (renombrado a .news-banner). 30min-1h",
+      "E5 — Cleanup Google Fonts (DT-A-01): si jsPDF no las necesita, quitar DM Sans + Cormorant del <link>. Validar PDFs primero. 30min",
+      "E6 — Documentar release notes v7.0-α (cambios desde v6.4) y comunicar a Kathy + Juan Pablo. 30min",
+      "E7 — Backup Firestore final pre-piloto + bump de versión a v7.0-α-rc1 en index.html. 15min",
+      "E8 — Sign-off de Luis y mover de 'alpha' a 'producción' (cambiar copy 'v7.0.0-α' → 'v7.0.0' o similar). 15min"
+    ],
+    "decisiones_pendientes_a_resolver_en_E": [
+      "¿Activar enforce FSM ahora o esperar más logs?",
+      "¿Limpiar duplicaciones D-03/D-04 ahora o dejar para v7.1?",
+      "¿Cleanup Google Fonts viejos ahora o esperar v7.1?",
+      "¿v7.0-α se considera producción tras E o necesita una fase 'beta' adicional?"
+    ]
+  },
+
+  "memoria_persistente_actualizada": {
+    "MEMORY_md_path": "C:\\Users\\Luis Andrade\\.claude\\projects\\C--Proyectos-gourmet-bites-v7\\memory\\MEMORY.md",
+    "entries_actuales": [
+      "feedback_recomendacion_explicita.md — entregar siempre recomendación explícita en cada pregunta",
+      "project_dt_d_02_agenda_sync.md — DT-D-02 Agenda sync incremental",
+      "user_equipo.md — Equipo Gourmet Bites: Luis R, Kathy, Juan Pablo. Si email nuevo: preguntar cómo saludar"
+    ]
+  },
+
+  "instrucciones_para_proxima_sesion_bloque_E": {
+    "lectura_obligatoria_en_orden": [
+      "1. Plan_de_accion_v7_0_alpha_bloqueD_completado.json (este documento — handoff de cierre Bloque D)",
+      "2. Plan_de_accion_v7_0_alpha_bloqueD_parcial.json (handoff parcial de la sesión previa, contexto histórico)",
+      "3. Plan_de_accion_v7_0_alpha_bloqueB_completado.json (cierre B)",
+      "4. Plan_de_accion_v7_0_alpha_bloqueC_completado.json (cierre C)",
+      "5. Plan_de_accion_v7_0_alpha_bloqueA_completado.json (cierre A — para entender el cascarón visual)",
+      "6. Estado actual de index.html y app-dashboard.js (los snapshots post-D6 son lo vivo)"
+    ],
+    "primer_paso_proxima_sesion": "Confirmar con Luis cuál sub-fase E arrancar primero. Mi recomendación: E1 (regression test integral) porque valida que las 8 subfases de D no rompieron nada antes de meter cambios de cierre. Si encuentra issues → micro-fixes; si no → arrancar E2-E8 en orden",
+    "reglas_persistentes": [
+      "No tocar cascarón visual del Bloque A (style#gb-shell-v7 + aside.gb-shell-sidebar)",
+      "Los bloques style#gb-shell-v7-mobile (B), style#gb-shell-v7-nav (D5+D7), style#gb-shell-v7-mobile-header (D8), style#gb-shell-v7-fab (D6) SÍ pueden ajustarse si E lo requiere — pero con cuidado",
+      "Snapshot intermedio en _legacy/ antes de cada subfase (formato app-X.v70a-pre/postBLOQUE-E-N.bak)",
+      "Verificación en navegador con datos reales antes de cerrar fase",
+      "Sin feature flags (solo window.__GB_V7_DEBUG y window.__GB_V7_ENFORCE_FSM ya existentes)",
+      "Una tarea a la vez, plan antes de código, pedir confirmación",
+      "Backup Firestore: Backups/gourmet-bites-backup-2026-04-26-ANTES-DE-FIX.json"
+    ],
+    "feedback_persistente_de_Luis": [
+      "SIEMPRE entregar recomendación explícita en cada pregunta (incluyendo binarias yes/no). Cerrar con 'Mi recomendación: X porque Y'.",
+      "Si aparece email nuevo en el equipo: preguntar a Luis cómo saludarlo en la app (no inferir del split del email). NOMBRE_POR_EMAIL map en renderDashHead.",
+      "Equipo actual: Luis R (luisrandrade@gmail.com) · Kathy (kathy.matuk@gmail.com) · Juan Pablo (juanpanadrade2005@gmail.com)."
+    ]
+  },
+
+  "estado_general": "Bloque D v7.0-α al 100%. Dashboard completamente rediseñado v7 (saludo dinámico + period switch ampliado + banner novedades delta real + 5 KPIs con Δ% honesto + Tendencia 6m SVG + Lo que pasa hoy + Accesos rápidos), FAB Crear bottom-sheet en móvil. Cascarón A intacto, setMode interno intacto, drawer móvil B operativo, todos los modos legacy operativos. Próximo paso: Bloque E (cierre, 4-6h) en sesión nueva."
+}

@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF — Bloque E sub-fase E1 + E1.1 COMPLETADAS. Listo para arrancar E2 (FSM enforce) o continuar con E3-E8 según decisión de Luis.",
+    "version": "v7.0-α / Bloque E parcial (E1 + E1.1 cerradas)",
+    "fecha": "2026-04-26 noche (sesión continuación de bloqueD_completado)",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade",
+    "documento_padre": "Plan_de_accion_v7_0_alpha_bloqueD_completado.json",
+    "proposito": "Cerrar E1 (smoke test integral desktop + móvil) y documentar E1.1 (subfase emergente: fix conceptual del FSM pedido vs en_producción). Permitir arrancar E2 en sesión nueva sin reconstruir contexto."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion_original": "32-38h en 5 bloques",
+    "horas_consumidas_acumuladas_aprox": "~25-29h (A + B + C + D + E1 + E1.1)",
+    "bloques": {
+      "A_cascaron_visual":      { "estado": "COMPLETADO 2026-04-26" },
+      "B_navegacion":           { "estado": "COMPLETADO 2026-04-26" },
+      "C_5_fixes_operativos":   { "estado": "COMPLETADO 2026-04-26" },
+      "D_dashboard_y_nav":      { "estado": "COMPLETADO 2026-04-26" },
+      "E_cierre":               { "estado": "EN CURSO — E1 + E1.1 cerradas, faltan E2-E8", "horas_consumidas": "~2h", "horas_restantes_estimadas": "3-4h" }
+    }
+  },
+
+  "subfases_E_cerradas_esta_sesion": {
+
+    "E1_smoke_test_integral": {
+      "estado": "CERRADO 2026-04-26",
+      "duracion_real": "~30min (formato liviano elegido por Luis)",
+      "alcance": "Smoke test de los 6 modos × desktop+móvil. Sin flow comercial completo (formato pleno se diferiría a sesión productiva real).",
+      "verificacion_desktop": {
+        "dash": "✓ saludo dinámico (NOMBRE_POR_EMAIL → 'Buenas noches, Luis R.'), period switch (Mes activo), banner novedades anchor 19-abr, Pipeline 3 cards, 5 KPIs, Lo que pasa hoy 1 item, Op. urgente 3d, Accesos rápidos. Tendencia 6m SVG perfecto (NOV→ABR, $20M nice ceil, footer '5 meses sin datos'). Conversión del período 71% (15/21). Pérdidas vacío. Vista por cliente. Otros operativos + Opciones avanzadas colapsables.",
+        "cot": "✓ Nueva cotización banner verde, tabs Datos/Productos/Cotización, mini-stats arriba, form completo. Crumb 'Ventas · Nueva cotización'.",
+        "prop": "✓ Nueva propuesta banner azul, sección Propuesta Evento + Datos del Evento. Crumb 'Ventas · Nueva propuesta'.",
+        "hist": "✓ 5 chips status con conteos (Vivas 6 / Pedidos 4 / Ventas 11 / Perdidas 0 / Anuladas 5), sub-tabs por tipo, lista con badges y acciones. Crumb 'Ventas · Histórico comercial'.",
+        "seg": "✓ Tareas y follow-ups / Seguimiento Comercial. 5 chips status (Todos 6 / Alertas>7d 0 / Pendientes 1 / Contactados 0 / Activas 5), 2 grupos (Sin contactar / Negociación activa), acciones WhatsApp/Llamar/Contactado/Activa/Perdida/Nota/Abrir.",
+        "cal_semana": "✓ Navegación ←→Hoy, evento Ximena 29-abr con badges En producción/Anticipo 50%/Producido + monto.",
+        "cal_mes": "✓ Grid mensual con pills de eventos (Carolina, Mona, Adriana, Ximena, etc.).",
+        "modal_KPI_pedidos_confirmados": "✓ Total $1.434.500 · 3 docs · 3 clientes, sort Monto/Antigüedad."
+      },
+      "verificacion_movil": "✓ Confirmado por Luis sin screenshots ('ok movil'). Header slim 48px, hamburguesa ☰ blanca, drawer slide-in, backdrop, FAB Crear, bottom-sheet 6 items.",
+      "hallazgos_no_bloqueantes": [
+        "Δ% '— vs mes anterior' en 4 KPIs es comportamiento correcto (D1.4-Q3): marzo 2026 vacío porque piloto arrancó 11-abr-2026. Observación UX para v7.1: cambiar copy a 'sin datos comparables aún'. NO se agrega como deuda formal.",
+        "DT-D-08 NUEVA (cosmético): SVG Tendencia 6m renderiza labels eje Y con font 'mono raro' (probablemente Inter tabular-nums heredado). Pulir en E4 si Luis quiere.",
+        "Versión sigue diciendo 'v6.4.0' arriba — esperado, se actualiza en E7/E8."
+      ]
+    },
+
+    "E1_1_fix_conceptual_FSM_pedido_vs_produccion": {
+      "estado": "CERRADO 2026-04-26",
+      "origen": "Hallazgo de Luis durante E1: 'hay un error conceptual al volverlo pedido inmediatamente dice en producción lo cual no es lógico'. Pre-existente al Bloque D, no es regresión. El nuevo dashboard lo hizo más visible.",
+      "duracion_real": "~50min (discovery 10min + decisiones 10min + código 15min + migración 10min + verificación 5min)",
+      "diagnostico_real": {
+        "FSM_actual_pre_E1_1": [
+          "submitMarkAsOrder (app-historial.js:704): const initialStatus=(productionDate<=todayIso)?'en_produccion':'pedido'; → si productionDate (default entrega-1d) es hoy/pasada, arrancaba directo en en_produccion.",
+          "autoTransitionToEnProduccion (app-core.js:1176-1204): cron implícito en cada loadAllHistory que promovía 'pedido con productionDate≤hoy → en_produccion' silenciosamente."
+        ],
+        "consecuencia": "Dashboard mostraba '3 pedidos en producción' cuando ninguno estaba realmente en cocina. El KPI 'Por producir' se llenaba solo, mintiendo a Kathy/JP."
+      },
+      "decisiones_aplicadas": {
+        "Q1_ubicacion_boton": "OPCIÓN A — Card historial junto a 'Marcar producido' y 'Marcar entregado'. Misma capa visual que las otras acciones del lifecycle.",
+        "Q2_migracion_3_docs": "OPCIÓN B — preguntar 1×1. Resultado: Luis confirmó los 3 a 'pedido + produced=false' (ninguno realmente producido).",
+        "Q3_cron_autoTransition": "OPCIÓN B — mantener solo rama 'aprobada → en_produccion' (limbo de propuestas). Eliminar rama 'pedido' (era la que causaba el problema).",
+        "Q4_boton_revertir_produccion": "OPCIÓN B — NO agregar reverso. Si hay incidente real, se agrega después (mismo patrón que FIX-03 nació de incidente real).",
+        "Q5_feedback": "OPCIÓN B — toast + actualización inline (renderHist + renderDashboard si dash activo).",
+        "Q6_notificar_Kathy": "NO — feature v7.1 cuando exista módulo Tareas/notificaciones."
+      },
+      "implementacion": [
+        "Cambio 1 — app-historial.js:704: const initialStatus='pedido'; (ternario eliminado, comment E1.1 explicando)",
+        "Cambio 2 — app-core.js:1180: candidatos = list.filter(q => q.status==='aprobada' && q.eventDate && q.eventDate<=todayIso); (rama 'pedido' eliminada, comment E1.1)",
+        "Cambio 3 — app-historial.js:418 (quotes) y :444 (proposals): botón nuevo '🔥 Iniciar producción' con style inline naranja (background:#FFF3E0; color:#E65100; border-color:#FFB74D). Visible solo si status==='pedido'/'aprobada' y !q.produced.",
+        "Cambio 4 — app-historial.js:1163: handler nuevo markAsInProduction(docId, kind, ev) con auditTransition (FSM ya permite pedido→en_produccion), updateDoc atómico, sync local quotesCache, toast '🔥 Producción iniciada', renderHist + renderDashboard.",
+        "Cambio 5 (mini-fix copy emergente) — app-dashboard.js:745 y :2185: '🔪 Producido' (botón CTA) → '🔪 Marcar producido'. '🔪 Producido' (span estado) → '✓ Producido'. Resuelve confusión UX preexistente: mismo texto se usaba para 'click acá' y 'ya hecho'."
+      ],
+      "migracion_realizada": {
+        "snippet_corrido_en_consola": "await Promise.all([ updateDoc(doc(db,'quotes','GB-2026-0123'),{status:'pedido',produced:false,producedAt:deleteField(),updatedAt:serverTimestamp()}), updateDoc(doc(db,'quotes','GB-2026-0127'),{status:'pedido',produced:false,producedAt:deleteField(),updatedAt:serverTimestamp()}) ]); location.reload();",
+        "docs_afectados": [
+          "GB-2026-0123 (Luz Miryam Sánchez) — secuela de test FIX-03 → bajado a pedido + produced=false",
+          "GB-2026-0127 (Ximena Corso) — produced=true por error → reseteado a pedido + produced=false. Badge 'Producido' en dash desapareció correctamente",
+          "GB-2026-0121 (Sergio Ibarnegaray) — NO migrado, ya estaba en pedido"
+        ]
+      },
+      "verificacion_navegador": [
+        "✓ Ximena en 'Por producir' ahora dice '🔪 Marcar producido' (botón CTA naranja) en vez del ambiguo '🔪 Producido'",
+        "✓ Botón '🔥 Iniciar producción' aparece en card de Sergio (status pedido)",
+        "✓ Click en botón disparó log [FIX-05] transición OK {from:'pedido', to:'en_produccion', context:'markAsInProduction GB-2026-0121'}",
+        "✓ Sergio quedó en pedido al final (Luis revertió o no commit, irrelevante — funcionalidad demostrada)",
+        "✓ Sin errores nuevos en consola (Uncaught SyntaxError 'transición' es secuela de pseudocódigo pegado en pasos previos, no del código real)"
+      ],
+      "snapshots": [
+        "_legacy/app-historial.v70a-preBLOQUE-E-1-1.bak.js (118KB)",
+        "_legacy/app-core.v70a-preBLOQUE-E-1-1.bak.js (144KB)",
+        "_legacy/app-historial.v70a-postBLOQUE-E-1-1.bak.js (120KB)",
+        "_legacy/app-core.v70a-postBLOQUE-E-1-1.bak.js (144KB)",
+        "_legacy/app-dashboard.v70a-postBLOQUE-E-1-1.bak.js (160KB) — incluye fix copy"
+      ]
+    }
+  },
+
+  "estado_archivos_post_E1_1": {
+    "app-historial.js": "120KB. Funciones nuevas/modificadas: markAsInProduction (nueva, ~20 líneas antes de toggleProduced), submitMarkAsOrder (initialStatus simplificado), render de cards historial (botón 🔥 Iniciar producción agregado en 2 ramas: quotes y proposals).",
+    "app-core.js": "144KB. autoTransitionToEnProduccion (1176-1186) simplificado: solo procesa rama 'aprobada'. Resto intacto.",
+    "app-dashboard.js": "160KB. Líneas 745 y 2184-2186: copy clarificado 'Marcar producido' (CTA) vs '✓ Producido' (estado). Sin cambios estructurales.",
+    "index.html": "Sin cambios en E1/E1.1. Sigue ~249KB.",
+    "otros_app_*": "INTACTOS — E1.1 no tocó app-cotizar, app-propuesta, app-seguimiento, app-assets."
+  },
+
+  "deuda_tecnica_acumulada_actualizada": [
+    "DT-D-01 (heredada) — Tab bar 'Productos | Cotización' sticky flota en sección Condiciones. Pre-existente.",
+    "DT-D-02 (heredada) — renderCalendar debe sincronizar deltas, no recrear desde cero.",
+    "DT-D-03 (heredada) — Doble exposición 'Imprimir hoja del día' (botón + quick-action). Evaluar en E3.",
+    "DT-D-04 (heredada) — Doble exposición items urgentes 'Lo que pasa hoy' vs 'Op. urgente 3d'. Evaluar en E3.",
+    "DT-D-05 (heredada) — D6 FAB desktop pendiente para v7.1 (botón Crear sidebar + ⌘N).",
+    "DT-D-06 (heredada) — Categoría 'Tareas pendientes' omitida en D1.3 hasta v7.1.",
+    "DT-D-07 (heredada) — Cobros vencidos heurística saldo>0 + fechaEntrega<hoy-7d. Cuando exista fechaPactadaPago, usar campo real.",
+    "DT-D-08 (NUEVA E1) — SVG Tendencia 6m: labels eje Y con font 'mono raro'. Cosmético, pulir en E4.",
+    "DT-E-01 (NUEVA E1.1, post-mortem) — Cuando se construya v7.1, considerar feature 'notificar a Kathy cuando se inicia producción' (push/WhatsApp/email). Hoy markAsInProduction solo da feedback al que clickea.",
+    "DT-E-02 (NUEVA E1.1, post-mortem) — UX: el copy '— vs mes anterior' aparece en KPIs cuando el período previo está vacío (caso piloto reciente). Considerar cambiar a 'sin datos comparables aún' para no sugerir que falló algo.",
+    "DT-A-01 (heredada) — DM Sans + Cormorant siguen cargadas en Google Fonts. Limpiar en E5 si jsPDF no las necesita.",
+    "DT-B-01 (heredada) — style#gb-shell-v7-mobile activo, D8 lo extiende. Consolidar mobile en E si se requiere.",
+    "FIX-05 (heredado de C) — sigue en modo AUDIT. Activar window.__GB_V7_ENFORCE_FSM=true en E2 después de revisar logs.",
+    "FIX-01-Q9 (heredado de C) — sigue sin job retroactivo — reconciliación orgánica al abrir cada doc viejo."
+  ],
+
+  "subfases_E_pendientes": {
+    "E2_decidir_FSM_enforce": {
+      "horas": "30min",
+      "tarea": "Recopilar logs [FIX-05] de los últimos días (incluyendo el de markAsInProduction recién agregado). Si no hay 'transición sospechosa' en los últimos N días, activar window.__GB_V7_ENFORCE_FSM=true en index.html. STATE_TRANSITIONS ya cubre la nueva ruta pedido→en_produccion vía markAsInProduction.",
+      "consideracion": "markAsInProduction agregado en E1.1 ya pasa por auditTransition. STATE_TRANSITIONS de FIX-05 incluye 'pedido': ['en_produccion','entregado','anulada'], así que enforce no bloqueará la transición nueva."
+    },
+    "E3_evaluar_DT_D_03_y_D_04": {
+      "horas": "30min",
+      "tarea": "Decidir si limpiar las 2 dobles exposiciones (Imprimir hoja, Lo que pasa hoy vs Op. urgente 3d) o diferir a v7.1.",
+      "recomendacion_para_proxima_sesion": "Mantener 'Lo que pasa hoy' como vista focalizada (hoy + vencidos), achicar 'Op. urgente 3d' a solo días siguientes (excluir hoy para no duplicar). 'Imprimir hoja' es seguro dejar duplicado."
+    },
+    "E4_limpieza_CSS_y_DT_D_08": {
+      "horas": "30min-1h",
+      "tarea": "Identificar selectors v6.4 sin referencia. Pulir font del SVG Tendencia 6m (DT-D-08)."
+    },
+    "E5_cleanup_Google_Fonts": {
+      "horas": "30min",
+      "tarea": "Validar PDFs sin DM Sans/Cormorant. Si OK, quitar del <link>."
+    },
+    "E6_release_notes": {
+      "horas": "30min",
+      "tarea": "Documentar cambios desde v6.4. Comunicar a Kathy + JP."
+    },
+    "E7_backup_y_bump_version": {
+      "horas": "15min",
+      "tarea": "Backup Firestore final. Bump 'v6.4.0' → 'v7.0.0-α-rc1' en index.html."
+    },
+    "E8_signoff_y_produccion": {
+      "horas": "15min",
+      "tarea": "Decisión Luis: ¿v7.0-α va a producción tras E o necesita beta?"
+    }
+  },
+
+  "ambiente": {
+    "primary_working_directory": "C:\\Proyectos\\gourmet-bites-v7",
+    "es_git_repo": false,
+    "platform": "win32",
+    "snapshots_path": "_legacy/",
+    "rollback_estados_clave": {
+      "fin_Bloque_D":     "_legacy/{index,app-dashboard}.v70a-postBLOQUE-D-1.bak.* + _legacy/index.v70a-postBLOQUE-D-6.bak.html",
+      "pre_E1_1":         "_legacy/{app-historial,app-core}.v70a-preBLOQUE-E-1-1.bak.js",
+      "fin_E1_1_actual":  "_legacy/{app-historial,app-core,app-dashboard}.v70a-postBLOQUE-E-1-1.bak.js (estado vivo del proyecto)"
+    }
+  },
+
+  "instrucciones_para_proxima_sesion": {
+    "lectura_obligatoria_en_orden": [
+      "1. Plan_de_accion_v7_0_alpha_bloqueE_E1_completado.json (este documento)",
+      "2. Plan_de_accion_v7_0_alpha_bloqueD_completado.json (handoff Bloque D)",
+      "3. Plan_de_accion_v7_0_alpha_bloqueC_completado.json (5 fixes operativos, contexto FSM/FIX-05)",
+      "4. Estado actual: index.html, app-historial.js, app-core.js, app-dashboard.js. Vivos = post-E1.1."
+    ],
+    "primer_paso_proxima_sesion": "Confirmar con Luis si arrancar por E2 (decisión FSM enforce, 30min) o E3 (deudas D-03/D-04). Mi recomendación: E2 primero porque es decisión binaria rápida y deja el sistema más blindado antes de tocar UI en E3+.",
+    "reglas_persistentes": [
+      "No tocar cascarón visual del Bloque A (style#gb-shell-v7 + aside.gb-shell-sidebar)",
+      "Bloques style#gb-shell-v7-{mobile,nav,mobile-header,fab} ajustables si se requiere",
+      "Snapshot pre/post cada subfase E-N en _legacy/ (formato app-X.v70a-pre/postBLOQUE-E-N.bak)",
+      "Verificación en navegador con datos reales antes de cerrar fase",
+      "Una tarea a la vez, plan antes de código, pedir confirmación",
+      "SIEMPRE entregar recomendación explícita en cada pregunta",
+      "Equipo: Luis R, Kathy, Juan Pablo. Email nuevo → preguntar cómo saludar"
+    ]
+  },
+
+  "estado_general": "Bloque E al ~30%. E1 (smoke test) + E1.1 (fix conceptual FSM pedido vs producción) cerradas. Sistema operativo en estado correcto: ningún pedido falsamente en 'en_produccion', botón manual '🔥 Iniciar producción' funcionando, copy clarificado en banners 'Marcar producido' vs '✓ Producido'. FSM (FIX-05) sigue en modo audit pero con cobertura ampliada (markAsInProduction agregado). Próximo: E2-E8 (3-4h). Todas las decisiones registradas y reversibles vía snapshots."
+}

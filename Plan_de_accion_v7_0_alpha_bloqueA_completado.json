@@ -1,0 +1,139 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF — Cierre Bloque A (cascarón visual) v7.0-α",
+    "version": "v7.0-α / Bloque A completado",
+    "fecha": "2026-04-26",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade",
+    "documento_padre": "Plan_de_accion_v7_0_fase0_completada.json",
+    "proposito": "Documentar el cierre del Bloque A (cascarón visual) de Fase 1 v7.0-α y dejar listo el arranque de Bloque C (5 fixes operativos). Bloques B y D diferidos a después de C."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion": "32-38h en 5 bloques",
+    "bloques": {
+      "A_cascaron_visual":   { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "6-8h" },
+      "B_navegacion":        { "estado": "DIFERIDO post-C",        "horas_estimadas": "4-6h" },
+      "C_5_fixes_operativos":{ "estado": "PRÓXIMO — arrancar ya",  "horas_estimadas": "10-12h" },
+      "D_dashboard":         { "estado": "DIFERIDO post-C",        "horas_estimadas": "8-10h" },
+      "E_cierre":            { "estado": "PENDIENTE",              "horas_estimadas": "4-6h" }
+    },
+    "decisiones_cerradas": [
+      "Nombre módulo Inicio (no Hoy)",
+      "Pendientes de cobro en Ventas",
+      "Saltar Bloques 4-6 Fase 0 hasta antes de β",
+      "Sin feature flag (solo window.__GB_V7_DEBUG para logging)",
+      "Cerrar Bloque A antes de C; saltar B y D a después de C porque resuelven dolor menor"
+    ]
+  },
+
+  "bloque_A_completado": {
+    "objetivo": "Aplicar el cascarón visual del wireframe 02-inicio-dashboard sobre el HTML actual sin romper la lógica de v6.4.0. Estrategia CSS-only no invasiva (sin envolver contenido) para minimizar riesgo.",
+
+    "subtareas_completadas": {
+      "A1_tokens_en_raiz": {
+        "estado": "COMPLETADA",
+        "descripcion": "Copiado wireframes/gb-tokens.css → ./gb-tokens.css (raíz) y enlazado desde index.html línea 10 con <link rel=\"stylesheet\" href=\"gb-tokens.css\">.",
+        "archivos_tocados": ["gb-tokens.css (nuevo en raíz)", "index.html (link agregado)"],
+        "riesgo": "ninguno (tokens cargan pero no se aplican porque inline style gana en cascada)"
+      },
+      "A2_1_tipografias_no_op": {
+        "estado": "COMPLETADA (no-op intencional)",
+        "descripcion": "Inter+Fraunces ya cargados vía gb-tokens.css. DM Sans + Cormorant Garamond siguen ganando en body por la cascada inline. Sin cambio visual abrupto. La migración tipográfica completa se difiere a Bloque D (rediseño Dashboard) o más adelante."
+      },
+      "A2_2_sidebar_shell": {
+        "estado": "COMPLETADA Y VERIFICADA EN NAVEGADOR",
+        "descripcion": "Inyectado <style id=\"gb-shell-v7\"> + <aside class=\"gb-shell-sidebar\"> en index.html. Sidebar oscuro 248px fijo a la izquierda en desktop ≥1024px. Móvil <1024px conserva comportamiento original (sidebar oculto, .mode-bar visible).",
+        "componentes": [
+          "Sidebar 248/64px con persistencia de colapso en localStorage",
+          "Wordmark blanco arriba (brand/wordmark-blanco.png) + cuchillo en colapsado",
+          "7 items: Inicio, Cotización, Evento, Buscar, Historial, Seguimiento, Agenda",
+          "Items wired a setMode() existente",
+          "Cuenta + Colapsar abajo",
+          "Hook a setMode para marcar item activo",
+          "Log condicionado a window.__GB_V7_DEBUG"
+        ],
+        "verificado_navegador": [
+          "Sidebar visible y bien posicionado",
+          "Click en items navega correctamente entre módulos",
+          "Item activo se marca",
+          "Colapsar 248→64 funciona",
+          "Móvil <1024px sin sidebar (mode-bar reaparece)"
+        ],
+        "prefijo_clases": ".gb-shell-* (cero colisiones con clases v6.4.0 existentes)"
+      },
+      "A2_3_header_slim": {
+        "estado": "COMPLETADA Y VERIFICADA EN NAVEGADOR",
+        "descripcion": "En desktop ≥1024px, .hdr (110px gradient oscuro) override a 48px slim blanco con borde gris. Wordmark/brand/logout ocultos (ya están en sidebar).",
+        "componentes": [
+          ".hdr fondo --gb-surface, altura --gb-header-h (48px)",
+          "Build info a la derecha en gris suave (Cotizador · v6.4.0 · 2026-04-24)",
+          "Crumb dinámico a la izquierda en Fraunces 17px (muestra módulo activo)",
+          "Hook setMode actualiza crumb"
+        ],
+        "verificado_navegador": [
+          "Header delgado blanco con borde",
+          "Crumb 'Inicio'/'Historial'/etc. cambia correctamente",
+          "Build info alineado a la derecha",
+          "Logo grande del header viejo ya no se ve (solo en sidebar)"
+        ]
+      },
+      "A2_4_max_width_sec": {
+        "estado": "DIFERIDA — innecesaria por ahora",
+        "descripcion": "Quitar max-width: 600px de .sec para usar ancho completo del .main. Dashboard ya respira a ancho completo (no usa .sec). Historial/Cotización siguen con max-width 600. Se hará junto con Bloque D (rediseño Dashboard) o cuando se rediseñe cada módulo individualmente."
+      },
+      "A2_5_migrar_variables_color": {
+        "estado": "DIFERIDA — innecesaria por ahora",
+        "descripcion": "Migrar variables --bk/--dk/--mid/etc. (13 colores propios) a --gb-neutral-* (sistema gb-tokens). Trabajo de find/replace masivo (~600 líneas CSS inline + posibles referencias en JS). Se hará en sesión dedicada o en Bloque D."
+      }
+    },
+
+    "archivos_modificados": [
+      "index.html — agregadas ~110 líneas (style id=gb-shell-v7 + aside.gb-shell-sidebar + script de sincronización)",
+      "gb-tokens.css — nuevo en raíz, copia de wireframes/gb-tokens.css"
+    ],
+
+    "snapshots_creados": [
+      "_legacy/index.v640.bak.html (línea base v6.4.0)",
+      "_legacy/index.v70a-postA.bak.html (estado post-Bloque-A)",
+      "_legacy/gb-tokens.v70a-postA.bak.css (tokens al cierre de Bloque A)"
+    ],
+
+    "decisiones_arquitectonicas_clave": [
+      "Estrategia CSS-only (no wrap del DOM existente) — prefijo .gb-shell-* aísla por completo",
+      "Breakpoint 1024px: shell solo en desktop, móvil 100% intacto",
+      "No se removió ninguna clase/función v6.4.0 — solo overrides condicionales por media query",
+      "Persistencia de colapso en localStorage('gbShellCollapsed')",
+      "window.__GB_V7_DEBUG para logging (sin feature flag completo)"
+    ]
+  },
+
+  "deuda_tecnica_post_bloque_A": [
+    "A2.4: max-width 600px en .sec sigue activo en Cotización/Historial/Seguimiento/Agenda — limita aprovechamiento de ancho del .main",
+    "A2.5: dos sistemas de variables CSS coexisten (--bk/--dk vs --gb-*) — duplicación temporal aceptada",
+    "Tipografía: DM Sans + Cormorant siguen activos en body — Inter+Fraunces solo aplican en componentes nuevos del shell (sidebar + crumb)",
+    ".hdr-build mantiene texto v6.4.0 — actualizar a v7.0-α cuando se haga release oficial"
+  ],
+
+  "proximo_bloque_C": {
+    "nombre": "Bloque C — 5 fixes operativos con Opus 4.7",
+    "objetivo": "Resolver bugs operativos reportados en producción que afectan a Kathy/JP en el piloto. Tocan lógica de negocio (no UI).",
+    "horas_estimadas": "10-12h",
+    "fixes_5_confirmados_del_handoff_padre": [
+      "FIX-01-Q9 — Migración silenciosa de campos duplicados: unificar fechas en orderData (ver handoff padre línea 900)",
+      "FIX-02-GATE-ENTREGA — Gate entregar-sin-producir: bloquear en UI y lógica marcar entregado un pedido que no está producido (línea 914)",
+      "FIX-03-REVERTIR-ENTREGA — Botón Revertir entrega: deshacer un 'marcar como entregado'. CRÍTICO para arreglar GB-2026-0123/0122 desde la UI (línea 927)",
+      "FIX-04-CONFIRM-MULTI-PEDIDO — Confirmación 2+ pedidos del mismo cliente: diálogo con detalle. Origen: incidente Luz Miryam Sánchez (línea 939)",
+      "FIX-05-MAQUINA-ESTADOS — Máquina de estados estricta: grafo formal Cotización → Pedido → En producción → Entregado, validado en UI y lógica (línea 950)"
+    ],
+    "orden_prioridad_acordado_2026_04_26": [
+      "1º FIX-03 Botón Revertir entrega — desbloquea arreglar GB-2026-0123/0122",
+      "2º FIX-04 Confirmación multi-pedido — previene repetición incidente",
+      "3º FIX-02 Gate entregar-sin-producir — bloqueo defensivo",
+      "4º FIX-01-Q9 — limpieza de campos",
+      "5º FIX-05 Máquina de estados — formaliza el grafo (consolida los anteriores)"
+    ],
+    "estrategia": "Hacer fix por fix, verificar cada uno en navegador con datos reales, hacer snapshot intermedio en _legacy/ antes de pasar al siguiente"
+  },
+
+  "estado_general": "Bloque A v7.0-α COMPLETADO. Cascarón visual aplicado, módulos navegables vía sidebar nuevo, header slim funcional con breadcrumb dinámico. Sin regresiones detectadas. Listo para arrancar Bloque C en chat dedicado o continuando este."
+}

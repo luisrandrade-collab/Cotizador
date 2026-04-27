@@ -1,0 +1,167 @@
+{
+  "meta": {
+    "tipo_documento": "HANDOFF — Cierre Bloque B (navegación móvil) v7.0-α",
+    "version": "v7.0-α / Bloque B completado",
+    "fecha": "2026-04-26",
+    "autor_sesion": "Claude Opus 4.7 + Luis Andrade",
+    "documento_padre": "Plan_de_accion_v7_0_alpha_bloqueC_completado.json",
+    "documento_abuelo": "Plan_de_accion_v7_0_alpha_bloqueA_completado.json",
+    "documento_bisabuelo": "Plan_de_accion_v7_0_fase0_completada.json",
+    "proposito": "Documentar el cierre del Bloque B (navegación móvil) de Fase 1 v7.0-α y dejar listo el arranque del Bloque D (rediseño Dashboard) — único bloque pendiente antes del E (cierre)."
+  },
+
+  "plan_total_v7_0_alpha": {
+    "estimacion_original": "32-38h en 5 bloques",
+    "horas_consumidas_acumuladas": "~17-21h (A + C + B)",
+    "bloques": {
+      "A_cascaron_visual":      { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "6-8h" },
+      "B_navegacion":           { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "4-6h", "horas_reales": "~1h" },
+      "C_5_fixes_operativos":   { "estado": "COMPLETADO 2026-04-26", "horas_estimadas": "10-12h" },
+      "D_dashboard":            { "estado": "PRÓXIMO — arrancar siguiente sesión", "horas_estimadas": "8-10h" },
+      "E_cierre":               { "estado": "PENDIENTE",             "horas_estimadas": "4-6h" }
+    }
+  },
+
+  "bloque_B_completado": {
+    "objetivo": "Resolver UX-06 (severidad ALTA — tabs móvil truncados a 'DASHBO/COTIZA/HISTORI/SEGUIMI/AGENDA') extendiendo el cascarón A para que el sidebar oscuro funcione como drawer en móvil <1024px. Sin tocar style#gb-shell-v7 ni aside.gb-shell-sidebar del Bloque A.",
+
+    "decision_arquitectonica_clave": {
+      "ruta_elegida": "Ruta A — Reusar aside.gb-shell-sidebar con clase modificadora .gb-mobile-open",
+      "alternativa_descartada": "Ruta B — Drawer móvil con markup duplicado de los 7 items",
+      "razon": "Cero duplicación de items. Cambio futuro = 1 solo lugar. Regla 'no tocar cascarón A' respetada literalmente: se agregó un bloque CSS NUEVO (style#gb-shell-v7-mobile) en lugar de modificar el del Bloque A.",
+      "scope_diferido_a_D": [
+        "B3 — FAB Crear (botón flotante con atajos a Cotización/Propuesta/Compras): diferido a D porque no resuelve dolor activo, encaja mejor con el rediseño Dashboard",
+        "B4 — Crumb dinámico ampliado a módulo+submódulo: diferido a D porque hoy los items son 1:1 con setMode() (no existen submódulos hasta que D reagrupe por proceso de negocio)",
+        "Reagrupación por proceso de negocio (Inicio/Ventas/Operaciones/Compras/Clientes): trabajo de D porque toca setMode() y rompe deep links"
+      ]
+    },
+
+    "subfixes_implementados": {
+
+      "B1_DRAWER_MOVIL": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "objetivo": "El sidebar oscuro (≥1024px) reaparece como drawer slide-in en <1024px, accesible por hamburguesa.",
+        "archivos_modificados": ["index.html"],
+        "implementacion": [
+          "Bloque CSS nuevo <style id=\"gb-shell-v7-mobile\"> insertado después del cierre de style#gb-shell-v7 (cascarón A intacto)",
+          "@media (max-width: 1023px) override de .gb-shell-sidebar: display:flex !important, width:84%/max:320px, transform:translateX(-100%), transition slide 250ms",
+          ".gb-shell-sidebar.gb-mobile-open → translateX(0)",
+          "Override de [data-collapsed='true'] en móvil: fuerza wordmark visible, oculta cuchillo, fuerza labels visibles (evita que estado colapsado de desktop se herede al drawer)",
+          "Backdrop semi-transparente (#gb-shell-mobile-backdrop) con z-index 1050, opacity transition",
+          "Burger blanco (.gb-shell-mobile-burger) position:absolute top:8 left:8 dentro del .hdr v6.4.0 oscuro, font-size 24px, text-shadow para contraste",
+          "Close X (.gb-shell-mobile-close) position:fixed esquina superior del drawer cuando está abierto",
+          "Script nuevo: openDrawer/closeDrawer + ensureBackdrop/ensureCloseBtn/ensureBurger inyectados en DOMContentLoaded y window.load (defensa por si .hdr se altera)",
+          "Cierre por: click backdrop, click close X, click cualquier item del sidebar, tecla Esc, resize a desktop",
+          "body.gb-mobile-drawer-open → overflow:hidden (bloquea scroll mientras drawer abierto)",
+          "Logs condicionados a window.__GB_V7_DEBUG con prefijo [gb-shell-mobile]"
+        ],
+        "verificado_navegador": [
+          "Móvil 400px: hamburguesa ☰ blanca visible arriba-izquierda del header oscuro",
+          "Click en ☰ → drawer entra deslizando + backdrop oscuro aparece",
+          "Wordmark 'Gourmet Bites' + cuchillo blanco arriba (no el cuchillo solo aunque venía colapsado de desktop)",
+          "Item activo 'Inicio' marcado con barrita lateral morada",
+          "Click en item navega vía setMode() y cierra drawer",
+          "Click backdrop / X / Esc cierran drawer",
+          "Desktop ≥1024px: sin regresión — sidebar fijo, sin burger, sin backdrop, sin close X"
+        ],
+        "decision_diseno": [
+          "Burger inyectado por JS (no en HTML estático) para no tocar el HTML del .hdr y permitir re-injection en window.load por si algo lo borra",
+          "Close X como nodo hermano del aside (no hijo) → respeta literalmente la regla 'no tocar aside.gb-shell-sidebar'",
+          "wireSidebarItemClicks usa setTimeout(closeDrawer, 50) para que setMode() termine de pintar antes de animar el cierre"
+        ]
+      },
+
+      "B2_RETIRO_MODE_BAR_MOVIL": {
+        "estado": "COMPLETADO Y VERIFICADO",
+        "objetivo": "Cerrar UX-06 retirando los tabs viejos truncados en móvil. En desktop ya estaban ocultos por Bloque A.",
+        "archivos_modificados": ["index.html"],
+        "implementacion": [
+          "Una sola regla CSS añadida al @media (max-width: 1023px) del style#gb-shell-v7-mobile: .mode-bar { display: none !important; }"
+        ],
+        "decision_diseno": [
+          "HTML del <div class=\"mode-bar\"> y los 7 .mode-btn NO se borraron — solo display:none por CSS. Razón: rollback rápido si fuera necesario (basta quitar la regla)",
+          "JS que setea .act en .mode-btn sigue ejecutando — es no-op visual pero mantiene la cadena de setMode() intacta sin riesgo"
+        ],
+        "verificado_navegador": [
+          "Móvil 400px: del header v6.4.0 se pasa directo al contenido del módulo, sin la barra de tabs cortados",
+          "Desktop ≥1024px: sin cambio (mode-bar ya estaba oculto por Bloque A)"
+        ]
+      }
+    },
+
+    "snapshots_creados_bloque_B": [
+      "_legacy/index.v70a-preBLOQUE-B.bak.html",
+      "_legacy/index.v70a-postB1.bak.html",
+      "_legacy/index.v70a-postB2.bak.html",
+      "_legacy/index.v70a-postBLOQUE-B.bak.html"
+    ]
+  },
+
+  "deuda_tecnica_post_bloque_B": [
+    "Header v6.4.0 (.hdr con gradient oscuro + logo + 'Gourmet Bites' + 'BY ANDRADE MATUK' + build) sigue activo en móvil <1024px — el header slim del Bloque A solo aplica ≥1024px. Se rediseñará en Bloque D junto al Dashboard.",
+    "B3 (FAB Crear) diferido a D",
+    "B4 (crumb módulo+submódulo) diferido a D — hoy los items siguen 1:1 con setMode() v6.4.0",
+    "Reagrupación por proceso de negocio (Inicio/Ventas/Operaciones/Compras/Clientes/Herramientas según wireframe 01c-mapa-modulos) diferida a D — invasivo, toca setMode()",
+    "FIX-05 sigue en modo AUDIT — activar window.__GB_V7_ENFORCE_FSM=true después de 1-2 semanas de logs (heredado de C)",
+    "FIX-01-Q9 sigue sin job retroactivo — reconciliación orgánica al abrir cada doc viejo (heredado de C)",
+    "Deuda heredada de Bloque A (max-width 600px en .sec, dos sistemas de variables CSS, tipografía DM Sans + Cormorant) — sin cambios"
+  ],
+
+  "ambiente": {
+    "primary_working_directory": "C:\\Proyectos\\gourmet-bites-v7",
+    "es_git_repo": false,
+    "platform": "win32",
+    "snapshots_path": "_legacy/",
+    "rollback_estados_clave": {
+      "fin_Bloque_A": "_legacy/index.v70a-postA.bak.html",
+      "fin_Bloque_C": "(archivos en raíz al 2026-04-26 17:30, snapshots app-*.v70a-postFIX-*)",
+      "fin_Bloque_B": "_legacy/index.v70a-postBLOQUE-B.bak.html"
+    }
+  },
+
+  "proximo_bloque_D": {
+    "nombre": "Bloque D — Rediseño Dashboard + reagrupación navegación por proceso de negocio",
+    "objetivo": "Aplicar el rediseño completo del módulo Inicio/Dashboard según wireframe 02-inicio-dashboard, migrar variables --bk/--dk → --gb-neutral-*, activar tipografía Inter+Fraunces sobre body, eliminar max-width 600px de .sec, reagrupar los 7 items del sidebar en 5 módulos por proceso de negocio (Inicio/Ventas/Operaciones/Compras/Clientes/Herramientas) según wireframe 01c-mapa-modulos.",
+    "horas_estimadas": "8-10h",
+    "scope_propuesto": [
+      "D1 — Rediseño dashboard (KPIs, pipeline activo, métricas del período, operación urgente) sobre wireframe 02-inicio-dashboard",
+      "D2 — Migración variables CSS --bk/--dk/etc. → --gb-neutral-* (find/replace masivo coordinado)",
+      "D3 — Activar tipografía Inter (body) + Fraunces (display) global",
+      "D4 — Quitar max-width: 600px de .sec",
+      "D5 — Reagrupar sidebar items en 5 módulos por proceso de negocio (toca setMode() — preservar deep links existentes)",
+      "D6 — FAB Crear con bottom-sheet (diferido de B3)",
+      "D7 — Crumb dinámico ampliado a módulo+submódulo (diferido de B4)",
+      "D8 — Header v6.4.0 reemplazado en móvil por header slim equivalente al desktop"
+    ],
+    "riesgos_a_mitigar": [
+      "D2 (migración variables) y D5 (reagrupación setMode) son los más invasivos — snapshot intermedio entre cada uno",
+      "D8 toca .hdr — verificar que no rompa el header desktop ni el burger inyectado de B1",
+      "Verificar todos los modos (cot, prop, search, hist, seg, cal) después de D5 para detectar regresiones de navegación"
+    ]
+  },
+
+  "instrucciones_para_proxima_sesion": {
+    "lectura_obligatoria_en_orden": [
+      "1. Plan_de_accion_v7_0_alpha_bloqueB_completado.json (este documento — handoff de cierre B)",
+      "2. Plan_de_accion_v7_0_alpha_bloqueC_completado.json (cierre C)",
+      "3. Plan_de_accion_v7_0_alpha_bloqueA_completado.json (cierre A — para entender el cascarón visual)",
+      "4. Plan_de_accion_v7_0_fase0_completada.json (solo si necesita contexto histórico de wireframes)",
+      "5. wireframes/02-inicio-dashboard.html (target de D1)",
+      "6. wireframes/01c-mapa-modulos.html (target de D5)"
+    ],
+    "reglas_persistentes": [
+      "No tocar cascarón visual del Bloque A (style#gb-shell-v7 + aside.gb-shell-sidebar)",
+      "El nuevo bloque style#gb-shell-v7-mobile + script de drawer móvil son del Bloque B y SÍ pueden ser ajustados si D8 lo requiere — pero con cuidado, son los que sostienen UX-06",
+      "Snapshot intermedio en _legacy/ antes de cada subfase (formato app-X.v70a-pre/postBLOQUE-D-N.bak)",
+      "Verificación en navegador con datos reales antes de cerrar fase",
+      "Sin feature flags (solo window.__GB_V7_DEBUG y window.__GB_V7_ENFORCE_FSM ya existentes)",
+      "Una tarea a la vez, plan antes de código, pedir confirmación",
+      "Backup Firestore: Backups/gourmet-bites-backup-2026-04-26-ANTES-DE-FIX.json.json"
+    ],
+    "feedback_persistente_de_Luis": [
+      "SIEMPRE entregar mi recomendación explícita en cada pregunta (incluyendo binarias yes/no). Cerrar con 'Mi recomendación: X porque Y'. Esto está guardado en memoria persistente del usuario."
+    ]
+  },
+
+  "estado_general": "Bloque B v7.0-α COMPLETADO en ~1h (estimado 4-6h). UX-06 resuelto: drawer móvil funcional + retiro de mode-bar truncado, sin regresión desktop. 4 snapshots disponibles para rollback. Próximo paso: Bloque D (Dashboard + navegación por proceso de negocio) en sesión nueva."
+}
