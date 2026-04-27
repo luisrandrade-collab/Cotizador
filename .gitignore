@@ -1,0 +1,37 @@
+# ─── DATOS SENSIBLES — NUNCA AL REPO PÚBLICO ─────────────────
+# Backups con datos reales de clientes (PII)
+Backups/
+*.json.json
+gourmet-bites-backup-*.json
+
+# ─── DOCUMENTACIÓN INTERNA — NO AL REPO PÚBLICO ──────────────
+# Roadmap, decisiones de diseño, deuda técnica
+Plan_de_accion_*.json
+Pendientes_*.md
+context_v*.json
+
+# ─── ARCHIVOS DE TRABAJO LOCAL ───────────────────────────────
+# Snapshots pre/post fases
+_legacy/
+*.bak.js
+*.bak.html
+*.bak.css
+
+# Configuración local de Claude Code
+.claude/
+
+# Wireframes y scripts internos
+wireframes/
+scripts/
+check.sh
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*~
