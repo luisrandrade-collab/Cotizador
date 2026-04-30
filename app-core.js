@@ -2288,10 +2288,9 @@ function _docPreviewRender(q,kind,id){
     }
     // Editar si la matriz lo permite
     const editable=(typeof canEdit==="function")?canEdit(q):true;
-    if(editable&&!isPF){
+    if(editable){
       btns.push('<button class="btn dp-btn-edit" onclick="docPreviewEdit()">✏️ Editar</button>');
     }else if(isPF&&st!=="superseded"){
-      // PF firmadas: redirigir a "Nueva versión" (igual que loadQuote ya hace)
       btns.push('<button class="btn dp-btn-edit" onclick="docPreviewEdit()">🔄 Nueva versión</button>');
     }
     // Generar PDF: siempre (si no hay PDF, primero; si hay, regenerar)
