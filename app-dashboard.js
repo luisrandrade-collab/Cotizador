@@ -504,16 +504,19 @@ async function renderDashboard(){
     const t14=new Date();t14.setDate(t14.getDate()+14);
     const t14Iso=t14.toISOString().slice(0,10);
     const upcoming=[];
+    const sinFecha=[];
     quotesCache.forEach(q=>{
       if(q._wrongCollection)return;
       const s=q.status||"enviada";
       if(s==="superseded")return;
       const ok=(q.kind==="quote"&&["pedido","en_produccion"].includes(s))||(q.kind==="proposal"&&["aprobada","en_produccion"].includes(s));
-      if(!ok||!q.eventDate)return;
+      if(!ok)return;
+      if(!q.eventDate){sinFecha.push(q);return}
       if(q.eventDate>=todayIso2&&q.eventDate<=t14Iso)upcoming.push(q);
     });
     upcoming.sort((a,b)=>(a.eventDate+(a.horaEntrega||"")).localeCompare(b.eventDate+(b.horaEntrega||"")));
-    if(!upcoming.length){$("dash-upcoming").innerHTML='<div class="dash-met-empty">No hay entregas en los próximos 14 días.</div>'}
+    const sinFechaHtml=sinFecha.length?'<div class="dash-met-empty" style="background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;border-radius:8px;padding:10px 14px;margin-top:8px;cursor:pointer" onclick="if(typeof switchSection===\'function\')switchSection(\'ventas\')">⚠️ '+sinFecha.length+' pedido'+(sinFecha.length>1?'s':'')+' sin fecha de entrega: '+sinFecha.map(q=>(q.client||q.id)).join(", ")+'</div>':"";
+    if(!upcoming.length){$("dash-upcoming").innerHTML='<div class="dash-met-empty">No hay entregas en los próximos 14 días.</div>'+sinFechaHtml}
     else{
       const byDay={};upcoming.forEach(q=>{(byDay[q.eventDate]=byDay[q.eventDate]||[]).push(q)});
       const dayLabel=iso=>{
@@ -532,7 +535,7 @@ async function renderDashboard(){
           return '<div class="dash-up-item" onclick="openDocument(\''+q.kind+'\',\''+q.id+'\')"><div class="ui-cli">'+tag+(q.client||"—")+'</div><div class="ui-meta">'+hora+' · '+total+'</div></div>';
         }).join("");
         return '<div class="dash-up-day"><div class="dash-up-day-label">'+dayLabel(d)+'</div>'+items+'</div>';
-      }).join("");
+      }).join("")+sinFechaHtml;
     }
   },"upcoming");
   // Pendientes por cobrar (top 8)

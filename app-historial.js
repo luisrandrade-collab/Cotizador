@@ -366,7 +366,7 @@ async function renderHist(){
     const _saldo=saldoPendiente(q);
     const _total=q.total||0;
     const pagadoBadge=(_total>0&&_cobrado>=_total)?'<span class="hc-pagado-ok">💰 Pagado ✓</span>':(q.saldoData?'<span class="hc-saldo-ok">💰 Saldo ✓</span>':'');
-    const prodBadge=q.produced?'<span class="hc-prod-ok">🔪 Producido</span>':'';
+    const prodBadge=q.produced?'<span class="hc-prod-ok">🔪 Producido</span>':(status==="en_produccion"?'<span class="hc-prod-warn" style="background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;border-radius:6px;padding:2px 8px;font-size:0.8em">⚠️ Sin producir</span>':'');
     const comentBadge=q.comentarioCliente?.texto?'<span class="hc-coment-ok">💬 Comentario</span>':'';
     // v5.0.2: badge sync pendiente / sync OK (solo en docs agendables con fecha futura)
     let syncBadge="";
@@ -392,7 +392,7 @@ async function renderHist(){
     // Aparece en propuestas: enviada, propfinal, aprobada, en_produccion, entregado
     // NO aparece: anulada, convertida, superseded
     const _editable=(typeof canEdit==="function")?canEdit(q):false;
-    if(_editable&&!isPF){
+    if(_editable){
       // FIX #1: si status requiere advertencia, usar handler que muestra modal primero
       const _statusLbl=(STATUS_META[q.status||"enviada"]?.label)||"";
       const _needsWarn=(typeof requiresWarning==="function"&&requiresWarning(q));
@@ -414,7 +414,7 @@ async function renderHist(){
         actionBtns.push('<button class="btn hc-btn-reactivar" onclick="openReactivarModal(\''+q.id+'\',\'quote\',event)">♻️ Reactivar</button>');
       }
     }else if(!isProp&&(status==="pedido"||status==="en_produccion")){
-      if(!q.eventDate)actionBtns.push('<button class="btn hc-btn-order" onclick="assignDeliveryDate(\''+q.id+'\',event)">📅 Asignar fecha de entrega</button>');
+      if(!q.eventDate)actionBtns.push('<button class="btn hc-btn-order" onclick="assignDeliveryDate(\''+q.id+'\',\'quote\',event)">📅 Asignar fecha de entrega</button>');
       // E1.1: botón "Iniciar producción" solo si status==='pedido' y no está ya producido.
       if(status==="pedido"&&!q.produced)actionBtns.push('<button class="btn hc-btn-order" style="background:#FFF3E0;color:#E65100;border-color:#FFB74D" onclick="markAsInProduction(\''+q.id+'\',\'quote\',event)">🔥 Iniciar producción</button>');
       // v7.0-α FIX-02b: si NO producido → botón normal "Marcar producido". Si SÍ producido →
@@ -441,6 +441,7 @@ async function renderHist(){
         actionBtns.push('<button class="btn hc-btn-reactivar" onclick="openReactivarModal(\''+q.id+'\',\'proposal\',event)">♻️ Reactivar</button>');
       }
     }else if(isProp&&(status==="aprobada"||status==="en_produccion")){
+      if(!q.eventDate)actionBtns.push('<button class="btn hc-btn-order" onclick="assignDeliveryDate(\''+q.id+'\',\'proposal\',event)">📅 Asignar fecha de entrega</button>');
       // E1.1: botón "Iniciar producción" solo si status==='aprobada' (equivalente a 'pedido' del lado quotes) y no producido.
       if(status==="aprobada"&&!q.produced)actionBtns.push('<button class="btn hc-btn-order" style="background:#FFF3E0;color:#E65100;border-color:#FFB74D" onclick="markAsInProduction(\''+q.id+'\',\'proposal\',event)">🔥 Iniciar producción</button>');
       // v7.0-α FIX-02b: ver explicación arriba (mismo patrón para propuestas)
@@ -742,9 +743,10 @@ async function submitMarkAsOrder(){
 }
 
 // ─── ASIGNAR FECHA DE ENTREGA ──────────────────────────────
-async function assignDeliveryDate(quoteId,ev){
+async function assignDeliveryDate(quoteId,kind,ev){
+  if(typeof kind!=="string"){ev=kind;kind="quote"}
   if(ev){ev.stopPropagation();ev.preventDefault()}
-  const q=quotesCache.find(x=>x.id===quoteId&&x.kind==="quote");
+  const q=quotesCache.find(x=>x.id===quoteId&&x.kind===kind);
   if(!q){if(typeof toast==="function")toast("No se encontró el pedido","error");else alert("No se encontró el pedido");return}
   const hoy=new Date().toISOString().slice(0,10);
   const fecha=prompt("Fecha de entrega (YYYY-MM-DD):",q.eventDate||hoy);
@@ -761,7 +763,8 @@ async function assignDeliveryDate(quoteId,ev){
     if(q.orderData){patch["orderData.fechaEntrega"]=fecha;patch["orderData.horaEntrega"]=hora}
     // v5.0.2: fecha futura → needsSync
     if(fecha>=hoy)patch.needsSync=true;
-    await updateDoc(doc(db,"quotes",quoteId),patch);
+    const coll=kind==="quote"?"quotes":(quoteId.startsWith("GB-PF-")?"propfinals":"proposals");
+    await updateDoc(doc(db,coll,quoteId),patch);
     q.eventDate=fecha;q.horaEntrega=hora;
     if(q.orderData){q.orderData.fechaEntrega=fecha;q.orderData.horaEntrega=hora}
     if(patch.needsSync)q.needsSync=true;
@@ -1179,8 +1182,11 @@ async function markAsInProduction(docId,kind,ev){
     showLoader("Iniciando producción...");
     const {db,doc,updateDoc,serverTimestamp}=window.fb;
     const coll=kind==="quote"?"quotes":(docId.startsWith("GB-PF-")?"propfinals":"proposals");
-    await updateDoc(doc(db,coll,docId),{status:"en_produccion",updatedAt:serverTimestamp()});
+    const patch={status:"en_produccion",updatedAt:serverTimestamp()};
+    if(q.produced===undefined||q.produced===null)patch.produced=false;
+    await updateDoc(doc(db,coll,docId),patch);
     q.status="en_produccion";
+    if(patch.produced===false)q.produced=false;
     hideLoader();renderHist();
     if(curMode==="dash"&&typeof renderDashboard==="function")renderDashboard();
     if(typeof toast==="function")toast("🔥 Producción iniciada","success",3000);
